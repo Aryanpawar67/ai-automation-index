@@ -17,17 +17,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span style={{ color: "#D0C8D8" }}>|</span>
           <div className="flex items-center gap-1">
             <Link href="/admin"
-              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-              style={{ color: "#553366" }}
-              onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.background = "#F4EFF6")}
-              onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.background = "transparent")}>
+              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors hover:bg-[#F4EFF6]"
+              style={{ color: "#553366" }}>
               Upload
             </Link>
             <Link href="/admin/batches"
-              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-              style={{ color: "#553366" }}
-              onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.background = "#F4EFF6")}
-              onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.background = "transparent")}>
+              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors hover:bg-[#F4EFF6]"
+              style={{ color: "#553366" }}>
               Batches
             </Link>
           </div>

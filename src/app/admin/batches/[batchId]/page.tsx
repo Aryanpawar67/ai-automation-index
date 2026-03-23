@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link               from "next/link";
 import BatchProgressTable from "@/components/admin/BatchProgressTable";
 import { db }             from "@/lib/db/client";

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link       from "next/link";
 import { db }     from "@/lib/db/client";
 import { batches } from "@/lib/db/schema";
@@ -45,10 +47,8 @@ export default async function BatchesPage() {
             <tbody>
               {rows.map((b, i) => (
                 <tr key={b.id}
-                  className="transition-colors"
-                  style={{ borderBottom: i < rows.length - 1 ? "1px solid #F4EFF6" : "none" }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLTableRowElement>) => (e.currentTarget.style.background = "#FAFAFA")}
-                  onMouseLeave={(e: React.MouseEvent<HTMLTableRowElement>) => (e.currentTarget.style.background = "transparent")}>
+                  className="transition-colors hover:bg-[#FAFAFA]"
+                  style={{ borderBottom: i < rows.length - 1 ? "1px solid #F4EFF6" : "none" }}>
                   <td className="px-5 py-3.5">
                     <Link href={`/admin/batches/${b.id}`}
                       className="font-medium hover:underline underline-offset-2 truncate max-w-[200px] block"

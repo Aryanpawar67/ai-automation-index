@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link         from "next/link";
 import ExcelUploader from "@/components/admin/ExcelUploader";
 import { db }        from "@/lib/db/client";
