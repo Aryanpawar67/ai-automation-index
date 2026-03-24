@@ -3,6 +3,7 @@ import { db }                              from "@/lib/db/client";
 import { jobDescriptions, analyses, companies, batches } from "@/lib/db/schema";
 import { generateReportToken }             from "@/lib/token";
 import { createAnalysisGraph }             from "@/app/api/analyze/graph";
+import { isValidJD }                       from "@/lib/validation";
 import { eq, sql }                         from "drizzle-orm";
 import type { FinalAnalysis }              from "@/app/api/analyze/agents/types";
 
@@ -25,9 +26,21 @@ export const analyzeJDFn = inngest.createFunction(
         .where(eq(jobDescriptions.id, jobDescriptionId));
       if (!jd) throw new Error("JD not found");
 
+      // Validation gate — catches old bad JDs or any that slipped through scraping
+      if (jd.status === "invalid" || !isValidJD(jd.title, jd.rawText)) {
+        await db.update(jobDescriptions)
+          .set({ status: "invalid" })
+          .where(eq(jobDescriptions.id, jobDescriptionId));
+        return { status: "skipped", reason: "did not pass JD validation" };
+      }
+
+      const [companyRow] = await db.select({ name: companies.name })
+        .from(companies)
+        .where(eq(companies.id, jd.companyId));
+
       const graph       = createAnalysisGraph();
       const graphStream = await graph.stream(
-        { jobDescription: jd.rawText, company: "" },
+        { jobDescription: jd.rawText, company: companyRow?.name ?? "" },
         { streamMode: "updates" }
       );
 
@@ -50,8 +63,15 @@ export const analyzeJDFn = inngest.createFunction(
         hoursSaved:   String(finalResult.estimatedHoursSavedPerWeek),
       });
 
+      // Sync the LangGraph-extracted job title back to the JD row so the
+      // report card always shows the clean, LLM-parsed title.
+      const cleanTitle = finalResult.jobTitle?.trim();
       await db.update(jobDescriptions)
-        .set({ status: "complete", error: null })
+        .set({
+          status: "complete",
+          error:  null,
+          ...(cleanTitle && cleanTitle.length > 3 ? { title: cleanTitle } : {}),
+        })
         .where(eq(jobDescriptions.id, jobDescriptionId));
 
       // Increment batch processed counter
