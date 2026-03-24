@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db }                        from "@/lib/db/client";
-import { batches, companies, datasetRows } from "@/lib/db/schema";
+import { batches, companies, datasetRows, pocs } from "@/lib/db/schema";
 import { inngest }                   from "@/inngest/client";
 import { inArray, eq }               from "drizzle-orm";
 
@@ -58,6 +58,16 @@ export async function POST(req: NextRequest) {
       }).returning();
       companyId = newCo.id;
     }
+
+    // Insert a stub poc so batch-progress SSE can find this company via batchId
+    await db.insert(pocs).values({
+      batchId:   batch.id,
+      companyId,
+      firstName: row.companyName,
+      lastName:  "",
+      email:     "",
+      country:   null,
+    });
 
     scrapeEvents.push({ name: "company/scrape", data: { companyId, batchId: batch.id } });
   }
