@@ -9,6 +9,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD, ScoredTask, ROIData, Opportunity } from "./types";
+import { lookupTools } from "./utils";
 
 const model = new ChatAnthropic({
   model: "claude-sonnet-4-6",
@@ -34,7 +35,7 @@ Hours reclaimed target: ${roiData.hoursReclaimed}h/week
 
 Scored tasks (with available tools):
 ${scoredTasks.map(t => {
-  const tools = toolsMapping[t.name] ?? [];
+  const tools = lookupTools(t.name, toolsMapping);
   return `- ${t.name} | Score: ${t.automationScore} | ${t.automationPotential} potential | Tools: ${tools.join(", ") || t.aiOpportunity}`;
 }).join("\n")}
 

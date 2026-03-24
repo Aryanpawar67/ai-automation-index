@@ -10,6 +10,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD, ScoredTask, Opportunity, ROIData, RoadmapPhase } from "./types";
+import { lookupTools } from "./utils";
 
 const model = new ChatAnthropic({
   model: "claude-sonnet-4-6",
@@ -37,7 +38,7 @@ Target outcome: ${roiData.hoursReclaimed}h/week reclaimed — ${roiData.focusShi
 Available tools (from research):
 ${scoredTasks
   .filter(t => t.automationScore >= 40)
-  .map(t => `- ${t.name}: ${(toolsMapping[t.name] ?? [t.aiOpportunity]).join(", ")}`)
+  .map(t => { const tools = lookupTools(t.name, toolsMapping); return `- ${t.name}: ${(tools.length > 0 ? tools : [t.aiOpportunity]).join(", ")}`; })
   .join("\n")}
 
 Top opportunities to sequence:
