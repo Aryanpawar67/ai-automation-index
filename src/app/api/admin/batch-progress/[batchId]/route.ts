@@ -21,16 +21,25 @@ export async function GET(
 
       while (active && Date.now() < deadline) {
         try {
-          // All companies in this batch (via pocs join)
-          const pocRows = await db.select({
-            companyId: pocs.companyId,
-          }).from(pocs).where(eq(pocs.batchId, batchId));
+          // Collect company IDs from pocs (new batches) + jobDescriptions (old batches / fallback)
+          const [pocRows, jdRows] = await Promise.all([
+            db.select({ companyId: pocs.companyId }).from(pocs).where(eq(pocs.batchId, batchId)),
+            db.select().from(jobDescriptions).where(eq(jobDescriptions.batchId, batchId)),
+          ]);
 
-          const batchCompanyIds = [...new Set(pocRows.map(p => p.companyId))];
+          const batchCompanyIds = [
+            ...new Set([
+              ...pocRows.map(p => p.companyId),
+              ...jdRows.map(j => j.companyId),
+            ]),
+          ];
 
-          // JDs for this batch
-          const jdRows = await db.select().from(jobDescriptions)
-            .where(eq(jobDescriptions.batchId, batchId));
+          // Nothing found yet — keep waiting
+          if (batchCompanyIds.length === 0) {
+            send({ type: "progress", rows: [] });
+            await new Promise(r => setTimeout(r, 2500));
+            continue;
+          }
 
           // Aggregate JDs per company
           const byCompany: Record<string, {
@@ -40,8 +49,6 @@ export async function GET(
             byCompany[id] = { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 };
           }
           for (const jd of jdRows) {
-            if (!byCompany[jd.companyId])
-              byCompany[jd.companyId] = { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 };
             byCompany[jd.companyId].total++;
             if (jd.status === "complete")  byCompany[jd.companyId].complete++;
             if (jd.status === "failed")    byCompany[jd.companyId].failed++;
@@ -49,31 +56,28 @@ export async function GET(
             if (jd.status === "invalid")   byCompany[jd.companyId].invalid++;
           }
 
-          const companyRows = batchCompanyIds.length > 0
-            ? await db.select({
-                id:           companies.id,
-                name:         companies.name,
-                scrapeStatus: companies.scrapeStatus,
-                scrapeError:  companies.scrapeError,
-                reportToken:  companies.reportToken,
-              }).from(companies).where(inArray(companies.id, batchCompanyIds))
-            : [];
+          const companyRows = await db.select({
+            id:           companies.id,
+            name:         companies.name,
+            scrapeStatus: companies.scrapeStatus,
+            scrapeError:  companies.scrapeError,
+            reportToken:  companies.reportToken,
+          }).from(companies).where(inArray(companies.id, batchCompanyIds));
 
-          const payload = companyRows
-            .map(c => ({
-              companyId:    c.id,
-              companyName:  c.name,
-              scrapeStatus: c.scrapeStatus,
-              scrapeError:  c.scrapeError,
-              reportToken:  c.reportToken,
-              jds:          byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 },
-            }));
+          const payload = companyRows.map(c => ({
+            companyId:    c.id,
+            companyName:  c.name,
+            scrapeStatus: c.scrapeStatus,
+            scrapeError:  c.scrapeError,
+            reportToken:  c.reportToken,
+            jds:          byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 },
+          }));
 
           send({ type: "progress", rows: payload });
 
-          // Settled when all companies have finished scraping and all JDs are terminal
-          const allScrapesDone = companyRows
-            .every(c => ["complete", "failed", "blocked"].includes(c.scrapeStatus));
+          // Only mark complete when we have all companies AND everything is settled
+          const allScrapesDone = companyRows.length === batchCompanyIds.length &&
+            companyRows.every(c => ["complete", "failed", "blocked"].includes(c.scrapeStatus));
           const allJdsDone = jdRows.length > 0 &&
             jdRows.every(j => ["complete", "failed", "invalid"].includes(j.status));
           if (allScrapesDone && (jdRows.length === 0 || allJdsDone)) {
