@@ -9,7 +9,7 @@ interface CompanyRow {
   scrapeStatus: string;
   scrapeError:  string | null;
   reportToken:  string | null;
-  jds: { total: number; complete: number; failed: number; analyzing: number };
+  jds: { total: number; complete: number; failed: number; analyzing: number; invalid: number };
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -94,12 +94,20 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
             </thead>
             <tbody>
               {rows.map(r => {
-                const jds      = r.jds ?? { total: 0, complete: 0, failed: 0, analyzing: 0 };
-                const rowPct   = jds.total ? Math.round((jds.complete / jds.total) * 100) : 0;
+                const jds    = r.jds ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 };
+                const validTotal = jds.total - (jds.invalid ?? 0);
+                const rowPct = validTotal ? Math.round((jds.complete / validTotal) * 100) : 0;
                 return (
                   <tr key={r.companyId} style={{ borderBottom: "1px solid #F4EFF6" }}>
-                    <td className="py-3 pr-4 font-medium" style={{ color: "#220133" }}>
-                      {r.companyName}
+                    <td className="py-3 pr-4">
+                      <p className="font-medium text-sm" style={{ color: "#220133" }}>{r.companyName}</p>
+                      <a
+                        href={`/admin/batches/${batchId}/companies/${r.companyId}`}
+                        className="text-xs hover:underline underline-offset-2"
+                        style={{ color: "#9988AA" }}
+                      >
+                        View JDs →
+                      </a>
                     </td>
                     <td className="py-3 pr-4">
                       <span className={`badge ${STATUS_BADGE[r.scrapeStatus] ?? "badge-medium"}`}>
@@ -114,7 +122,10 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
                     </td>
                     <td className="py-3 pr-4 text-xs" style={{ color: "#553366" }}>
                       <span className="text-emerald-600 font-medium">{jds.complete}</span>
-                      <span style={{ color: "#D0C8D8" }}> / {jds.total}</span>
+                      <span style={{ color: "#D0C8D8" }}> / {validTotal}</span>
+                      {jds.invalid > 0 && (
+                        <span className="ml-2 text-red-400">{jds.invalid} invalid</span>
+                      )}
                       {jds.failed > 0 && (
                         <span className="ml-2 text-red-500">{jds.failed} failed</span>
                       )}

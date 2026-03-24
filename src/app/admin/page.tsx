@@ -20,14 +20,36 @@ export default async function AdminHome() {
   return (
     <div className="max-w-3xl space-y-8">
 
-      <div>
-        <h1 className="text-2xl font-bold mb-1" style={{ color: "#220133" }}>Upload POC Excel</h1>
-        <p className="text-sm mb-6" style={{ color: "#9988AA" }}>
-          Upload your weekly POC file. Companies are queued for scraping immediately —
-          the daily cron processes up to 100 per day at 6 AM UTC.
-        </p>
-        <ExcelUploader />
-      </div>
+      {/* Primary CTA — Dataset Manager */}
+      <Link href="/admin/dataset"
+        className="card card-hover p-6 block mb-6"
+        style={{ borderColor: "#FD5A0F22", background: "linear-gradient(135deg, #FFF8F5 0%, #fff 100%)" }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="badge badge-medium">Recommended</span>
+            </div>
+            <h2 className="text-lg font-bold mb-1" style={{ color: "#220133" }}>Prospect Dataset Manager</h2>
+            <p className="text-sm" style={{ color: "#9988AA" }}>
+              Upload your Excel, filter by ATS / HQ / size, select companies and create named batches.
+            </p>
+          </div>
+          <span className="text-2xl ml-6" style={{ color: "#FD5A0F" }}>→</span>
+        </div>
+      </Link>
+
+      {/* Secondary — Quick upload */}
+      <details className="mb-8">
+        <summary className="text-sm font-medium cursor-pointer select-none" style={{ color: "#9988AA" }}>
+          Quick upload (process immediately, no filtering)
+        </summary>
+        <div className="mt-4">
+          <p className="text-xs mb-4" style={{ color: "#9988AA" }}>
+            Upload a POC Excel — all companies are queued for scraping immediately.
+          </p>
+          <ExcelUploader />
+        </div>
+      </details>
 
       {recent.length > 0 && (
         <div>
