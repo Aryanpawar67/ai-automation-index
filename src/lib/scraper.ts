@@ -1,5 +1,8 @@
 import * as cheerio from "cheerio";
-import { stripHtml }  from "./stripHtml";
+import { stripHtml }              from "./stripHtml";
+import { scrapeWorkday }          from "./scrapers/workday";
+import { scrapeOracleHCM, scrapeOracleTaleo } from "./scrapers/oracleHcm";
+import { scrapeSAPSuccessFactors } from "./scrapers/sapSuccessFactors";
 
 export interface ScrapedJD {
   title:      string;
@@ -221,9 +224,9 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
-export async function scrapeCareerPage(url: string): Promise<ScrapeResult> {
+export async function scrapeCareerPage(url: string, atsType?: string | null): Promise<ScrapeResult> {
   try {
-    // Tier 1 — known ATS APIs (direct Greenhouse/Lever or custom-domain companies)
+    // Tier 1a — known ATS APIs (direct Greenhouse/Lever or custom-domain companies)
     const detected = detectATS(url);
     if (detected?.ats === "greenhouse") {
       const jds = await scrapeGreenhouse(url, detected.boardSlug);
@@ -231,6 +234,24 @@ export async function scrapeCareerPage(url: string): Promise<ScrapeResult> {
     }
     if (detected?.ats === "lever") {
       const jds = await scrapeLever(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+
+    // Tier 1b — enterprise HCM platforms (atsType from companies table takes priority over URL detection)
+    if (atsType === "workday" || /\.wd\d+\.myworkdayjobs\.com/i.test(url)) {
+      const jds = await scrapeWorkday(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+    if (atsType === "oracle_hcm" || /\.fa\.[a-z0-9]+\.oraclecloud\.com/i.test(url)) {
+      const jds = await scrapeOracleHCM(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+    if (atsType === "oracle_taleo" || /taleo\.net/i.test(url)) {
+      const jds = await scrapeOracleTaleo(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+    if (atsType === "sap_sf" || /\.jobs2web\.com|successfactors\.com/i.test(url)) {
+      const jds = await scrapeSAPSuccessFactors(url);
       if (jds.length > 0) return { success: true, jds };
     }
 
