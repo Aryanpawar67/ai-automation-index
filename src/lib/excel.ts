@@ -7,7 +7,18 @@ export interface POCRow {
   country:       string;
   companyName:   string;
   careerPageUrl: string;
+  atsType:       string | null;
 }
+
+const HCM_MAP: Record<string, string> = {
+  "workday":               "workday",
+  "oracle hcm":            "oracle_hcm",
+  "oracle hcm cloud":      "oracle_hcm",
+  "oracle taleo":          "oracle_taleo",
+  "taleo":                 "oracle_taleo",
+  "sap successfactors":    "sap_sf",
+  "successfactors":        "sap_sf",
+};
 
 const REQUIRED = ["first_name", "last_name", "email", "company_name", "career_page_url"];
 
@@ -35,12 +46,16 @@ export function parseExcel(buffer: Buffer): POCRow[] {
 
   return normalised
     .filter(r => r.email && r.company_name && r.career_page_url)
-    .map(r => ({
-      firstName:     r.first_name     ?? "",
-      lastName:      r.last_name      ?? "",
-      email:         r.email,
-      country:       r.country        ?? "",
-      companyName:   r.company_name,
-      careerPageUrl: r.career_page_url,
-    }));
+    .map(r => {
+      const rawHcm = (r["hcm_/_hris_/_ats"] ?? r["hcm/hris/ats"] ?? r["ats"] ?? "").toLowerCase().trim();
+      return {
+        firstName:     r.first_name     ?? "",
+        lastName:      r.last_name      ?? "",
+        email:         r.email,
+        country:       r.country        ?? "",
+        companyName:   r.company_name,
+        careerPageUrl: r.career_page_url,
+        atsType:       HCM_MAP[rawHcm] ?? null,
+      };
+    });
 }

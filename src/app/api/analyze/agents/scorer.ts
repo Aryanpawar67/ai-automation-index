@@ -49,7 +49,7 @@ Consider: does AI exist TODAY for this specific task in this context? What human
 Return:
 {
   "automationScore": <integer 0-100 per calibration scale>,
-  "automationPotential": <"high" if score>=70, "medium" if 40-69, "low" if <40>,
+  "automationPotential": <"high" if score>=65, "medium" if 40-64, "low" if <40>,
   "scoringRationale": "2-3 sentences explaining why this score. Reference specific AI tools if they exist. Mention what aspect still requires human involvement.",
   "aiOpportunity": "one sentence: name a specific production-ready AI tool and describe exactly how it automates this task (e.g. 'Use ChatGPT to draft email responses from bullet points, cutting composition time by 70%')"
 }`;
@@ -69,7 +69,7 @@ export async function runScorerAgent(task: RawTask, context: ParsedJD): Promise<
 
   // Enforce threshold consistency
   const potential =
-    scored.automationScore >= 70 ? "high" :
+    scored.automationScore >= 65 ? "high" :
     scored.automationScore >= 40 ? "medium" : "low";
 
   return {

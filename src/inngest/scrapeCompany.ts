@@ -2,7 +2,8 @@ import { inngest }            from "./client";
 import { db }                 from "@/lib/db/client";
 import { companies, jobDescriptions } from "@/lib/db/schema";
 import { scrapeCareerPage }   from "@/lib/scraper";
-import { eq }                 from "drizzle-orm";
+import { isValidJD }          from "@/lib/validation";
+import { eq, and }            from "drizzle-orm";
 
 export const scrapeCompanyFn = inngest.createFunction(
   {
@@ -20,7 +21,7 @@ export const scrapeCompanyFn = inngest.createFunction(
     const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
     if (!company) throw new Error(`Company ${companyId} not found`);
 
-    const result = await scrapeCareerPage(company.careerPageUrl);
+    const result = await scrapeCareerPage(company.careerPageUrl, company.atsType ?? undefined);
 
     if (!result.success) {
       await db.update(companies).set({
@@ -30,7 +31,8 @@ export const scrapeCompanyFn = inngest.createFunction(
       return { status: "failed", reason: result.error };
     }
 
-    // Persist scraped JDs
+    // Persist ALL scraped JDs — valid ones as 'pending', invalid as 'invalid'
+    // Both are stored so admins can inspect what was collected
     if (result.jds.length > 0) {
       await db.insert(jobDescriptions).values(
         result.jds.map(jd => ({
@@ -40,7 +42,7 @@ export const scrapeCompanyFn = inngest.createFunction(
           rawText:    jd.rawText,
           sourceUrl:  jd.sourceUrl ?? null,
           department: jd.department ?? null,
-          status:     "pending" as const,
+          status:     isValidJD(jd.title, jd.rawText) ? ("pending" as const) : ("invalid" as const),
         }))
       );
     }
@@ -50,20 +52,26 @@ export const scrapeCompanyFn = inngest.createFunction(
       scrapedAt:    new Date(),
     }).where(eq(companies.id, companyId));
 
-    // Fan out — one analyzeJD event per JD
-    const jds = await db.select()
+    // Fan out — only send valid (pending) JDs to LangGraph analysis
+    const validJds = await db.select()
       .from(jobDescriptions)
-      .where(eq(jobDescriptions.companyId, companyId));
+      .where(and(
+        eq(jobDescriptions.companyId, companyId),
+        eq(jobDescriptions.status, "pending"),
+      ));
 
-    if (jds.length > 0) {
+    if (validJds.length > 0) {
       await inngest.send(
-        jds.map(jd => ({
+        validJds.map(jd => ({
           name: "jd/analyze" as const,
           data: { jobDescriptionId: jd.id, batchId },
         }))
       );
     }
 
-    return { status: "complete", jdCount: jds.length };
+    const totalJds = result.jds.length;
+    const validCount = validJds.length;
+    const invalidCount = totalJds - validCount;
+    return { status: "complete", jdCount: validCount, invalidCount };
   }
 );

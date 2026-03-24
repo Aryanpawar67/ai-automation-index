@@ -1,4 +1,8 @@
 import * as cheerio from "cheerio";
+import { stripHtml }              from "./stripHtml";
+import { scrapeWorkday }          from "./scrapers/workday";
+import { scrapeOracleHCM, scrapeOracleTaleo } from "./scrapers/oracleHcm";
+import { scrapeSAPSuccessFactors } from "./scrapers/sapSuccessFactors";
 
 export interface ScrapedJD {
   title:      string;
@@ -13,27 +17,59 @@ export type ScrapeResult =
 
 // ── Tier 1: Known ATS public APIs ─────────────────────────────────────────────
 
-function detectATS(url: string): string | null {
-  if (/greenhouse\.io/i.test(url))  return "greenhouse";
-  if (/lever\.co/i.test(url))       return "lever";
-  if (/teamtailor\.com/i.test(url)) return "teamtailor";
-  if (/workable\.com/i.test(url))   return "workable";
+// Map of companies that use Greenhouse behind a custom domain (no greenhouse.io in URL).
+// Key: regex to match the career page URL. Value: Greenhouse board slug.
+const CUSTOM_GREENHOUSE_BOARDS: Array<[RegExp, string]> = [
+  [/stripe\.com\/jobs/i, "stripe"],
+];
+
+function detectATS(url: string): { ats: string; boardSlug?: string } | null {
+  if (/greenhouse\.io/i.test(url))  return { ats: "greenhouse" };
+  if (/lever\.co/i.test(url))       return { ats: "lever" };
+  if (/teamtailor\.com/i.test(url)) return { ats: "teamtailor" };
+  if (/workable\.com/i.test(url))   return { ats: "workable" };
+
+  for (const [re, slug] of CUSTOM_GREENHOUSE_BOARDS) {
+    if (re.test(url)) return { ats: "greenhouse", boardSlug: slug };
+  }
   return null;
 }
 
-async function scrapeGreenhouse(url: string): Promise<ScrapedJD[]> {
-  const match = url.match(/greenhouse\.io\/([^/?#]+)/i);
-  if (!match) return [];
-  const board = match[1];
-  const res   = await fetch(
-    `https://boards-api.greenhouse.io/v1/boards/${board}/jobs?content=true`,
+// Sites known to be JS-rendered SPAs — skip Tier 2, route straight to Tier 3
+// Note: stripe.com/jobs excluded — individual listing pages are server-side rendered
+const SPA_JOB_SITES = [
+  /amazon\.jobs/i,
+  /careers\.google\.com/i,
+  /jobs\.netflix\.com/i,
+  /meta\.com\/careers/i,
+  /careers\.microsoft\.com/i,
+  /workday\.com/i,
+  /smartrecruiters\.com/i,
+  /icims\.com/i,
+  /taleo\.net/i,
+  /successfactors/i,
+];
+
+function isSPAJobSite(url: string): boolean {
+  return SPA_JOB_SITES.some(re => re.test(url));
+}
+
+// Non-job marketing content paths — exclude these even if they contain job keywords
+const NON_JOB_PATH =
+  /\/(about|leadership|blog|news|press|investors?|team|culture|life|values|benefits|faq|login|signup|register|privacy|terms|contact|sitemap|resources|guides|docs|support|help|diversity|inclusion)\b/i;
+
+async function scrapeGreenhouse(url: string, boardSlug?: string): Promise<ScrapedJD[]> {
+  const slug = boardSlug ?? url.match(/greenhouse\.io\/([^/?#]+)/i)?.[1];
+  if (!slug) return [];
+  const res = await fetch(
+    `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`,
     { signal: AbortSignal.timeout(10_000) }
   );
   if (!res.ok) return [];
   const data = await res.json() as { jobs?: Array<{ title: string; content: string; absolute_url: string; departments?: Array<{ name: string }> }> };
   return (data.jobs ?? []).slice(0, 10).map(j => ({
     title:      j.title,
-    rawText:    j.content ?? j.title,
+    rawText:    stripHtml(j.content ?? j.title),
     sourceUrl:  j.absolute_url,
     department: j.departments?.[0]?.name,
   }));
@@ -51,13 +87,45 @@ async function scrapeLever(url: string): Promise<ScrapedJD[]> {
   const data = await res.json() as Array<{ text: string; descriptionPlain: string; hostedUrl: string; categories?: { team?: string } }>;
   return (Array.isArray(data) ? data : []).slice(0, 10).map(j => ({
     title:      j.text,
-    rawText:    j.descriptionPlain ?? j.text,
+    rawText:    stripHtml(j.descriptionPlain ?? j.text),
     sourceUrl:  j.hostedUrl,
     department: j.categories?.team,
   }));
 }
 
 // ── Tier 2: Static HTML scraping with cheerio ─────────────────────────────────
+
+// Returns true if the page body looks like an actual job description
+function looksLikeJobContent(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hits = [
+    /\bresponsibilit/,
+    /\brequirement/,
+    /\bqualification/,
+    /\bwe (are|re) (looking|hiring|seeking)/,
+    /\byou (will|ll|should|must)/,
+    /\bexperience (with|in)/,
+    /\bskills?\b/,
+    /\bbenefits?\b/,
+    /\bsalary\b/,
+    /\bcompensation\b/,
+    /\bapply\b/,
+  ].filter(re => re.test(lower)).length;
+  return hits >= 2;
+}
+
+// Extract the best available title from a JD page
+function extractTitle($jd: ReturnType<typeof cheerio.load>): string {
+  // Try specific job-title selectors first
+  const candidates = [
+    $jd("[class*='job-title'],[class*='jobtitle'],[class*='position-title'],[class*='role-title']").first().text().trim(),
+    $jd("h1").first().text().trim(),
+    $jd("h2").first().text().trim(),
+    // <title> tag minus site-name suffix (e.g. "Software Engineer | Stripe")
+    $jd("title").text().replace(/\s*[|\-–—].*$/, "").trim(),
+  ];
+  return candidates.find(t => t.length > 3 && t.length < 120) ?? "Untitled Position";
+}
 
 async function scrapeStatic(url: string): Promise<ScrapedJD[]> {
   const res = await fetch(url, {
@@ -69,18 +137,36 @@ async function scrapeStatic(url: string): Promise<ScrapedJD[]> {
   const html = await res.text();
   const $    = cheerio.load(html);
 
-  // Collect job-like links
+  // Minimum path depth for a link to be considered an individual job listing.
+  // Must be strictly deeper than the source career page URL — this filters out
+  // locale-prefixed hub pages like /in/jobs, /au/jobs that appear in nav/footer
+  // of sites like stripe.com/jobs/search (depth=2 → require depth≥3).
+  const sourceDepth = new URL(url).pathname.split("/").filter(Boolean).length;
+  const minLinkDepth = Math.max(2, sourceDepth + 1);
+
+  // Collect job-like links — exclude marketing paths and shallow hub pages
   const seen     = new Set<string>();
   const jobLinks: string[] = [];
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href") ?? "";
     const text = $(el).text().toLowerCase();
     if (/job|career|position|opening|vacancy|role/.test(href + text)) {
+      if (NON_JOB_PATH.test(href)) return;
       try {
         const absolute = href.startsWith("http") ? href : new URL(href, url).href;
+        // Skip shallow hub/category pages (localized variants, section indexes)
+        const linkDepth = new URL(absolute).pathname.split("/").filter(Boolean).length;
+        if (linkDepth < minLinkDepth) return;
         if (!seen.has(absolute)) { seen.add(absolute); jobLinks.push(absolute); }
       } catch { /* invalid url, skip */ }
     }
+  });
+
+  // Sort deeper/more-specific paths first so the best candidates fill the 10 slots
+  jobLinks.sort((a, b) => {
+    const da = new URL(a).pathname.split("/").filter(Boolean).length;
+    const db = new URL(b).pathname.split("/").filter(Boolean).length;
+    return db - da;
   });
 
   const jds: ScrapedJD[] = [];
@@ -95,8 +181,11 @@ async function scrapeStatic(url: string): Promise<ScrapedJD[]> {
       const $jd    = cheerio.load(jdHtml);
       $jd("script,style,nav,footer,header").remove();
       const rawText = $jd("body").text().replace(/\s{3,}/g, "\n").trim().slice(0, 8000);
-      const title   = $jd("h1").first().text().trim() || "Untitled Position";
-      if (rawText.length > 200) jds.push({ title, rawText, sourceUrl: link });
+      const title   = extractTitle($jd);
+      // Require min length AND content that looks like an actual job description
+      if (rawText.length > 300 && looksLikeJobContent(rawText)) {
+        jds.push({ title, rawText, sourceUrl: link });
+      }
     } catch { /* skip failed individual JD */ }
   }
   return jds;
@@ -135,22 +224,42 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
-export async function scrapeCareerPage(url: string): Promise<ScrapeResult> {
+export async function scrapeCareerPage(url: string, atsType?: string | null): Promise<ScrapeResult> {
   try {
-    // Tier 1 — known ATS APIs
-    const ats = detectATS(url);
-    if (ats === "greenhouse") {
-      const jds = await scrapeGreenhouse(url);
+    // Tier 1a — known ATS APIs (direct Greenhouse/Lever or custom-domain companies)
+    const detected = detectATS(url);
+    if (detected?.ats === "greenhouse") {
+      const jds = await scrapeGreenhouse(url, detected.boardSlug);
       if (jds.length > 0) return { success: true, jds };
     }
-    if (ats === "lever") {
+    if (detected?.ats === "lever") {
       const jds = await scrapeLever(url);
       if (jds.length > 0) return { success: true, jds };
     }
 
-    // Tier 2 — static HTML
-    const staticJds = await scrapeStatic(url);
-    if (staticJds.length > 0) return { success: true, jds: staticJds };
+    // Tier 1b — enterprise HCM platforms (atsType from companies table takes priority over URL detection)
+    if (atsType === "workday" || /\.wd\d+\.myworkdayjobs\.com/i.test(url)) {
+      const jds = await scrapeWorkday(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+    if (atsType === "oracle_hcm" || /\.fa\.[a-z0-9]+\.oraclecloud\.com/i.test(url)) {
+      const jds = await scrapeOracleHCM(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+    if (atsType === "oracle_taleo" || /taleo\.net/i.test(url)) {
+      const jds = await scrapeOracleTaleo(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+    if (atsType === "sap_sf" || /\.jobs2web\.com|successfactors\.com/i.test(url)) {
+      const jds = await scrapeSAPSuccessFactors(url);
+      if (jds.length > 0) return { success: true, jds };
+    }
+
+    // Tier 2 — static HTML (skip for known JS-rendered SPAs)
+    if (!isSPAJobSite(url)) {
+      const staticJds = await scrapeStatic(url);
+      if (staticJds.length > 0) return { success: true, jds: staticJds };
+    }
 
     // Tier 3 — Firecrawl for JS-rendered pages
     const firecrawlJds = await scrapeFirecrawl(url);

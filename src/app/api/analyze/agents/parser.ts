@@ -10,7 +10,7 @@ import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD } from "./types";
 
 const model = new ChatAnthropic({
-  model: "claude-haiku-4-5-20251001",
+  model: "claude-sonnet-4-6",
   temperature: 0,
 });
 
@@ -28,7 +28,7 @@ ${jd}
 Return this exact JSON structure:
 {
   "jobTitle": "exact title from JD or best inference",
-  "department": "one of: Marketing, Engineering, Sales, HR, Finance, Operations, Legal, Product, Customer Success, Data, Design",
+  "department": "one of: Marketing, Engineering, Sales, HR, Finance, Operations, Legal, Product, Customer Success, Data, Design, Security, Infrastructure, Business Development, Partnerships, Strategy, Research, Analytics, Revenue, Growth, Recruiting, Procurement",
   "seniority": "one of: junior, mid, senior, lead, executive",
   "responsibilities": ["list every distinct responsibility as a short phrase"],
   "requiredSkills": ["every named skill, tool, or technology explicitly mentioned"],
