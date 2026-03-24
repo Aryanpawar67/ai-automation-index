@@ -48,15 +48,21 @@ export async function POST(req: NextRequest) {
     let companyId: string;
     if (existing.length > 0) {
       companyId = existing[0].id;
-      // Reset scrape status so it gets re-scraped in this batch
+      // Reset scrape status so it gets re-scraped in this batch;
+      // also update atsType if the new upload has a value for it
       await db.update(companies)
-        .set({ scrapeStatus: "pending", scrapeError: null })
+        .set({
+          scrapeStatus: "pending",
+          scrapeError:  null,
+          ...(row.atsType ? { atsType: row.atsType } : {}),
+        })
         .where(eq(companies.id, companyId));
     } else {
       const [newCo] = await db.insert(companies).values({
         name:          row.companyName,
         careerPageUrl: row.careerPageUrl,
         scrapeStatus:  "pending",
+        atsType:       row.atsType,
       }).returning();
       companyId = newCo.id;
     }
