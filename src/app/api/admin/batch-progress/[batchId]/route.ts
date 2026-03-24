@@ -26,15 +26,16 @@ export async function GET(
 
           // Aggregate per company
           const byCompany: Record<string, {
-            total: number; complete: number; failed: number; analyzing: number;
+            total: number; complete: number; failed: number; analyzing: number; invalid: number;
           }> = {};
           for (const jd of jdRows) {
             if (!byCompany[jd.companyId])
-              byCompany[jd.companyId] = { total: 0, complete: 0, failed: 0, analyzing: 0 };
+              byCompany[jd.companyId] = { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 };
             byCompany[jd.companyId].total++;
             if (jd.status === "complete")  byCompany[jd.companyId].complete++;
             if (jd.status === "failed")    byCompany[jd.companyId].failed++;
             if (jd.status === "analyzing") byCompany[jd.companyId].analyzing++;
+            if (jd.status === "invalid")   byCompany[jd.companyId].invalid++;
           }
 
           const companyIds = Object.keys(byCompany);
@@ -62,7 +63,7 @@ export async function GET(
           send({ type: "progress", rows: payload });
 
           const allSettled = jdRows.length > 0 &&
-            jdRows.every(j => j.status === "complete" || j.status === "failed");
+            jdRows.every(j => ["complete", "failed", "invalid"].includes(j.status));
           if (allSettled) {
             send({ type: "complete" });
             break;

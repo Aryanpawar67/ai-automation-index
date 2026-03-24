@@ -11,6 +11,7 @@ import {
 export const batches = pgTable("batches", {
   id:           uuid("id").primaryKey().defaultRandom(),
   filename:     text("filename").notNull(),
+  name:         text("name"),   // human-readable name for dataset-created batches
   uploadedBy:   text("uploaded_by").notNull().default("admin"),
   // 'pending' | 'scraping' | 'analyzing' | 'complete' | 'partial_failure'
   status:       text("status").notNull().default("pending"),
@@ -20,6 +21,21 @@ export const batches = pgTable("batches", {
   failedJds:    integer("failed_jds").notNull().default(0),
   createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt:  timestamp("completed_at", { withTimezone: true }),
+});
+
+export const datasetRows = pgTable("dataset_rows", {
+  id:            uuid("id").primaryKey().defaultRandom(),
+  rowNumber:     integer("row_number"),
+  companyName:   text("company_name").notNull(),
+  domain:        text("domain").notNull(),
+  headquarters:  text("headquarters"),
+  employeeSize:  text("employee_size"),
+  hcmRaw:        text("hcm_raw"),
+  atsType:       text("ats_type"),
+  careerPageUrl: text("career_page_url").notNull(),
+  jobPreview:    jsonb("job_preview").$type<string[]>(),
+  sourceFile:    text("source_file"),
+  uploadedAt:    timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const companies = pgTable("companies", {

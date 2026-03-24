@@ -1,5 +1,49 @@
 import * as XLSX from "xlsx";
 
+export interface DatasetRow {
+  rowNumber:     number;
+  companyName:   string;
+  domain:        string;
+  headquarters:  string;
+  employeeSize:  string;
+  hcmRaw:        string;
+  atsType:       string | null;
+  careerPageUrl: string;
+  jobPreview:    string[];
+}
+
+export function parseExcelRaw(buffer: Buffer, sourceFile: string): DatasetRow[] {
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheet    = workbook.Sheets[workbook.SheetNames[0]];
+  const rows     = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
+
+  return rows
+    .filter(r => r["Company Name"]?.trim() && r["Career Page URL"]?.trim())
+    .map((r, i) => {
+      const rawHcm   = (r["HCM / HRIS / ATS"] ?? "").toLowerCase().trim();
+      const jobPreview = [1,2,3,4,5,6,7,8,9,10]
+        .map(n => (r[`Job ${n}`] ?? "").trim())
+        .filter(Boolean);
+
+      let domain = (r["Domain"] ?? "").trim();
+      if (!domain) {
+        try { domain = new URL(r["Career Page URL"].trim()).hostname; } catch { domain = ""; }
+      }
+
+      return {
+        rowNumber:     typeof r["#"] === "number" ? (r["#"] as unknown as number) : i + 1,
+        companyName:   r["Company Name"].trim(),
+        domain,
+        headquarters:  (r["Headquarters"] ?? "").trim(),
+        employeeSize:  (r["Employee Size"] ?? "").trim(),
+        hcmRaw:        (r["HCM / HRIS / ATS"] ?? "").trim(),
+        atsType:       HCM_MAP[rawHcm] ?? null,
+        careerPageUrl: r["Career Page URL"].trim(),
+        jobPreview,
+      };
+    });
+}
+
 export interface POCRow {
   firstName:     string;
   lastName:      string;
