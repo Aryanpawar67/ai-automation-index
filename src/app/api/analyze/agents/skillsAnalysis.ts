@@ -45,6 +45,10 @@ Each entry must be a concise skill name (1-4 words), not a sentence.
 }`;
 
 export async function runSkillsAnalysisAgent(parsedJD: ParsedJD): Promise<SkillsAnalysis> {
+  if (parsedJD.requiredSkills.length === 0 && parsedJD.toolsMentioned.length === 0) {
+    return { futureProof: [], atRisk: [], aiAugmented: [] };
+  }
+
   let searchContext = "";
   if (process.env.TAVILY_API_KEY) {
     const result = await searchWeb(

@@ -48,6 +48,10 @@ Return:
 }`;
 
 export async function runDecomposerAgent(parsedJD: ParsedJD): Promise<RawTask[]> {
+  if (parsedJD.responsibilities.length === 0) {
+    throw new Error("No responsibilities extracted from JD — cannot decompose tasks");
+  }
+
   const response = await model.invoke([
     new SystemMessage(SYSTEM),
     new HumanMessage(PROMPT(parsedJD)),
