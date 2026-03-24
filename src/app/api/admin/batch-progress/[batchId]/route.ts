@@ -1,6 +1,6 @@
 import { NextRequest }      from "next/server";
 import { db }               from "@/lib/db/client";
-import { companies, jobDescriptions } from "@/lib/db/schema";
+import { companies, jobDescriptions, pocs } from "@/lib/db/schema";
 import { eq }               from "drizzle-orm";
 
 export async function GET(
@@ -20,14 +20,24 @@ export async function GET(
 
       while (active) {
         try {
-          // Get all companies that have JDs in this batch
+          // All companies in this batch (via pocs join)
+          const pocRows = await db.select({
+            companyId: pocs.companyId,
+          }).from(pocs).where(eq(pocs.batchId, batchId));
+
+          const batchCompanyIds = [...new Set(pocRows.map(p => p.companyId))];
+
+          // JDs for this batch
           const jdRows = await db.select().from(jobDescriptions)
             .where(eq(jobDescriptions.batchId, batchId));
 
-          // Aggregate per company
+          // Aggregate JDs per company
           const byCompany: Record<string, {
             total: number; complete: number; failed: number; analyzing: number; invalid: number;
           }> = {};
+          for (const id of batchCompanyIds) {
+            byCompany[id] = { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 };
+          }
           for (const jd of jdRows) {
             if (!byCompany[jd.companyId])
               byCompany[jd.companyId] = { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 };
@@ -38,8 +48,7 @@ export async function GET(
             if (jd.status === "invalid")   byCompany[jd.companyId].invalid++;
           }
 
-          const companyIds = Object.keys(byCompany);
-          const companyRows = companyIds.length > 0
+          const companyRows = batchCompanyIds.length > 0
             ? await db.select({
                 id:           companies.id,
                 name:         companies.name,
@@ -50,21 +59,25 @@ export async function GET(
             : [];
 
           const payload = companyRows
-            .filter(c => byCompany[c.id])
+            .filter(c => batchCompanyIds.includes(c.id))
             .map(c => ({
               companyId:    c.id,
               companyName:  c.name,
               scrapeStatus: c.scrapeStatus,
               scrapeError:  c.scrapeError,
               reportToken:  c.reportToken,
-              jds:          byCompany[c.id],
+              jds:          byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 },
             }));
 
           send({ type: "progress", rows: payload });
 
-          const allSettled = jdRows.length > 0 &&
+          // Settled when all companies have finished scraping and all JDs are terminal
+          const allScrapesDone = companyRows
+            .filter(c => batchCompanyIds.includes(c.id))
+            .every(c => ["complete", "failed", "blocked"].includes(c.scrapeStatus));
+          const allJdsDone = jdRows.length > 0 &&
             jdRows.every(j => ["complete", "failed", "invalid"].includes(j.status));
-          if (allSettled) {
+          if (allScrapesDone && (jdRows.length === 0 || allJdsDone)) {
             send({ type: "complete" });
             break;
           }

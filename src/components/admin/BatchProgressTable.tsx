@@ -12,6 +12,39 @@ interface CompanyRow {
   jds: { total: number; complete: number; failed: number; analyzing: number; invalid: number };
 }
 
+function RetryScrapeButton({ companyId, batchId, onQueued }: {
+  companyId: string;
+  batchId:   string;
+  onQueued?: () => void;
+}) {
+  const [state, setState] = useState<"idle" | "loading" | "done">("idle");
+
+  const handleRetry = async () => {
+    setState("loading");
+    await fetch(`/api/admin/company/${companyId}/retry-scrape`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ batchId }),
+    });
+    setState("done");
+    onQueued?.();
+  };
+
+  if (state === "done")
+    return <span className="text-xs font-medium" style={{ color: "#059669" }}>Queued ✓</span>;
+
+  return (
+    <button
+      onClick={handleRetry}
+      disabled={state === "loading"}
+      className="text-xs px-2.5 py-1 rounded-lg font-medium transition-colors disabled:opacity-50"
+      style={{ border: "1px solid #FDBB96", color: "#FD5A0F", background: "#FFF0EA" }}
+    >
+      {state === "loading" ? "Queuing…" : "Retry scrape"}
+    </button>
+  );
+}
+
 const STATUS_BADGE: Record<string, string> = {
   complete:    "badge-low",
   failed:      "badge-high",
@@ -21,6 +54,8 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function BatchProgressTable({ batchId }: { batchId: string }) {
+  // local override so retried rows clear their error display immediately
+  const [retriedIds, setRetriedIds] = useState<Set<string>>(new Set());
   const [rows, setRows]   = useState<CompanyRow[]>([]);
   const [done, setDone]   = useState(false);
   const [error, setError] = useState(false);
@@ -113,11 +148,20 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
                       <span className={`badge ${STATUS_BADGE[r.scrapeStatus] ?? "badge-medium"}`}>
                         {r.scrapeStatus}
                       </span>
-                      {r.scrapeError && (
+                      {r.scrapeError && !retriedIds.has(r.companyId) && (
                         <p className="text-xs mt-0.5 max-w-[180px] truncate" style={{ color: "#9988AA" }}
                           title={r.scrapeError}>
                           {r.scrapeError}
                         </p>
+                      )}
+                      {(r.scrapeStatus === "failed" || r.scrapeStatus === "blocked") && !retriedIds.has(r.companyId) && (
+                        <div className="mt-1.5">
+                          <RetryScrapeButton
+                            companyId={r.companyId}
+                            batchId={batchId}
+                            onQueued={() => setRetriedIds(prev => new Set(prev).add(r.companyId))}
+                          />
+                        </div>
                       )}
                     </td>
                     <td className="py-3 pr-4 text-xs" style={{ color: "#553366" }}>
