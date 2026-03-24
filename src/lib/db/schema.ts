@@ -32,6 +32,9 @@ export const companies = pgTable("companies", {
   scrapeStatus:   text("scrape_status").notNull().default("pending"),
   scrapeError:    text("scrape_error"),
   scrapedAt:      timestamp("scraped_at", { withTimezone: true }),
+  // ATS/HCM platform type from Excel upload — used to route to the correct Tier 1 scraper
+  // 'workday' | 'oracle_hcm' | 'oracle_taleo' | 'sap_sf' | null
+  atsType:        text("ats_type"),
   createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
