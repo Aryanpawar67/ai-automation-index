@@ -25,6 +25,11 @@
 *.pem
 .pids
 
+# test files
+*.xlsx
+.playwright-mcp/
+docs/superpowers/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
