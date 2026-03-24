@@ -18,60 +18,74 @@ export const scrapeCompanyFn = inngest.createFunction(
       .set({ scrapeStatus: "in_progress" })
       .where(eq(companies.id, companyId));
 
-    const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-    if (!company) throw new Error(`Company ${companyId} not found`);
+    try {
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      if (!company) {
+        await db.update(companies)
+          .set({ scrapeStatus: "failed", scrapeError: "Company record not found" })
+          .where(eq(companies.id, companyId));
+        return { status: "failed", reason: "Company record not found" };
+      }
 
-    const result = await scrapeCareerPage(company.careerPageUrl, company.atsType ?? undefined);
+      const result = await scrapeCareerPage(company.careerPageUrl, company.atsType ?? undefined);
 
-    if (!result.success) {
+      if (!result.success) {
+        await db.update(companies).set({
+          scrapeStatus: result.blocked ? "blocked" : "failed",
+          scrapeError:  result.error,
+        }).where(eq(companies.id, companyId));
+        return { status: "failed", reason: result.error };
+      }
+
+      // Persist ALL scraped JDs — valid ones as 'pending', invalid as 'invalid'
+      // Both are stored so admins can inspect what was collected
+      if (result.jds.length > 0) {
+        await db.insert(jobDescriptions).values(
+          result.jds.map(jd => ({
+            companyId,
+            batchId,
+            title:      jd.title,
+            rawText:    jd.rawText,
+            sourceUrl:  jd.sourceUrl ?? null,
+            department: jd.department ?? null,
+            status:     isValidJD(jd.title, jd.rawText) ? ("pending" as const) : ("invalid" as const),
+          }))
+        );
+      }
+
       await db.update(companies).set({
-        scrapeStatus: result.blocked ? "blocked" : "failed",
-        scrapeError:  result.error,
+        scrapeStatus: "complete",
+        scrapedAt:    new Date(),
       }).where(eq(companies.id, companyId));
-      return { status: "failed", reason: result.error };
+
+      // Fan out — only send valid (pending) JDs to LangGraph analysis
+      const validJds = await db.select()
+        .from(jobDescriptions)
+        .where(and(
+          eq(jobDescriptions.companyId, companyId),
+          eq(jobDescriptions.status, "pending"),
+        ));
+
+      if (validJds.length > 0) {
+        await inngest.send(
+          validJds.map(jd => ({
+            name: "jd/analyze" as const,
+            data: { jobDescriptionId: jd.id, batchId },
+          }))
+        );
+      }
+
+      const totalJds = result.jds.length;
+      const validCount = validJds.length;
+      const invalidCount = totalJds - validCount;
+      return { status: "complete", jdCount: validCount, invalidCount };
+    } catch (err) {
+      // Ensure company never stays stuck in 'in_progress' if something unexpected throws
+      const message = err instanceof Error ? err.message : String(err);
+      await db.update(companies)
+        .set({ scrapeStatus: "failed", scrapeError: message })
+        .where(eq(companies.id, companyId));
+      throw err; // re-throw so Inngest can log it
     }
-
-    // Persist ALL scraped JDs — valid ones as 'pending', invalid as 'invalid'
-    // Both are stored so admins can inspect what was collected
-    if (result.jds.length > 0) {
-      await db.insert(jobDescriptions).values(
-        result.jds.map(jd => ({
-          companyId,
-          batchId,
-          title:      jd.title,
-          rawText:    jd.rawText,
-          sourceUrl:  jd.sourceUrl ?? null,
-          department: jd.department ?? null,
-          status:     isValidJD(jd.title, jd.rawText) ? ("pending" as const) : ("invalid" as const),
-        }))
-      );
-    }
-
-    await db.update(companies).set({
-      scrapeStatus: "complete",
-      scrapedAt:    new Date(),
-    }).where(eq(companies.id, companyId));
-
-    // Fan out — only send valid (pending) JDs to LangGraph analysis
-    const validJds = await db.select()
-      .from(jobDescriptions)
-      .where(and(
-        eq(jobDescriptions.companyId, companyId),
-        eq(jobDescriptions.status, "pending"),
-      ));
-
-    if (validJds.length > 0) {
-      await inngest.send(
-        validJds.map(jd => ({
-          name: "jd/analyze" as const,
-          data: { jobDescriptionId: jd.id, batchId },
-        }))
-      );
-    }
-
-    const totalJds = result.jds.length;
-    const validCount = validJds.length;
-    const invalidCount = totalJds - validCount;
-    return { status: "complete", jdCount: validCount, invalidCount };
   }
 );

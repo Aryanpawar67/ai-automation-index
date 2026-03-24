@@ -1,7 +1,7 @@
 import { NextRequest }      from "next/server";
 import { db }               from "@/lib/db/client";
 import { companies, jobDescriptions, pocs } from "@/lib/db/schema";
-import { eq }               from "drizzle-orm";
+import { eq, inArray }      from "drizzle-orm";
 
 export async function GET(
   req: NextRequest,
@@ -16,9 +16,10 @@ export async function GET(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
 
       let active = true;
+      const deadline = Date.now() + 30 * 60 * 1000; // 30-minute hard stop
       req.signal.addEventListener("abort", () => { active = false; });
 
-      while (active) {
+      while (active && Date.now() < deadline) {
         try {
           // All companies in this batch (via pocs join)
           const pocRows = await db.select({
@@ -55,11 +56,10 @@ export async function GET(
                 scrapeStatus: companies.scrapeStatus,
                 scrapeError:  companies.scrapeError,
                 reportToken:  companies.reportToken,
-              }).from(companies)
+              }).from(companies).where(inArray(companies.id, batchCompanyIds))
             : [];
 
           const payload = companyRows
-            .filter(c => batchCompanyIds.includes(c.id))
             .map(c => ({
               companyId:    c.id,
               companyName:  c.name,
@@ -73,7 +73,6 @@ export async function GET(
 
           // Settled when all companies have finished scraping and all JDs are terminal
           const allScrapesDone = companyRows
-            .filter(c => batchCompanyIds.includes(c.id))
             .every(c => ["complete", "failed", "blocked"].includes(c.scrapeStatus));
           const allJdsDone = jdRows.length > 0 &&
             jdRows.every(j => ["complete", "failed", "invalid"].includes(j.status));
