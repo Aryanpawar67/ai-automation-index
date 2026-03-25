@@ -52,7 +52,10 @@ export function extractTenantFromHtml(html: string): WorkdayTenant | null {
   const wdLinkMatch = html.match(
     /https?:\/\/([a-z0-9-]+)\.(?:wd\d+\.)?myworkdayjobs\.com\/(?:[a-z]{2}-[A-Z]{2}\/)?([a-z0-9_-]+)/i
   );
-  if (wdLinkMatch) return { tenant: wdLinkMatch[1], jobSite: wdLinkMatch[2], resolvedUrl: wdLinkMatch[0] };
+  if (wdLinkMatch) {
+    const baseUrl = wdLinkMatch[0].split(/\/login|\/apply|\/signin/i)[0];
+    return { tenant: wdLinkMatch[1], jobSite: wdLinkMatch[2], resolvedUrl: baseUrl };
+  }
 
   // 4. window.__WD_CONFIG__ = {...}
   const cfgMatch = html.match(/window\.__WD_CONFIG__\s*=\s*(\{[^}]+\})/);
@@ -122,7 +125,10 @@ export async function resolveWorkdayEntryPoint(url: string): Promise<WorkdayTena
 
       // Immediately check if any href IS a myworkdayjobs.com URL
       const wdDirect = extractWorkdayTenant(abs);
-      if (wdDirect) return { ...wdDirect, resolvedUrl: abs };
+      if (wdDirect) {
+        const cleanUrl = abs.split(/\/login|\/apply|\/signin/i)[0];
+        return { ...wdDirect, resolvedUrl: cleanUrl };
+      }
 
       // Collect off-domain links with job-related text or path
       const isOffDomain = new URL(abs).hostname !== new URL(url).hostname;
