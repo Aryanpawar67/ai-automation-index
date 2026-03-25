@@ -29,6 +29,13 @@ export const scrapeCompanyFn = inngest.createFunction(
 
       const result = await scrapeCareerPage(company.careerPageUrl, company.atsType ?? undefined);
 
+      // Persist the resolved ATS URL so future scrapes skip the landing-page resolution step
+      if (result.success && result.resolvedUrl && result.resolvedUrl !== company.careerPageUrl) {
+        await db.update(companies)
+          .set({ careerPageUrl: result.resolvedUrl })
+          .where(eq(companies.id, companyId));
+      }
+
       if (!result.success) {
         await db.update(companies).set({
           scrapeStatus: result.blocked ? "blocked" : "failed",
