@@ -1264,3 +1264,12 @@
  GET /admin/batches/dbdbab5d-f1ac-40e8-9fcd-97659156fa1c 200 in 525ms (compile: 39ms, proxy.ts: 40ms, render: 446ms)
  PUT /api/inngest 200 in 42ms (compile: 27ms, render: 16ms)
  GET /report/48b9dfb3-8b73-4e13-a0c7-7f1f3a34392c?token=MmE0ZGQ2ZGE0NGI0OTkzODY2NGZkNjE0MWQxYWI3YjZjZGQ5YjRiYjhhYjdjMWZkZTA2ZThhN2I0NjU0M2Y4ZjoxNzc1MDIwMDEyOTY3 200 in 6.1s (compile: 365ms, render: 5.8s)
+ PUT /api/inngest 200 in 34ms (compile: 17ms, render: 17ms)
+ PUT /api/inngest 200 in 14ms (compile: 1978µs, render: 12ms)
+ PUT /api/inngest 200 in 81ms (compile: 22ms, render: 59ms)
+ PUT /api/inngest 200 in 12ms (compile: 2ms, render: 10ms)
+✓ Compiled in 115ms
+ GET /report/48b9dfb3-8b73-4e13-a0c7-7f1f3a34392c?token=MmE0ZGQ2ZGE0NGI0OTkzODY2NGZkNjE0MWQxYWI3YjZjZGQ5YjRiYjhhYjdjMWZkZTA2ZThhN2I0NjU0M2Y4ZjoxNzc1MDIwMDEyOTY3 200 in 314ms (compile: 159ms, render: 155ms)
+ GET /admin/batches/dbdbab5d-f1ac-40e8-9fcd-97659156fa1c 200 in 356ms (compile: 249ms, proxy.ts: 35ms, render: 72ms)
+ PUT /api/inngest 200 in 17ms (compile: 3ms, render: 14ms)
+ PUT /api/inngest 200 in 15ms (compile: 7ms, render: 8ms)

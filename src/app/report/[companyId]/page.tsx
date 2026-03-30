@@ -50,7 +50,9 @@ export default async function CompanyReportHub({
     .where(and(eq(analyses.companyId, companyId), ne(jobDescriptions.status, "invalid")))
     .orderBy(analyses.createdAt);
 
-  const cleanAnalyses = rows.filter(r => isValidTitle(r.jdTitle));
+  const cleanAnalyses = rows
+    .filter(r => isValidTitle(r.jdTitle))
+    .map(r => ({ ...r, createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt }));
 
   const data = {
     company:            company.name,
