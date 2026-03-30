@@ -53,6 +53,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/admin/leads",
+    exact: false,
+    label: "Leads",
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.6"/>
+        <path d="M2 8l10 7 10-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
     href: "/admin",
     exact: true,
     label: "Quick Upload",
