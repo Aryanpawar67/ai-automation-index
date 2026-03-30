@@ -16,7 +16,7 @@ export function middleware(req: NextRequest) {
   }
 
   const cookie   = req.cookies.get(COOKIE_NAME);
-  const expected = Buffer.from(process.env.ADMIN_PASSWORD ?? "").toString("base64");
+  const expected = btoa(process.env.ADMIN_PASSWORD ?? "");
 
   if (!cookie || cookie.value !== expected) {
     if (pathname.startsWith("/api/")) {
