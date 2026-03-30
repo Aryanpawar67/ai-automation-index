@@ -9,26 +9,46 @@ export interface DatasetRow {
   hcmRaw:        string;
   atsType:       string | null;
   careerPageUrl: string;
-  jobPreview:    string[];
+  // POC contact fields — present only when the Excel sheet contains them
+  pocFirstName:  string | null;
+  pocLastName:   string | null;
+  pocEmail:      string | null;
+}
+
+// Normalise a header string: lowercase, collapse whitespace → underscore
+function norm(s: string) { return s.toLowerCase().trim().replace(/[\s/]+/g, "_"); }
+
+// Find the first key in a normalised row whose normalised key contains all of the given substrings
+function findCol(normRow: Record<string, string>, ...parts: string[]): string {
+  const key = Object.keys(normRow).find(k => parts.every(p => k.includes(p)));
+  return key ? normRow[key] : "";
 }
 
 export function parseExcelRaw(buffer: Buffer, sourceFile: string): DatasetRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheet    = workbook.Sheets[workbook.SheetNames[0]];
-  const rows     = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
+  const raw      = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
 
-  return rows
+  // Build a parallel array of normalised-key rows for flexible header matching
+  const normRows = raw.map(r =>
+    Object.fromEntries(Object.entries(r).map(([k, v]) => [norm(k), String(v).trim()]))
+  );
+
+  return raw
     .filter(r => r["Company Name"]?.trim() && r["Career Page URL"]?.trim())
     .map((r, i) => {
-      const rawHcm   = (r["HCM / HRIS / ATS"] ?? "").toLowerCase().trim();
-      const jobPreview = [1,2,3,4,5,6,7,8,9,10]
-        .map(n => (r[`Job ${n}`] ?? "").trim())
-        .filter(Boolean);
+      const nr     = normRows[i];
+      const rawHcm = (r["HCM / HRIS / ATS"] ?? "").toLowerCase().trim();
 
       let domain = (r["Domain"] ?? "").trim();
       if (!domain) {
         try { domain = new URL(r["Career Page URL"].trim()).hostname; } catch { domain = ""; }
       }
+
+      // Flexible POC column matching — handles "First Name", "first_name", "POC First Name", etc.
+      const firstName = findCol(nr, "first") || findCol(nr, "firstname") || "";
+      const lastName  = findCol(nr, "last")  || findCol(nr, "lastname")  || "";
+      const email     = findCol(nr, "email") || "";
 
       return {
         rowNumber:     typeof r["#"] === "number" ? (r["#"] as unknown as number) : i + 1,
@@ -39,7 +59,9 @@ export function parseExcelRaw(buffer: Buffer, sourceFile: string): DatasetRow[] 
         hcmRaw:        (r["HCM / HRIS / ATS"] ?? "").trim(),
         atsType:       HCM_MAP[rawHcm] ?? null,
         careerPageUrl: r["Career Page URL"].trim(),
-        jobPreview,
+        pocFirstName:  firstName || null,
+        pocLastName:   lastName  || null,
+        pocEmail:      email     || null,
       };
     });
 }

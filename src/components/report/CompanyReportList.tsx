@@ -12,40 +12,20 @@ interface AnalysisRow {
   createdAt:    string;
 }
 
-type SortKey = "rank" | "jdTitle" | "jdDepartment" | "overallScore" | "hoursSaved";
-type SortDir = "asc" | "desc";
-
 function potential(score: number): "high" | "medium" | "low" {
   if (score >= 65) return "high";
   if (score >= 40) return "medium";
   return "low";
 }
 
-const POTENTIAL_LABEL: Record<string, string> = {
-  high:   "High",
-  medium: "Medium",
-  low:    "Low",
+const POTENTIAL_CFG: Record<string, { label: string; text: string; bg: string; border: string }> = {
+  high:   { label: "High",   text: "#dc2626", bg: "rgba(239,68,68,0.10)",  border: "rgba(239,68,68,0.25)"  },
+  medium: { label: "Medium", text: "#d97706", bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.25)" },
+  low:    { label: "Low",    text: "#059669", bg: "rgba(16,185,129,0.10)", border: "rgba(16,185,129,0.25)" },
 };
 
-const POTENTIAL_STYLE: Record<string, React.CSSProperties> = {
-  high:   { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
-  medium: { background: "#fef3c7", color: "#d97706", border: "1px solid #fde68a" },
-  low:    { background: "#d1fae5", color: "#059669", border: "1px solid #a7f3d0" },
-};
-
-const SCORE_BAR: Record<string, string> = {
-  high:   "#ef4444",
-  medium: "#f59e0b",
-  low:    "#10b981",
-};
-
-function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  return (
-    <span style={{ opacity: active ? 1 : 0.3, marginLeft: 4, fontSize: 10 }}>
-      {active && dir === "asc" ? "▲" : "▼"}
-    </span>
-  );
-}
+const SCORE_COLOR = (score: number) =>
+  score >= 65 ? "#ef4444" : score >= 40 ? "#f59e0b" : "#10b981";
 
 export default function CompanyReportList({
   company,
@@ -58,251 +38,223 @@ export default function CompanyReportList({
   companyId: string;
   token:     string;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("overallScore");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // Default order: highest score first
+  const sorted = [...analyses].sort((a, b) => (b.overallScore ?? -1) - (a.overallScore ?? -1));
 
-  function handleSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortDir("desc");
-    }
-  }
-
-  const sorted = [...analyses].sort((a, b) => {
-    let av: string | number = 0;
-    let bv: string | number = 0;
-    if (sortKey === "overallScore") {
-      av = a.overallScore ?? -1;
-      bv = b.overallScore ?? -1;
-    } else if (sortKey === "hoursSaved") {
-      av = parseFloat(a.hoursSaved ?? "0") || 0;
-      bv = parseFloat(b.hoursSaved ?? "0") || 0;
-    } else if (sortKey === "jdTitle") {
-      av = a.jdTitle.toLowerCase();
-      bv = b.jdTitle.toLowerCase();
-    } else if (sortKey === "jdDepartment") {
-      av = (a.jdDepartment ?? "").toLowerCase();
-      bv = (b.jdDepartment ?? "").toLowerCase();
-    }
-    if (av < bv) return sortDir === "asc" ? -1 : 1;
-    if (av > bv) return sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  // Summary stats
-  const scoredRows    = analyses.filter(a => a.overallScore != null);
-  const avgScore      = scoredRows.length
+  const scoredRows = analyses.filter(a => a.overallScore != null);
+  const avgScore   = scoredRows.length
     ? Math.round(scoredRows.reduce((s, a) => s + (a.overallScore ?? 0), 0) / scoredRows.length)
     : null;
-  const totalHours    = analyses.reduce((s, a) => s + (parseFloat(a.hoursSaved ?? "0") || 0), 0);
-  const highCount     = scoredRows.filter(a => potential(a.overallScore!) === "high").length;
-
-  function thProps(key: SortKey) {
-    return {
-      onClick:   () => handleSort(key),
-      style:     { cursor: "pointer", userSelect: "none" as const, whiteSpace: "nowrap" as const },
-    };
-  }
+  const totalHours = analyses.reduce((s, a) => s + (parseFloat(a.hoursSaved ?? "0") || 0), 0);
+  const highCount  = scoredRows.filter(a => potential(a.overallScore!) === "high").length;
 
   return (
-    <div className="animate-fade-in">
+    <div style={{ animation: "fadeInUp 0.4s ease both" }}>
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-1" style={{ color: "#220133" }}>
+      {/* Page header */}
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: "#220133", margin: "0 0 5px", letterSpacing: "-0.5px" }}>
           {company}
         </h1>
-        <p className="text-sm" style={{ color: "#9988AA" }}>
-          AI automation analysis across your open roles · Powered by Claude
+        <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
+          AI automation analysis across your open roles · Powered by iMocha
         </p>
       </div>
 
       {analyses.length === 0 ? (
-        <div className="card p-12 text-center">
-          <p className="text-sm" style={{ color: "#9988AA" }}>
-            Analysis is in progress. Check back shortly.
-          </p>
+        <div style={{
+          background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
+          padding: "60px 40px", textAlign: "center",
+          boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+          <p style={{ fontSize: 15, fontWeight: 600, color: "#553366", margin: "0 0 6px" }}>Analysis in progress</p>
+          <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>Check back shortly — roles are being scored now.</p>
         </div>
       ) : (
         <>
           {/* Summary strip */}
-          <div className="card mb-6 px-6 py-4 flex flex-wrap gap-8 items-center">
-            <Stat label="Total roles" value={String(analyses.length)} />
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+            <StatChip label="Total roles" value={String(analyses.length)} color="#220133" bg="#F4EFF6" border="#EAE4EF" />
             {avgScore != null && (
-              <Stat
-                label="Avg automation score"
-                value={String(avgScore)}
-                valueStyle={{ color: avgScore >= 65 ? "#dc2626" : avgScore >= 40 ? "#d97706" : "#059669" }}
+              <StatChip
+                label="Avg automation score" value={`${avgScore}%`}
+                color={SCORE_COLOR(avgScore)} bg={avgScore >= 65 ? "rgba(239,68,68,0.08)" : avgScore >= 40 ? "rgba(245,158,11,0.08)" : "rgba(16,185,129,0.08)"}
+                border={avgScore >= 65 ? "rgba(239,68,68,0.2)" : avgScore >= 40 ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)"}
               />
             )}
             {totalHours > 0 && (
-              <Stat label="Total hrs reclaimed / week" value={`${totalHours}h`} />
+              <StatChip label="Total hrs reclaimed/wk" value={`${totalHours}h`} color="#059669" bg="rgba(16,185,129,0.08)" border="rgba(16,185,129,0.2)" />
             )}
             {highCount > 0 && (
-              <Stat
-                label="High potential roles"
-                value={String(highCount)}
-                valueStyle={{ color: "#dc2626" }}
-              />
+              <StatChip label="High potential roles" value={String(highCount)} color="#dc2626" bg="rgba(239,68,68,0.08)" border="rgba(239,68,68,0.2)" />
             )}
           </div>
 
-          {/* Table */}
-          <div className="card overflow-hidden">
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #EAE4EF", background: "#FAFAFA" }}>
-                    <Th style={{ width: 48, textAlign: "center" }}>#</Th>
-                    <Th {...thProps("jdTitle")}>
-                      Role <SortIcon active={sortKey === "jdTitle"} dir={sortDir} />
-                    </Th>
-                    <Th {...thProps("jdDepartment")}>
-                      Department <SortIcon active={sortKey === "jdDepartment"} dir={sortDir} />
-                    </Th>
-                    <Th {...thProps("overallScore")} style={{ width: 180, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
-                      Automation Score <SortIcon active={sortKey === "overallScore"} dir={sortDir} />
-                    </Th>
-                    <Th {...thProps("hoursSaved")} style={{ width: 120, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
-                      Hrs / week <SortIcon active={sortKey === "hoursSaved"} dir={sortDir} />
-                    </Th>
-                    <Th style={{ width: 110 }}>Potential</Th>
-                    <Th style={{ width: 80 }} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((a, i) => {
-                    const score = a.overallScore ?? 0;
-                    const pot   = potential(score);
-                    const hours = a.hoursSaved ? parseFloat(a.hoursSaved) : null;
-                    return (
-                      <tr
-                        key={a.analysisId}
-                        style={{ borderBottom: "1px solid #EAE4EF" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#FDFBFE")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "")}
-                      >
-                        {/* Rank */}
-                        <td style={{ padding: "14px 12px", textAlign: "center", color: "#9988AA", fontWeight: 500 }}>
-                          {i + 1}
-                        </td>
+          {/* Role cards grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 32 }}>
+            {sorted.map((a, i) => {
+              const score    = a.overallScore ?? 0;
+              const pot      = a.overallScore != null ? potential(score) : null;
+              const potCfg   = pot ? POTENTIAL_CFG[pot] : null;
+              const scoreCol = SCORE_COLOR(score);
+              const hours    = a.hoursSaved ? parseFloat(a.hoursSaved) : null;
 
-                        {/* Role title */}
-                        <td style={{ padding: "14px 16px", maxWidth: 320 }}>
-                          <span className="font-medium" style={{ color: "#220133", lineHeight: 1.4, display: "block" }}>
-                            {a.jdTitle}
-                          </span>
-                        </td>
-
-                        {/* Department */}
-                        <td style={{ padding: "14px 16px", color: "#553366", whiteSpace: "nowrap" }}>
-                          {a.jdDepartment ?? <span style={{ color: "#D0C8D8" }}>—</span>}
-                        </td>
-
-                        {/* Score + bar */}
-                        <td style={{ padding: "14px 16px" }}>
-                          {a.overallScore != null ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <span className="score-number font-bold" style={{ color: SCORE_BAR[pot], minWidth: 26, fontSize: 14 }}>
-                                {score}
-                              </span>
-                              <div className="progress-track" style={{ flex: 1, height: 5 }}>
-                                <div
-                                  className="progress-fill"
-                                  style={{ width: `${score}%`, background: SCORE_BAR[pot] }}
-                                />
-                              </div>
-                            </div>
-                          ) : (
-                            <span style={{ color: "#D0C8D8" }}>—</span>
-                          )}
-                        </td>
-
-                        {/* Hours saved */}
-                        <td style={{ padding: "14px 16px", color: "#553366", whiteSpace: "nowrap" }}>
-                          {hours != null
-                            ? <span className="score-number">{hours}h</span>
-                            : <span style={{ color: "#D0C8D8" }}>—</span>
-                          }
-                        </td>
-
-                        {/* Potential badge */}
-                        <td style={{ padding: "14px 16px" }}>
-                          {a.overallScore != null && (
-                            <span className="badge" style={POTENTIAL_STYLE[pot]}>
-                              {POTENTIAL_LABEL[pot]}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* View link */}
-                        <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                          <Link
-                            href={`/report/${companyId}/${a.analysisId}?token=${token}`}
-                            style={{ color: "#FD5A0F", fontWeight: 600, fontSize: 12 }}
-                          >
-                            View →
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+              return (
+                <RoleCard
+                  key={a.analysisId}
+                  rank={i + 1}
+                  title={a.jdTitle}
+                  department={a.jdDepartment}
+                  score={a.overallScore}
+                  scoreColor={scoreCol}
+                  hours={hours}
+                  potCfg={potCfg}
+                  href={`/report/${companyId}/${a.analysisId}?token=${token}`}
+                  delay={i * 0.05}
+                />
+              );
+            })}
           </div>
         </>
       )}
+
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
 
-function Th({
-  children,
-  style,
-  onClick,
-}: {
-  children?: React.ReactNode;
-  style?:    React.CSSProperties;
-  onClick?:  () => void;
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatChip({ label, value, color, bg, border }: {
+  label: string; value: string; color: string; bg: string; border: string;
 }) {
   return (
-    <th
-      onClick={onClick}
-      style={{
-        padding:       "11px 16px",
-        textAlign:     "left",
-        fontSize:      11,
-        fontWeight:    600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color:         "#9988AA",
-        ...style,
-      }}
-    >
-      {children}
-    </th>
+    <div style={{
+      padding: "10px 18px", borderRadius: 16,
+      background: bg, border: `1px solid ${border}`,
+      display: "flex", flexDirection: "column", gap: 2,
+    }}>
+      <span style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{value}</span>
+      <span style={{ fontSize: 11, color: "#9988AA", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        {label}
+      </span>
+    </div>
   );
 }
 
-function Stat({
-  label,
-  value,
-  valueStyle,
-}: {
-  label:       string;
-  value:       string;
-  valueStyle?: React.CSSProperties;
+function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, href, delay }: {
+  rank:       number;
+  title:      string;
+  department: string | null;
+  score:      number | null;
+  scoreColor: string;
+  hours:      number | null;
+  potCfg:     { label: string; text: string; bg: string; border: string } | null;
+  href:       string;
+  delay:      number;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
-    <div>
-      <div style={{ fontSize: 11, color: "#9988AA", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 2 }}>
-        {label}
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: "#fff",
+        border: "1px solid #EAE4EF",
+        borderRadius: 20,
+        padding: "20px 22px",
+        boxShadow: hovered ? "0 8px 32px rgba(34,1,51,0.10)" : "0 2px 12px rgba(34,1,51,0.06)",
+        transform: hovered ? "translateY(-2px)" : "none",
+        transition: "box-shadow 0.18s, transform 0.18s",
+        animation: `fadeInUp 0.35s ease ${delay}s both`,
+        display: "flex", flexDirection: "column", gap: 12,
+      }}>
+      {/* Top row: rank + score */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: "50%",
+            background: "#F4EFF6", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 10, fontWeight: 700, color: "#9988AA", flexShrink: 0,
+          }}>
+            {rank}
+          </span>
+          {potCfg && (
+            <span style={{
+              padding: "3px 9px", borderRadius: 20,
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.05em",
+              background: potCfg.bg, color: potCfg.text, border: `1px solid ${potCfg.border}`,
+            }}>
+              {potCfg.label}
+            </span>
+          )}
+        </div>
+        {score != null && (
+          <div style={{ textAlign: "right" }}>
+            <span style={{ fontSize: 32, fontWeight: 800, color: scoreColor, lineHeight: 1, letterSpacing: "-1px" }}>
+              {score}
+            </span>
+            <span style={{ fontSize: 12, color: "#9988AA" }}>/100</span>
+          </div>
+        )}
       </div>
-      <div className="score-number" style={{ fontSize: 22, fontWeight: 700, color: "#220133", ...valueStyle }}>
-        {value}
+
+      {/* Title + department */}
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 15, fontWeight: 700, color: "#220133", margin: "0 0 4px", lineHeight: 1.3 }}>
+          {title}
+        </p>
+        {department && (
+          <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>{department}</p>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      {score != null && (
+        <div style={{ height: 4, borderRadius: 2, background: "#F4EFF6", overflow: "hidden" }}>
+          <div style={{
+            height: "100%", width: `${score}%`,
+            background: scoreColor, borderRadius: 2,
+            transition: "width 0.6s ease",
+          }} />
+        </div>
+      )}
+
+      {/* Bottom row: hours + CTA */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        {hours != null ? (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: "#059669" }}>{hours}h</span>
+            <span style={{ fontSize: 11, color: "#9988AA" }}>saved/wk</span>
+          </div>
+        ) : (
+          <div />
+        )}
+        <Link
+          href={href}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "7px 16px", borderRadius: 10,
+            fontSize: 12, fontWeight: 700,
+            background: hovered ? "#FD5A0F" : "#FFF0EA",
+            color: hovered ? "#fff" : "#FD5A0F",
+            border: "1px solid #FDBB96",
+            textDecoration: "none",
+            flexShrink: 0,
+          }}
+        >
+          View report
+          <svg width="10" height="10" fill="none" viewBox="0 0 16 16">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </Link>
       </div>
     </div>
   );

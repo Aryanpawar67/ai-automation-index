@@ -1,9 +1,9 @@
 import { inngest }            from "./client";
 import { db }                 from "@/lib/db/client";
-import { companies, jobDescriptions } from "@/lib/db/schema";
+import { companies, jobDescriptions, batches } from "@/lib/db/schema";
 import { scrapeCareerPage }   from "@/lib/scraper";
 import { isValidJD }          from "@/lib/validation";
-import { eq, and }            from "drizzle-orm";
+import { eq, sql }            from "drizzle-orm";
 
 export const scrapeCompanyFn = inngest.createFunction(
   {
@@ -29,11 +29,15 @@ export const scrapeCompanyFn = inngest.createFunction(
 
       const result = await scrapeCareerPage(company.careerPageUrl, company.atsType ?? undefined);
 
-      // Persist the resolved ATS URL so future scrapes skip the landing-page resolution step
-      if (result.success && result.resolvedUrl && result.resolvedUrl !== company.careerPageUrl) {
-        await db.update(companies)
-          .set({ careerPageUrl: result.resolvedUrl })
-          .where(eq(companies.id, companyId));
+      // Persist the resolved ATS URL + total available jobs count
+      if (result.success) {
+        const updates: Record<string, unknown> = {};
+        if (result.resolvedUrl && result.resolvedUrl !== company.careerPageUrl)
+          updates.careerPageUrl = result.resolvedUrl;
+        if (result.totalAvailable)
+          updates.totalJobsAvailable = result.totalAvailable;
+        if (Object.keys(updates).length > 0)
+          await db.update(companies).set(updates).where(eq(companies.id, companyId));
       }
 
       if (!result.success) {
@@ -44,20 +48,27 @@ export const scrapeCompanyFn = inngest.createFunction(
         return { status: "failed", reason: result.error };
       }
 
-      // Persist ALL scraped JDs — valid ones as 'pending', invalid as 'invalid'
+      // Persist ALL scraped JDs — valid ones as 'scraped', invalid as 'invalid'
       // Both are stored so admins can inspect what was collected
       if (result.jds.length > 0) {
-        await db.insert(jobDescriptions).values(
-          result.jds.map(jd => ({
-            companyId,
-            batchId,
-            title:      jd.title,
-            rawText:    jd.rawText,
-            sourceUrl:  jd.sourceUrl ?? null,
-            department: jd.department ?? null,
-            status:     isValidJD(jd.title, jd.rawText) ? ("pending" as const) : ("invalid" as const),
-          }))
-        );
+        const jdRows = result.jds.map(jd => ({
+          companyId,
+          batchId,
+          title:      jd.title,
+          rawText:    jd.rawText,
+          sourceUrl:  jd.sourceUrl ?? null,
+          department: jd.department ?? null,
+          status:     isValidJD(jd.title, jd.rawText) ? ("scraped" as const) : ("invalid" as const),
+        }));
+        await db.insert(jobDescriptions).values(jdRows);
+
+        // Increment batch totalJds by the number of valid (non-invalid) JDs
+        const validCount = jdRows.filter(j => j.status === "scraped").length;
+        if (validCount > 0) {
+          await db.update(batches)
+            .set({ totalJds: sql`total_jds + ${validCount}` })
+            .where(eq(batches.id, batchId));
+        }
       }
 
       await db.update(companies).set({
@@ -65,27 +76,9 @@ export const scrapeCompanyFn = inngest.createFunction(
         scrapedAt:    new Date(),
       }).where(eq(companies.id, companyId));
 
-      // Fan out — only send valid (pending) JDs to LangGraph analysis
-      const validJds = await db.select()
-        .from(jobDescriptions)
-        .where(and(
-          eq(jobDescriptions.companyId, companyId),
-          eq(jobDescriptions.status, "pending"),
-        ));
-
-      if (validJds.length > 0) {
-        await inngest.send(
-          validJds.map(jd => ({
-            name: "jd/analyze" as const,
-            data: { jobDescriptionId: jd.id, batchId },
-          }))
-        );
-      }
-
-      const totalJds = result.jds.length;
-      const validCount = validJds.length;
-      const invalidCount = totalJds - validCount;
-      return { status: "complete", jdCount: validCount, invalidCount };
+      const scraped  = result.jds.length;
+      const invalid  = result.jds.filter(j => !isValidJD(j.title, j.rawText)).length;
+      return { status: "complete", scrapedCount: scraped - invalid, invalidCount: invalid };
     } catch (err) {
       // Ensure company never stays stuck in 'in_progress' if something unexpected throws
       const message = err instanceof Error ? err.message : String(err);

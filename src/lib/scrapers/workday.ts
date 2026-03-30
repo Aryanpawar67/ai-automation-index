@@ -15,9 +15,10 @@ import { stripHtml } from "../stripHtml";
 import type { ScrapedJD } from "../scraper";
 
 export interface WorkdayTenant {
-  tenant:      string;
-  jobSite:     string;
-  resolvedUrl?: string; // populated when URL was resolved from a landing page
+  tenant:       string;
+  jobSite:      string;
+  host:         string;  // full hostname e.g. comcast.wd5.myworkdayjobs.com
+  resolvedUrl?: string;  // populated when URL was resolved from a landing page
 }
 
 // ── URL extraction helpers ─────────────────────────────────────────────────
@@ -27,9 +28,9 @@ export function extractWorkdayTenant(url: string): WorkdayTenant | null {
   // Handles: company.wd5.myworkdayjobs.com/[locale/]JobSite[/...]
   //      and: company.myworkdayjobs.com/[locale/]JobSite[/...]
   const m = url.match(
-    /https?:\/\/([^.]+)\.(?:wd\d+\.)?myworkdayjobs\.com\/(?:[a-z]{2}-[A-Z]{2}\/)?([^/?#\s]+)/
+    /https?:\/\/([^.]+\.((?:wd\d+\.)?myworkdayjobs\.com))\/(?:[a-z]{2}-[A-Z]{2}\/)?([^/?#\s]+)/
   );
-  if (m) return { tenant: m[1], jobSite: m[2] };
+  if (m) return { tenant: m[1].split(".")[0], host: m[1], jobSite: m[3] };
   return null;
 }
 
@@ -40,21 +41,22 @@ export function extractTenantFromHtml(html: string): WorkdayTenant | null {
   if (jsonMatch) {
     try {
       const cfg = JSON.parse(jsonMatch[1]);
-      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, jobSite: cfg.jobSite };
+      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, host: `${cfg.tenant}.myworkdayjobs.com`, jobSite: cfg.jobSite };
     } catch { /* ignore */ }
   }
 
   // 2. CxS API URL embedded in page scripts/network calls — most reliable signal
   const cxsMatch = html.match(/\/wday\/cxs\/([a-z0-9_-]+)\/([a-z0-9_-]+)\/jobs/i);
-  if (cxsMatch) return { tenant: cxsMatch[1], jobSite: cxsMatch[2] };
+  if (cxsMatch) return { tenant: cxsMatch[1], host: `${cxsMatch[1]}.myworkdayjobs.com`, jobSite: cxsMatch[2] };
 
-  // 3. Direct myworkdayjobs.com URL in any href/src/script
+  // 3. Direct myworkdayjobs.com URL in any href/src/script — capture full host with wd shard
   const wdLinkMatch = html.match(
-    /https?:\/\/([a-z0-9-]+)\.(?:wd\d+\.)?myworkdayjobs\.com\/(?:[a-z]{2}-[A-Z]{2}\/)?([a-z0-9_-]+)/i
+    /https?:\/\/([a-z0-9-]+\.((?:wd\d+\.)?myworkdayjobs\.com))\/(?:[a-z]{2}-[A-Z]{2}\/)?([a-z0-9_-]+)/i
   );
   if (wdLinkMatch) {
     const baseUrl = wdLinkMatch[0].split(/\/login|\/apply|\/signin/i)[0];
-    return { tenant: wdLinkMatch[1], jobSite: wdLinkMatch[2], resolvedUrl: baseUrl };
+    const tenant  = wdLinkMatch[1].split(".")[0];
+    return { tenant, host: wdLinkMatch[1], jobSite: wdLinkMatch[3], resolvedUrl: baseUrl };
   }
 
   // 4. window.__WD_CONFIG__ = {...}
@@ -62,7 +64,7 @@ export function extractTenantFromHtml(html: string): WorkdayTenant | null {
   if (cfgMatch) {
     try {
       const cfg = JSON.parse(cfgMatch[1]);
-      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, jobSite: cfg.jobSite };
+      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, host: `${cfg.tenant}.myworkdayjobs.com`, jobSite: cfg.jobSite };
     } catch { /* ignore */ }
   }
 
@@ -70,7 +72,7 @@ export function extractTenantFromHtml(html: string): WorkdayTenant | null {
   const scriptMatch = html.match(
     /["']tenant["']\s*:\s*["']([^"']+)["'][\s\S]{0,300}["']jobSite["']\s*:\s*["']([^"']+)["']/i
   );
-  if (scriptMatch) return { tenant: scriptMatch[1], jobSite: scriptMatch[2] };
+  if (scriptMatch) return { tenant: scriptMatch[1], host: `${scriptMatch[1]}.myworkdayjobs.com`, jobSite: scriptMatch[2] };
 
   return null;
 }
@@ -192,11 +194,13 @@ interface WorkdayPosting {
   locationsText?: string;
 }
 
-/** POST to Workday CxS jobs search API. Returns up to 10 postings. */
-async function fetchWorkdayJobs(tenant: string, jobSite: string): Promise<WorkdayPosting[]> {
+/** POST to Workday CxS jobs search API. Returns up to 10 postings + total available count. */
+async function fetchWorkdayJobs(
+  host: string, tenant: string, jobSite: string
+): Promise<{ postings: WorkdayPosting[]; total: number }> {
   try {
     const res = await fetch(
-      `https://${tenant}.myworkdayjobs.com/wday/cxs/${tenant}/${jobSite}/jobs`,
+      `https://${host}/wday/cxs/${tenant}/${jobSite}/jobs`,
       {
         method:  "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
@@ -204,10 +208,13 @@ async function fetchWorkdayJobs(tenant: string, jobSite: string): Promise<Workda
         signal:  AbortSignal.timeout(12_000),
       }
     );
-    if (!res.ok) return [];
+    if (!res.ok) return { postings: [], total: 0 };
     const data = await res.json();
-    return (data.jobPostings ?? []).slice(0, 10);
-  } catch { return []; }
+    return {
+      postings: (data.jobPostings ?? []).slice(0, 10),
+      total:    data.total ?? data.totalJobPostings ?? (data.jobPostings?.length ?? 0),
+    };
+  } catch { return { postings: [], total: 0 }; }
 }
 
 /**
@@ -218,13 +225,14 @@ async function fetchWorkdayJobs(tenant: string, jobSite: string): Promise<Workda
  * Falls back to HTML page scraping if API returns no description.
  */
 async function fetchWorkdayJD(
+  host: string,
   tenant: string,
   jobSite: string,
   externalPath: string
 ): Promise<string> {
   // Primary: CxS JSON detail API
   try {
-    const apiUrl = `https://${tenant}.myworkdayjobs.com/wday/cxs/${tenant}/${jobSite}${externalPath}`;
+    const apiUrl = `https://${host}/wday/cxs/${tenant}/${jobSite}${externalPath}`;
     const res = await fetch(apiUrl, {
       headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)" },
       signal: AbortSignal.timeout(10_000),
@@ -246,7 +254,7 @@ async function fetchWorkdayJD(
 
   // Fallback: fetch the HTML page — look for JSON-LD or embedded job data
   try {
-    const pageUrl = `https://${tenant}.myworkdayjobs.com${externalPath}`;
+    const pageUrl = `https://${host}${externalPath}`;
     const res = await fetch(pageUrl, {
       headers: { "Accept": "text/html", "User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)" },
       signal: AbortSignal.timeout(10_000),
@@ -288,24 +296,25 @@ async function fetchWorkdayJD(
 
 // ── Public entry point ─────────────────────────────────────────────────────
 
-export async function scrapeWorkday(url: string): Promise<{ jds: ScrapedJD[]; resolvedUrl?: string }> {
+export async function scrapeWorkday(url: string): Promise<{ jds: ScrapedJD[]; resolvedUrl?: string; totalAvailable?: number }> {
   const tenantInfo = await resolveWorkdayEntryPoint(url);
   if (!tenantInfo) return { jds: [] };
 
-  const postings = await fetchWorkdayJobs(tenantInfo.tenant, tenantInfo.jobSite);
+  const { host, tenant, jobSite } = tenantInfo;
+  const { postings, total } = await fetchWorkdayJobs(host, tenant, jobSite);
   if (postings.length === 0) return { jds: [], resolvedUrl: tenantInfo.resolvedUrl };
 
   const jds: ScrapedJD[] = [];
   for (const posting of postings) {
     if (!posting.externalPath) continue;
-    const rawText = await fetchWorkdayJD(tenantInfo.tenant, tenantInfo.jobSite, posting.externalPath);
+    const rawText = await fetchWorkdayJD(host, tenant, jobSite, posting.externalPath);
     if (!rawText || rawText.length < 100) continue;
     jds.push({
       title:     posting.title,
       rawText,
-      sourceUrl: `https://${tenantInfo.tenant}.myworkdayjobs.com${posting.externalPath}`,
+      sourceUrl: `https://${host}/${jobSite}${posting.externalPath}`,
     });
   }
 
-  return { jds, resolvedUrl: tenantInfo.resolvedUrl };
+  return { jds, resolvedUrl: tenantInfo.resolvedUrl, totalAvailable: total };
 }

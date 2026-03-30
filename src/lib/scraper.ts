@@ -12,7 +12,7 @@ export interface ScrapedJD {
 }
 
 export type ScrapeResult =
-  | { success: true;  jds: ScrapedJD[]; resolvedUrl?: string }
+  | { success: true;  jds: ScrapedJD[]; resolvedUrl?: string; totalAvailable?: number }
   | { success: false; error: string; blocked: boolean };
 
 // ── Tier 1: Known ATS public APIs ─────────────────────────────────────────────
@@ -240,7 +240,7 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // Tier 1b — enterprise HCM platforms (atsType from companies table takes priority over URL detection)
     if (atsType === "workday" || /myworkdayjobs\.com/i.test(url)) {
       const result = await scrapeWorkday(url);
-      if (result.jds.length > 0) return { success: true, jds: result.jds, resolvedUrl: result.resolvedUrl };
+      if (result.jds.length > 0) return { success: true, jds: result.jds, resolvedUrl: result.resolvedUrl, totalAvailable: result.totalAvailable };
     }
     if (atsType === "oracle_hcm" || /\.fa\.[a-z0-9]+\.oraclecloud\.com/i.test(url)) {
       const jds = await scrapeOracleHCM(url);
@@ -250,7 +250,7 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       const jds = await scrapeOracleTaleo(url);
       if (jds.length > 0) return { success: true, jds };
     }
-    if (atsType === "sap_sf" || /\.jobs2web\.com|successfactors\.com/i.test(url)) {
+    if (atsType === "sap_sf" || /\.jobs2web\.com|successfactors\.com|sapsf\.com/i.test(url)) {
       const jds = await scrapeSAPSuccessFactors(url);
       if (jds.length > 0) return { success: true, jds };
     }

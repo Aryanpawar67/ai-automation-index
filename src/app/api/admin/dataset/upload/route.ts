@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db }                        from "@/lib/db/client";
 import { datasetRows }               from "@/lib/db/schema";
 import { parseExcelRaw }             from "@/lib/excel";
-import { inArray }                   from "drizzle-orm";
+import { inArray, eq }               from "drizzle-orm";
 
 // POST ?dryRun=true  → parse only, return stats (no DB write)
-// POST               → parse + insert new rows, skip exact-domain duplicates
+// POST               → insert new rows; update POC fields on existing rows
 export async function POST(req: NextRequest) {
   const dryRun = req.nextUrl.searchParams.get("dryRun") === "true";
 
@@ -32,13 +32,14 @@ export async function POST(req: NextRequest) {
   // Find which domains already exist in dataset_rows
   const incomingDomains = parsed.map(r => r.domain).filter(Boolean);
   const existing = await db
-    .select({ domain: datasetRows.domain })
+    .select({ id: datasetRows.id, domain: datasetRows.domain })
     .from(datasetRows)
     .where(inArray(datasetRows.domain, incomingDomains));
 
-  const existingDomains = new Set(existing.map(r => r.domain));
-  const newRows         = parsed.filter(r => !existingDomains.has(r.domain));
-  const duplicateCount  = parsed.length - newRows.length;
+  const existingByDomain = new Map(existing.map(r => [r.domain, r.id]));
+  const newRows           = parsed.filter(r => !existingByDomain.has(r.domain));
+  const updateRows        = parsed.filter(r => existingByDomain.has(r.domain) && (r.pocFirstName || r.pocLastName || r.pocEmail));
+  const duplicateCount    = parsed.length - newRows.length;
 
   // Dry run — return stats only
   if (dryRun) {
@@ -46,11 +47,11 @@ export async function POST(req: NextRequest) {
       total:          parsed.length,
       newRows:        newRows.length,
       duplicates:     duplicateCount,
-      existingInDb:   existingDomains.size,
+      existingInDb:   existingByDomain.size,
     });
   }
 
-  // Actual insert — only new rows
+  // Insert new rows
   if (newRows.length > 0) {
     await db.insert(datasetRows).values(
       newRows.map(r => ({
@@ -62,14 +63,26 @@ export async function POST(req: NextRequest) {
         hcmRaw:        r.hcmRaw || null,
         atsType:       r.atsType,
         careerPageUrl: r.careerPageUrl,
-        jobPreview:    r.jobPreview.length > 0 ? r.jobPreview : null,
         sourceFile:    file.name,
+        pocFirstName:  r.pocFirstName,
+        pocLastName:   r.pocLastName,
+        pocEmail:      r.pocEmail,
       }))
     );
   }
 
+  // Update POC fields on existing rows (one query per row — typically small batch)
+  for (const r of updateRows) {
+    const id = existingByDomain.get(r.domain)!;
+    await db
+      .update(datasetRows)
+      .set({ pocFirstName: r.pocFirstName, pocLastName: r.pocLastName, pocEmail: r.pocEmail })
+      .where(eq(datasetRows.id, id));
+  }
+
   return NextResponse.json({
     inserted:   newRows.length,
+    updated:    updateRows.length,
     duplicates: duplicateCount,
     total:      parsed.length,
   });

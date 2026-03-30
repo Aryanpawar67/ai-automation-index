@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db }                        from "@/lib/db/client";
 import { datasetRows, companies }    from "@/lib/db/schema";
-import { ilike, eq, and, SQL, inArray } from "drizzle-orm";
+import { ilike, eq, and, or, SQL, inArray, isNotNull } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   const sp   = req.nextUrl.searchParams;
@@ -9,16 +9,25 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(100, Math.max(10, parseInt(sp.get("limit") ?? "50")));
   const offset = (page - 1) * limit;
 
-  const ats    = sp.get("ats")    ?? "";
-  const hq     = sp.get("hq")    ?? "";
-  const size   = sp.get("size")  ?? "";
-  const search = sp.get("search") ?? "";
+  const ats       = sp.get("ats")        ?? "";
+  const hq        = sp.get("hq")        ?? "";
+  const size      = sp.get("size")      ?? "";
+  const search    = sp.get("search")    ?? "";
+  const enriched  = sp.get("enriched")  ?? "";  // 'hr' | 'linkedin' | ''
 
   const conditions: SQL[] = [];
-  if (ats)    conditions.push(eq(datasetRows.atsType, ats));
-  if (hq)     conditions.push(ilike(datasetRows.headquarters, `%${hq}%`));
-  if (size)   conditions.push(eq(datasetRows.employeeSize, size));
-  if (search) conditions.push(ilike(datasetRows.companyName, `%${search}%`));
+  if (ats)                conditions.push(eq(datasetRows.atsType, ats));
+  if (hq)                 conditions.push(ilike(datasetRows.headquarters, `%${hq}%`));
+  if (size)               conditions.push(eq(datasetRows.employeeSize, size));
+  if (enriched === "hr")  conditions.push(eq(datasetRows.hrStackStatus, "complete"));
+  if (enriched === "linkedin") conditions.push(isNotNull(datasetRows.linkedinUrl));
+  if (search) conditions.push(or(
+    ilike(datasetRows.companyName,  `%${search}%`),
+    ilike(datasetRows.domain,       `%${search}%`),
+    ilike(datasetRows.pocFirstName, `%${search}%`),
+    ilike(datasetRows.pocLastName,  `%${search}%`),
+    ilike(datasetRows.pocEmail,     `%${search}%`),
+  )!);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 

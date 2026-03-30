@@ -79,6 +79,25 @@ export const analyzeJDFn = inngest.createFunction(
         .set({ processedJds: sql`processed_jds + 1` })
         .where(eq(batches.id, batchId));
 
+      // Check if all JDs in the batch are now done → transition batch status
+      const [counts] = await db
+        .select({
+          total:     sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} NOT IN ('invalid','cancelled') THEN 1 END)`.mapWith(Number),
+          processed: sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'complete' THEN 1 END)`.mapWith(Number),
+          failed:    sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'failed' THEN 1 END)`.mapWith(Number),
+        })
+        .from(jobDescriptions)
+        .where(eq(jobDescriptions.batchId, batchId));
+
+      if (counts.total > 0 && counts.processed + counts.failed >= counts.total) {
+        await db.update(batches)
+          .set({
+            status:      counts.failed > 0 ? "partial_failure" : "complete",
+            completedAt: new Date(),
+          })
+          .where(eq(batches.id, batchId));
+      }
+
       // Generate report token for the company if not yet set
       const [company] = await db.select().from(companies)
         .where(eq(companies.id, jd.companyId));

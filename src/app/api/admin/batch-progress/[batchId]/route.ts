@@ -43,34 +43,48 @@ export async function GET(
 
           // Aggregate JDs per company
           const byCompany: Record<string, {
-            total: number; complete: number; failed: number; analyzing: number; invalid: number;
+            total: number; complete: number; failed: number; analyzing: number; invalid: number; scraped: number; cancelled: number;
           }> = {};
           for (const id of batchCompanyIds) {
-            byCompany[id] = { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 };
+            byCompany[id] = { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0, scraped: 0, cancelled: 0 };
           }
+          const jdTitlesByCompany: Record<string, string[]> = {};
           for (const jd of jdRows) {
             byCompany[jd.companyId].total++;
             if (jd.status === "complete")  byCompany[jd.companyId].complete++;
             if (jd.status === "failed")    byCompany[jd.companyId].failed++;
             if (jd.status === "analyzing") byCompany[jd.companyId].analyzing++;
             if (jd.status === "invalid")   byCompany[jd.companyId].invalid++;
+            if (jd.status === "scraped")   byCompany[jd.companyId].scraped++;
+            if (jd.status === "cancelled") byCompany[jd.companyId].cancelled++;
+            if (jd.status === "scraped") {
+              if (!jdTitlesByCompany[jd.companyId]) jdTitlesByCompany[jd.companyId] = [];
+              if (jdTitlesByCompany[jd.companyId].length < 5) jdTitlesByCompany[jd.companyId].push(jd.title);
+            }
           }
 
           const companyRows = await db.select({
-            id:           companies.id,
-            name:         companies.name,
-            scrapeStatus: companies.scrapeStatus,
-            scrapeError:  companies.scrapeError,
-            reportToken:  companies.reportToken,
+            id:                  companies.id,
+            name:                companies.name,
+            scrapeStatus:        companies.scrapeStatus,
+            scrapeError:         companies.scrapeError,
+            reportToken:         companies.reportToken,
+            totalJobsAvailable:  companies.totalJobsAvailable,
+            careerPageUrl:       companies.careerPageUrl,
+            atsType:             companies.atsType,
           }).from(companies).where(inArray(companies.id, batchCompanyIds));
 
           const payload = companyRows.map(c => ({
-            companyId:    c.id,
-            companyName:  c.name,
-            scrapeStatus: c.scrapeStatus,
-            scrapeError:  c.scrapeError,
-            reportToken:  c.reportToken,
-            jds:          byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0 },
+            companyId:           c.id,
+            companyName:         c.name,
+            scrapeStatus:        c.scrapeStatus,
+            scrapeError:         c.scrapeError,
+            reportToken:         c.reportToken,
+            totalJobsAvailable:  c.totalJobsAvailable ?? null,
+            careerPageUrl:       c.careerPageUrl,
+            atsType:             c.atsType ?? null,
+            jdTitles:            jdTitlesByCompany[c.id] ?? [],
+            jds:                 byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0, scraped: 0, cancelled: 0 },
           }));
 
           send({ type: "progress", rows: payload });
@@ -79,7 +93,7 @@ export async function GET(
           const allScrapesDone = companyRows.length === batchCompanyIds.length &&
             companyRows.every(c => ["complete", "failed", "blocked"].includes(c.scrapeStatus));
           const allJdsDone = jdRows.length > 0 &&
-            jdRows.every(j => ["complete", "failed", "invalid"].includes(j.status));
+            jdRows.every(j => ["complete", "failed", "invalid", "scraped", "cancelled"].includes(j.status));
           if (allScrapesDone && (jdRows.length === 0 || allJdsDone)) {
             send({ type: "complete" });
             break;

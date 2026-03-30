@@ -19,7 +19,7 @@ export async function GET(
     );
   }
 
-  const [company] = await db.select({ name: companies.name })
+  const [company] = await db.select({ name: companies.name, totalJobsAvailable: companies.totalJobsAvailable })
     .from(companies)
     .where(eq(companies.id, companyId));
 
@@ -49,5 +49,10 @@ export async function GET(
   // marketing/navigation string (from pre-validation batches).
   const clean = rows.filter(r => isValidTitle(r.jdTitle));
 
-  return NextResponse.json({ company: company.name, analyses: clean, token });
+  return NextResponse.json({
+    company:            company.name,
+    analyses:           clean,
+    totalJobsAvailable: company.totalJobsAvailable,
+    token,
+  });
 }

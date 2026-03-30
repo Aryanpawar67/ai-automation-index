@@ -9,18 +9,31 @@ import { notFound }                     from "next/navigation";
 
 function ExpiredScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: "linear-gradient(160deg, #FFF8F5 0%, #FFFFFF 50%, #F9F7FB 100%)" }}>
-      <div className="card p-10 max-w-sm w-full text-center">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-          style={{ background: "#fef2f2" }}>
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+    <div style={{
+      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "0 16px",
+      background: "linear-gradient(160deg, #FFF8F5 0%, #FFFFFF 50%, #F4EFF6 100%)",
+    }}>
+      <div style={{
+        background: "#fff", border: "1px solid #EAE4EF", borderRadius: 24,
+        padding: "40px 36px", maxWidth: 380, width: "100%", textAlign: "center",
+        boxShadow: "0 4px 24px rgba(34,1,51,0.08)",
+      }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 16,
+          background: "#fef2f2", border: "1px solid #fecaca",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          margin: "0 auto 16px",
+        }}>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
             <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
               stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <h1 className="text-lg font-bold mb-2" style={{ color: "#220133" }}>Link expired or invalid</h1>
-        <p className="text-sm leading-relaxed" style={{ color: "#9988AA" }}>
+        <h1 style={{ fontSize: 18, fontWeight: 800, color: "#220133", margin: "0 0 8px" }}>
+          Link expired or invalid
+        </h1>
+        <p style={{ fontSize: 13, color: "#9988AA", margin: 0, lineHeight: 1.6 }}>
           Report links are valid for 7 days. Please contact your iMocha representative for a fresh link.
         </p>
       </div>
