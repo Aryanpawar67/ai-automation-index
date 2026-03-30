@@ -48,6 +48,7 @@ const SPA_JOB_SITES = [
   /icims\.com/i,
   /taleo\.net/i,
   /successfactors/i,
+  /sapsf\.com/i,
 ];
 
 function isSPAJobSite(url: string): boolean {
