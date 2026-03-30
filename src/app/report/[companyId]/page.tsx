@@ -2,6 +2,11 @@ export const dynamic = "force-dynamic";
 
 import CompanyReportList     from "@/components/report/CompanyReportList";
 import FullAnalysisHeroStrip from "@/components/report/FullAnalysisHeroStrip";
+import { db }                from "@/lib/db/client";
+import { analyses, jobDescriptions, companies } from "@/lib/db/schema";
+import { isValidTitle }      from "@/lib/validation";
+import { eq, and, ne }       from "drizzle-orm";
+import { notFound }          from "next/navigation";
 
 function IMochaLogo({ size = 22 }: { size?: number }) {
   return (
@@ -11,40 +16,6 @@ function IMochaLogo({ size = 22 }: { size?: number }) {
       <path d="M21.575 39.46C16.327 38.072 12.129 34.08 10.73 28.873C10.38 27.831 9.506 27.137 8.456 27.137H2.334C0.935 27.137 -0.289 28.525 0.06 29.914C1.984 40.154 10.205 48.139 20.525 50.048C21.925 50.395 23.149 49.18 23.149 47.792V41.89C23.324 40.502 22.624 39.634 21.575 39.46Z" fill="#FD5A0F"/>
       <path d="M39.591 28.699C38.192 33.906 33.994 37.898 28.746 39.287C27.697 39.634 26.997 40.502 26.997 41.543V47.444C26.997 48.833 28.396 50.048 29.621 49.701C39.941 47.792 48.162 39.807 50.086 29.567C50.436 28.178 49.211 26.79 47.812 26.79H41.69C40.64 26.963 39.766 27.658 39.591 28.699Z" fill="#FD5A0F"/>
     </svg>
-  );
-}
-
-function ExpiredScreen() {
-  return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      padding: "0 16px",
-      background: "linear-gradient(160deg, #FFF8F5 0%, #FFFFFF 50%, #F4EFF6 100%)",
-    }}>
-      <div style={{
-        background: "#fff", border: "1px solid #EAE4EF", borderRadius: 24,
-        padding: "40px 36px", maxWidth: 380, width: "100%", textAlign: "center",
-        boxShadow: "0 4px 24px rgba(34,1,51,0.08)",
-      }}>
-        <div style={{
-          width: 52, height: 52, borderRadius: 16,
-          background: "#fef2f2", border: "1px solid #fecaca",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 16px",
-        }}>
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-            <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-              stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <h1 style={{ fontSize: 18, fontWeight: 800, color: "#220133", margin: "0 0 8px" }}>
-          Link expired or invalid
-        </h1>
-        <p style={{ fontSize: 13, color: "#9988AA", margin: 0, lineHeight: 1.6 }}>
-          Report links are valid for 7 days. Please contact your iMocha representative for a fresh link.
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -58,26 +29,34 @@ export default async function CompanyReportHub({
   const { companyId }  = await params;
   const { token = "" } = await searchParams;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const res    = await fetch(
-    `${appUrl}/api/report/${companyId}?token=${encodeURIComponent(token)}`,
-    { cache: "no-store" }
-  );
+  const [company] = await db
+    .select({ name: companies.name, totalJobsAvailable: companies.totalJobsAvailable })
+    .from(companies)
+    .where(eq(companies.id, companyId));
 
-  if (!res.ok) return <ExpiredScreen />;
+  if (!company) return notFound();
 
-  const data = await res.json() as {
-    company:            string;
-    analyses:           Array<{
-      analysisId:   string;
-      jdTitle:      string;
-      jdDepartment: string | null;
-      overallScore: number | null;
-      hoursSaved:   string | null;
-      createdAt:    string;
-    }>;
-    totalJobsAvailable: number | null;
-    token:              string;
+  const rows = await db
+    .select({
+      analysisId:   analyses.id,
+      jdTitle:      jobDescriptions.title,
+      jdDepartment: jobDescriptions.department,
+      overallScore: analyses.overallScore,
+      hoursSaved:   analyses.hoursSaved,
+      createdAt:    analyses.createdAt,
+    })
+    .from(analyses)
+    .innerJoin(jobDescriptions, eq(analyses.jobDescriptionId, jobDescriptions.id))
+    .where(and(eq(analyses.companyId, companyId), ne(jobDescriptions.status, "invalid")))
+    .orderBy(analyses.createdAt);
+
+  const cleanAnalyses = rows.filter(r => isValidTitle(r.jdTitle));
+
+  const data = {
+    company:            company.name,
+    analyses:           cleanAnalyses,
+    totalJobsAvailable: company.totalJobsAvailable,
+    token,
   };
 
   return (
