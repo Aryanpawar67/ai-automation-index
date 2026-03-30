@@ -1,7 +1,7 @@
-import { NextResponse }          from "next/server";
-import { db }                    from "@/lib/db/client";
-import { reportLeads, companies } from "@/lib/db/schema";
-import { eq, desc }              from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import { db }                        from "@/lib/db/client";
+import { reportLeads, companies }    from "@/lib/db/schema";
+import { eq, desc }                  from "drizzle-orm";
 
 export async function GET() {
   const rows = await db
@@ -25,4 +25,11 @@ export async function GET() {
       createdAt:   r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
     }))
   );
+}
+
+export async function DELETE(req: NextRequest) {
+  const { id } = await req.json().catch(() => ({})) as { id?: string };
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  await db.delete(reportLeads).where(eq(reportLeads.id, id));
+  return NextResponse.json({ ok: true });
 }

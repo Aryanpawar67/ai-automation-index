@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { db }                     from "@/lib/db/client";
 import { reportLeads, companies }  from "@/lib/db/schema";
 import { eq, desc }                from "drizzle-orm";
+import DeleteLeadButton            from "@/components/admin/DeleteLeadButton";
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-GB", {
@@ -95,6 +96,7 @@ export default async function LeadsPage() {
                 }}>
                   Date Submitted
                 </th>
+                <th style={{ padding: "14px 24px", width: 48 }} />
               </tr>
             </thead>
             <tbody>
@@ -156,6 +158,10 @@ export default async function LeadsPage() {
                     <span style={{ fontSize: 13, color: "#9988AA" }}>
                       {formatDate(new Date(row.createdAt))}
                     </span>
+                  </td>
+                  {/* Delete */}
+                  <td style={{ padding: "16px 16px 16px 0" }}>
+                    <DeleteLeadButton id={row.id} />
                   </td>
                 </tr>
               ))}
