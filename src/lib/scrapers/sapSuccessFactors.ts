@@ -145,6 +145,49 @@ async function scrapeViaOData(companyCode: string, fallbackUrl: string): Promise
   return [];
 }
 
+// ── SF Career Site Builder REST API on a custom domain ───────────────────────
+// Some companies host SF CSB on their own domain (e.g. jobs.atos.net).
+// The API surface is identical to career{N}.successfactors.com — only the host differs.
+
+async function scrapeViaCustomDomainCsb(host: string, companyCode: string): Promise<ScrapedJD[]> {
+  try {
+    const listRes = await fetch(
+      `https://${host}/api/rest/listjobs/v4/job?companyId=${encodeURIComponent(companyCode)}&language=en_US&pageSize=10&pageNo=0`,
+      { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(10_000) }
+    );
+    if (!listRes.ok) return [];
+    const listData = await listRes.json();
+    const jobs = (listData?.jobs ?? listData?.jobPostings ?? []) as Array<Record<string, unknown>>;
+    if (jobs.length === 0) return [];
+    const jds: ScrapedJD[] = [];
+    for (const job of jobs.slice(0, 10)) {
+      const jobId = job.jobId ?? job.jobReqId ?? job.id;
+      if (!jobId) continue;
+      try {
+        const detailRes = await fetch(
+          `https://${host}/api/rest/jobdetail/v4/job/${jobId}?companyId=${encodeURIComponent(companyCode)}&language=en_US`,
+          { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(8_000) }
+        );
+        if (!detailRes.ok) continue;
+        const detail = await detailRes.json();
+        const rawText = stripHtml([
+          detail?.jobDescription,
+          detail?.jobDescriptionStr,
+          detail?.jobSummary,
+          detail?.extJobDesc,
+        ].filter(Boolean).join("\n\n"));
+        if (rawText.length < 100) continue;
+        jds.push({
+          title:     String(job.jobTitle ?? job.title ?? "Untitled"),
+          rawText,
+          sourceUrl: `https://${host}/career?company=${companyCode}&jobId=${jobId}`,
+        });
+      } catch { continue; }
+    }
+    return jds;
+  } catch { return []; }
+}
+
 // ── Company code extraction from HTML ────────────────────────────────────────
 
 function extractCompanyCodeFromHtml(html: string): string | null {
@@ -155,6 +198,15 @@ function extractCompanyCodeFromHtml(html: string): string | null {
     html.match(/[Cc]ompany[Ii]d["'\s:=]+["']([A-Za-z0-9_-]{3,})["']/)?.[1] ??
     // ?company=X embedded in script src or iframe src
     html.match(/[?&]company=([A-Za-z0-9_-]{3,})/i)?.[1] ??
+    // SFConfig / sfConfig / SF_CONFIG object patterns
+    html.match(/(?:SFConfig|sfConfig|SF_CONFIG)\s*[=:][^{]*\{[^}]*?(?:company|tenant|companyCode)\s*[:=]\s*["']([A-Za-z0-9_-]{3,})["']/i)?.[1] ??
+    // data-company / data-tenant attributes
+    html.match(/data-company=["']([^"']+)["']/i)?.[1] ??
+    html.match(/data-tenant=["']([^"']+)["']/i)?.[1] ??
+    // companyId in REST API URLs embedded in the page
+    html.match(/\/api\/rest\/(?:listjobs|jobdetail)\/v\d+\/[^?]*\?companyId=([A-Za-z0-9_-]{3,})/i)?.[1] ??
+    // JSON config "company": "code" pattern
+    html.match(/"company"\s*:\s*"([A-Za-z0-9_-]{3,})"/i)?.[1] ??
     null
   );
 }
@@ -176,7 +228,12 @@ export async function scrapeSAPSuccessFactors(url: string): Promise<ScrapedJD[]>
 
   // 3. Custom domain — fetch page HTML to find SAP config
   try {
-    const res = await fetch(url, {
+    // Strip query params for the HTML fetch — search/filter pages often redirect to base
+    const baseUrl = new URL(url);
+    baseUrl.search = "";
+    const fetchUrl = baseUrl.toString();
+
+    const res = await fetch(fetchUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)" },
       signal:  AbortSignal.timeout(10_000),
     });
@@ -195,6 +252,9 @@ export async function scrapeSAPSuccessFactors(url: string): Promise<ScrapedJD[]>
     // Company code in HTML
     const code = extractCompanyCodeFromHtml(html);
     if (code) {
+      const host = new URL(url).hostname;
+      const customDomain = await scrapeViaCustomDomainCsb(host, code);
+      if (customDomain.length > 0) return customDomain;
       const csb = await scrapeViaCsb(code, url);
       if (csb.length > 0) return csb;
       return scrapeViaOData(code, url);
