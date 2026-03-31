@@ -58,20 +58,6 @@ const ATS_BADGE_CFG: Record<string, { label: string; bg: string; color: string }
   lever:        { label: "Lever",      bg: "#EEF5FB", color: "#4A90D9" },
 };
 
-function AtsBadge({ atsType }: { atsType: string }) {
-  const cfg = ATS_BADGE_CFG[atsType];
-  return (
-    <span style={{
-      display: "inline-block", fontSize: 10, fontWeight: 700,
-      padding: "2px 8px", borderRadius: 5,
-      background: cfg?.bg ?? "#F4EFF6",
-      color: cfg?.color ?? "#9988AA",
-    }}>
-      {cfg?.label ?? atsType}
-    </span>
-  );
-}
-
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function BatchListView({
@@ -244,21 +230,41 @@ export default function BatchListView({
                   </div>
                 </div>
 
-                {/* Right — ATS badges + available count + actions */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, flexWrap: "wrap" }}>
-                  {/* ATS badges + available roles */}
-                  {(b.atsTypes.length > 0 || b.totalAvailable > 0) && (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                      {b.atsTypes.length > 0 && (
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                          {b.atsTypes.map(a => <AtsBadge key={a} atsType={a} />)}
-                        </div>
-                      )}
-                      {b.totalAvailable > 0 && (
-                        <span style={{ fontSize: 11, color: "#9988AA", fontWeight: 500 }}>
-                          {b.totalAvailable.toLocaleString()} roles available
+                {/* Right — stat cards + actions */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+                  {/* ATS stat card */}
+                  {b.atsTypes.map(a => {
+                    const cfg = ATS_BADGE_CFG[a];
+                    return (
+                      <div key={a} style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                        padding: "8px 14px", borderRadius: 10, minWidth: 90, textAlign: "center",
+                        background: cfg?.bg ?? "#F4EFF6",
+                        border: `1.5px solid ${cfg?.color ?? "#9988AA"}30`,
+                      }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: cfg?.color ?? "#553366", lineHeight: 1 }}>
+                          {cfg?.label ?? a}
                         </span>
-                      )}
+                        <span style={{ fontSize: 10, fontWeight: 500, color: cfg?.color ?? "#9988AA", opacity: 0.7, marginTop: 2 }}>
+                          ATS / HCM
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Roles available stat card */}
+                  {b.totalAvailable > 0 && (
+                    <div style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                      padding: "8px 14px", borderRadius: 10, minWidth: 80, textAlign: "center",
+                      background: "#F4EFF6", border: "1.5px solid #C4B5D030",
+                    }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: "#220133", lineHeight: 1 }}>
+                        {b.totalAvailable.toLocaleString()}
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 500, color: "#9988AA", marginTop: 2 }}>
+                        open roles
+                      </span>
                     </div>
                   )}
 
