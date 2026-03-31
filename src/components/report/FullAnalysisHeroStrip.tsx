@@ -5,13 +5,11 @@ import { useState } from "react";
 export default function FullAnalysisHeroStrip({
   company,
   companyId,
-  token,
   totalAvailable,
   analysedCount,
 }: {
   company:        string;
   companyId:      string;
-  token:          string;
   totalAvailable: number;
   analysedCount:  number;
 }) {
@@ -27,7 +25,7 @@ export default function FullAnalysisHeroStrip({
     setErrMsg("");
     try {
       const res = await fetch(
-        `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
+        `/api/report/${companyId}/interest`,
         {
           method:  "POST",
           headers: { "Content-Type": "application/json" },

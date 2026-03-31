@@ -72,6 +72,7 @@ export async function GET(
             totalJobsAvailable:  companies.totalJobsAvailable,
             careerPageUrl:       companies.careerPageUrl,
             atsType:             companies.atsType,
+            slug:                companies.slug,
           }).from(companies).where(inArray(companies.id, batchCompanyIds));
 
           const payload = companyRows.map(c => ({
@@ -83,6 +84,7 @@ export async function GET(
             totalJobsAvailable:  c.totalJobsAvailable ?? null,
             careerPageUrl:       c.careerPageUrl,
             atsType:             c.atsType ?? null,
+            slug:                c.slug ?? null,
             jdTitles:            jdTitlesByCompany[c.id] ?? [],
             jds:                 byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0, scraped: 0, cancelled: 0 },
           }));

@@ -100,12 +100,10 @@ function formatAnalysisText(company: string, row: AnalysisRow): string {
 export default function DownloadAllButton({
   companyId,
   company,
-  token,
   count,
 }: {
   companyId: string;
   company:   string;
-  token:     string;
   count:     number;
 }) {
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
@@ -113,7 +111,7 @@ export default function DownloadAllButton({
   const handleDownload = async () => {
     setState("loading");
     try {
-      const res  = await fetch(`/api/report/${companyId}/download?token=${encodeURIComponent(token)}`);
+      const res  = await fetch(`/api/report/${companyId}/download`);
       const data = await res.json() as { company: string; analyses: AnalysisRow[] };
 
       const zip        = new JSZip();

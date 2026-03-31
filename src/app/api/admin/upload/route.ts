@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db }                        from "@/lib/db/client";
-import { batches, companies, pocs }  from "@/lib/db/schema";
-import { parseExcel }                from "@/lib/excel";
-import { inngest }                   from "@/inngest/client";
-import { eq }                        from "drizzle-orm";
+import { NextRequest, NextResponse }  from "next/server";
+import { db }                         from "@/lib/db/client";
+import { batches, companies, pocs }   from "@/lib/db/schema";
+import { parseExcel }                 from "@/lib/excel";
+import { inngest }                    from "@/inngest/client";
+import { generateUniqueSlug }         from "@/lib/slug";
+import { eq }                         from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   let formData: FormData;
@@ -58,11 +59,13 @@ export async function POST(req: NextRequest) {
         })
         .where(eq(companies.id, companyId));
     } else {
+      const slug = await generateUniqueSlug(row.companyName);
       const [newCo] = await db.insert(companies).values({
         name:          row.companyName,
         careerPageUrl: row.careerPageUrl,
         scrapeStatus:  "pending",
         atsType:       row.atsType,
+        slug,
       }).returning();
       companyId = newCo.id;
     }

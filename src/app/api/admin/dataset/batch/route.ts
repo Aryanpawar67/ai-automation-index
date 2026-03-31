@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db }                        from "@/lib/db/client";
 import { batches, companies, datasetRows, pocs } from "@/lib/db/schema";
 import { inngest }                   from "@/inngest/client";
+import { generateUniqueSlug }        from "@/lib/slug";
 import { inArray, eq }               from "drizzle-orm";
 import { validateCareerUrl }         from "@/lib/urlValidator";
 
@@ -79,11 +80,13 @@ export async function POST(req: NextRequest) {
           atsType:      row.atsType ?? existing[0].atsType,
         }).where(eq(companies.id, companyId));
       } else {
+        const slug = await generateUniqueSlug(row.companyName);
         const [newCo] = await db.insert(companies).values({
           name:          row.companyName,
           careerPageUrl: row.careerPageUrl,
           scrapeStatus:  "pending",
           atsType:       row.atsType,
+          slug,
         }).returning();
         companyId = newCo.id;
       }

@@ -31,12 +31,12 @@ export default function CompanyReportList({
   company,
   analyses,
   companyId,
-  token,
+  identifier,
 }: {
-  company:   string;
-  analyses:  AnalysisRow[];
-  companyId: string;
-  token:     string;
+  company:    string;
+  analyses:   AnalysisRow[];
+  companyId:  string;
+  identifier: string;
 }) {
   // Default order: highest score first
   const sorted = [...analyses].sort((a, b) => (b.overallScore ?? -1) - (a.overallScore ?? -1));
@@ -110,7 +110,7 @@ export default function CompanyReportList({
                   scoreColor={scoreCol}
                   hours={hours}
                   potCfg={potCfg}
-                  href={`/report/${companyId}/${a.analysisId}?token=${token}`}
+                  href={`/report/${identifier}/${a.analysisId}`}
                   delay={i * 0.05}
                 />
               );

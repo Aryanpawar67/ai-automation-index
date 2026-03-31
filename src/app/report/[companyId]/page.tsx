@@ -8,6 +8,8 @@ import { isValidTitle }      from "@/lib/validation";
 import { eq, and, ne }       from "drizzle-orm";
 import { notFound }          from "next/navigation";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function IMochaLogo({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 51 51" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -21,20 +23,21 @@ function IMochaLogo({ size = 22 }: { size?: number }) {
 
 export default async function CompanyReportHub({
   params,
-  searchParams,
 }: {
   params:       Promise<{ companyId: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<Record<string, string>>;
 }) {
-  const { companyId }  = await params;
-  const { token = "" } = await searchParams;
+  const { companyId: identifier } = await params;
 
+  // Resolve by slug or UUID
   const [company] = await db
-    .select({ name: companies.name, totalJobsAvailable: companies.totalJobsAvailable })
+    .select({ id: companies.id, name: companies.name, slug: companies.slug, totalJobsAvailable: companies.totalJobsAvailable })
     .from(companies)
-    .where(eq(companies.id, companyId));
+    .where(UUID_RE.test(identifier) ? eq(companies.id, identifier) : eq(companies.slug, identifier));
 
   if (!company) return notFound();
+
+  const companyId = company.id;
 
   const rows = await db
     .select({
@@ -54,12 +57,8 @@ export default async function CompanyReportHub({
     .filter(r => isValidTitle(r.jdTitle))
     .map(r => ({ ...r, createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt }));
 
-  const data = {
-    company:            company.name,
-    analyses:           cleanAnalyses,
-    totalJobsAvailable: company.totalJobsAvailable,
-    token,
-  };
+  // Use slug for public-facing links, fall back to UUID for old records without slug
+  const publicIdentifier = company.slug ?? companyId;
 
   return (
     <div style={{ minHeight: "100vh", background: "#F4EFF6" }}>
@@ -88,22 +87,21 @@ export default async function CompanyReportHub({
         </div>
       </nav>
 
-      {data.totalJobsAvailable != null && data.totalJobsAvailable > data.analyses.length && (
+      {company.totalJobsAvailable != null && company.totalJobsAvailable > cleanAnalyses.length && (
         <FullAnalysisHeroStrip
-          company={data.company}
+          company={company.name}
           companyId={companyId}
-          token={token}
-          totalAvailable={data.totalJobsAvailable}
-          analysedCount={data.analyses.length}
+          totalAvailable={company.totalJobsAvailable}
+          analysedCount={cleanAnalyses.length}
         />
       )}
 
       <main style={{ maxWidth: 1152, margin: "0 auto", padding: "36px 28px 60px" }}>
         <CompanyReportList
-          company={data.company}
-          analyses={data.analyses}
+          company={company.name}
+          analyses={cleanAnalyses}
           companyId={companyId}
-          token={token}
+          identifier={publicIdentifier}
         />
       </main>
 

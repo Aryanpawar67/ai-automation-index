@@ -88,6 +88,7 @@ export const companies = pgTable("companies", {
   // 'workday' | 'oracle_hcm' | 'oracle_taleo' | 'sap_sf' | null
   atsType:             text("ats_type"),
   totalJobsAvailable:  integer("total_jobs_available"),
+  slug:                text("slug").unique(),
   createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
