@@ -197,7 +197,7 @@ async function scrapeStatic(url: string): Promise<ScrapedJD[]> {
 async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
   if (!process.env.FIRECRAWL_API_KEY) return [];
   try {
-    const res = await fetch("https://api.firecrawl.dev/v1/crawl", {
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method:  "POST",
       headers: {
         "Content-Type":  "application/json",
@@ -205,19 +205,41 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
       },
       body: JSON.stringify({
         url,
-        limit:         10,
-        scrapeOptions: { formats: ["markdown"] },
-        includePaths:  ["*job*", "*career*", "*position*", "*opening*"],
+        formats: ["markdown"],
+        waitFor: 6000,
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) return [];
-    const data = await res.json() as { data?: Array<{ metadata?: { title?: string }; markdown?: string; url?: string }> };
-    return (data.data ?? []).slice(0, 10).map(page => ({
-      title:     page.metadata?.title ?? "Untitled Position",
-      rawText:   (page.markdown ?? "").slice(0, 8000),
-      sourceUrl: page.url,
-    })).filter(j => j.rawText.length > 100);
+    const data = await res.json() as { success?: boolean; data?: { markdown?: string; metadata?: { title?: string } } };
+    const markdown = data?.data?.markdown ?? "";
+    if (!markdown || markdown.length < 100) return [];
+
+    // Extract individual job links from markdown
+    const jobLinkRegex = /\[([^\]]{5,120})\]\((https?:\/\/[^\)]+(?:job|career|requisition|req_id|jobReqId|career_job_req_id)[^\)]*)\)/gi;
+    const seen = new Set<string>();
+    const jds: ScrapedJD[] = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = jobLinkRegex.exec(markdown)) !== null) {
+      const title  = match[1].trim();
+      const jobUrl = match[2].trim();
+      if (seen.has(jobUrl)) continue;
+      seen.add(jobUrl);
+      jds.push({ title, rawText: markdown.slice(0, 8000), sourceUrl: jobUrl });
+      if (jds.length >= 10) break;
+    }
+
+    // Fallback: treat the whole page as one entry
+    if (jds.length === 0) {
+      jds.push({
+        title:     data?.data?.metadata?.title ?? "Job Listing",
+        rawText:   markdown.slice(0, 8000),
+        sourceUrl: url,
+      });
+    }
+
+    return jds;
   } catch {
     return [];
   }
