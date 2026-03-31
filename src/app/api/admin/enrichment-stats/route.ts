@@ -12,7 +12,10 @@ export async function GET() {
     const [liComplete] = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(eq(datasetRows.linkedinStatus, "complete"));
     const [liNotFound] = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(eq(datasetRows.linkedinStatus, "not_found"));
     const [liFailed]   = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(eq(datasetRows.linkedinStatus, "failed"));
-    const [hasPoc]     = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(isNotNull(datasetRows.pocFirstName));
+    const [hasPoc]      = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(isNotNull(datasetRows.pocFirstName));
+    const [indComplete] = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(eq(datasetRows.industryStatus, "complete"));
+    const [indNotFound] = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(eq(datasetRows.industryStatus, "not_found"));
+    const [indFailed]   = await db.select({ n: sql<number>`count(*)::int` }).from(datasetRows).where(eq(datasetRows.industryStatus, "failed"));
 
     return NextResponse.json({
       total: total.n,
@@ -28,6 +31,12 @@ export async function GET() {
         notFound: liNotFound.n,
         failed:   liFailed.n,
         pending:  hasPoc.n - liComplete.n - liNotFound.n - liFailed.n,
+      },
+      industry: {
+        complete: indComplete.n,
+        notFound: indNotFound.n,
+        failed:   indFailed.n,
+        pending:  total.n - indComplete.n - indNotFound.n - indFailed.n,
       },
     });
   } catch (e) {

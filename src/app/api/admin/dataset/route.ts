@@ -14,11 +14,13 @@ export async function GET(req: NextRequest) {
   const size      = sp.get("size")      ?? "";
   const search    = sp.get("search")    ?? "";
   const enriched  = sp.get("enriched")  ?? "";  // 'hr' | 'linkedin' | ''
+  const industry  = sp.get("industry")  ?? "";
 
   const conditions: SQL[] = [];
   if (ats)                conditions.push(eq(datasetRows.atsType, ats));
   if (hq)                 conditions.push(ilike(datasetRows.headquarters, `%${hq}%`));
   if (size)               conditions.push(eq(datasetRows.employeeSize, size));
+  if (industry)           conditions.push(eq(datasetRows.industry, industry));
   if (enriched === "hr")  conditions.push(eq(datasetRows.hrStackStatus, "complete"));
   if (enriched === "linkedin") conditions.push(isNotNull(datasetRows.linkedinUrl));
   if (search) conditions.push(or(
@@ -63,8 +65,11 @@ export async function GET(req: NextRequest) {
   }));
 
   // Filter options for dropdowns (distinct values from full dataset)
-  const allAts  = await db.selectDistinct({ val: datasetRows.atsType }).from(datasetRows);
-  const allSizes = await db.selectDistinct({ val: datasetRows.employeeSize }).from(datasetRows);
+  const [allAts, allSizes, allIndustries] = await Promise.all([
+    db.selectDistinct({ val: datasetRows.atsType }).from(datasetRows),
+    db.selectDistinct({ val: datasetRows.employeeSize }).from(datasetRows),
+    db.selectDistinct({ val: datasetRows.industry }).from(datasetRows),
+  ]);
 
   return NextResponse.json({
     rows:    rowsWithStatus,
@@ -72,8 +77,9 @@ export async function GET(req: NextRequest) {
     page,
     pages:   Math.ceil(total / limit),
     filters: {
-      atsOptions:  allAts.map(r => r.val).filter(Boolean).sort(),
-      sizeOptions: allSizes.map(r => r.val).filter(Boolean).sort(),
+      atsOptions:      allAts.map(r => r.val).filter(Boolean).sort(),
+      sizeOptions:     allSizes.map(r => r.val).filter(Boolean).sort(),
+      industryOptions: allIndustries.map(r => r.val).filter(Boolean).sort(),
     },
   });
 }

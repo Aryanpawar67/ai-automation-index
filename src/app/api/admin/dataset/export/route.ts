@@ -58,6 +58,9 @@ export async function GET(req: NextRequest) {
     "HR Stack — HRIS":        hrField(r, "hris"),
     "HR Stack — HRIS Source": hrSource(r, "hris"),
     "HR Stack Enriched At":   r.hrStackDiscoveredAt ? new Date(r.hrStackDiscoveredAt).toISOString().slice(0, 10) : "",
+    // Industry enrichment
+    "Industry Sector":        r.industry ?? "",
+    "Industry Enriched At":   r.industryDiscoveredAt ? new Date(r.industryDiscoveredAt).toISOString().slice(0, 10) : "",
   }));
 
   const ws = XLSX.utils.json_to_sheet(sheetData);
@@ -89,7 +92,9 @@ export async function GET(req: NextRequest) {
     { wch: 40 },  // HR LXP Source
     { wch: 22 },  // HR HRIS
     { wch: 40 },  // HR HRIS Source
-    { wch: 14 },  // Enriched At
+    { wch: 14 },  // HR Enriched At
+    { wch: 22 },  // Industry Sector
+    { wch: 14 },  // Industry Enriched At
   ];
 
   const buffer   = Buffer.from(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer);

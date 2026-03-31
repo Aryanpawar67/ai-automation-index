@@ -72,6 +72,10 @@ export const datasetRows = pgTable("dataset_rows", {
   linkedinSource:       text("linkedin_source"),        // 'google_cse' | 'manual'
   linkedinStatus:       text("linkedin_status"),        // 'pending' | 'running' | 'complete' | 'not_found' | 'failed'
   linkedinDiscoveredAt: timestamp("linkedin_discovered_at", { withTimezone: true }),
+  // ── Industry sector enrichment ───────────────────────────────────────────────
+  industryStatus:       text("industry_status"),        // 'pending' | 'running' | 'complete' | 'failed' | 'not_found'
+  industry:             text("industry"),               // e.g. "Insurance", "Banking", "Healthcare"
+  industryDiscoveredAt: timestamp("industry_discovered_at", { withTimezone: true }),
 });
 
 export const companies = pgTable("companies", {

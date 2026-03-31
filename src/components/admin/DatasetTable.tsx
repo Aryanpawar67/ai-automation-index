@@ -43,6 +43,8 @@ interface DatasetRow {
   linkedinUrl:        string | null;
   linkedinConfidence: number | null;
   linkedinStatus:     string | null;
+  industry:           string | null;
+  industryStatus:     string | null;
 }
 
 interface ApiResponse {
@@ -50,7 +52,7 @@ interface ApiResponse {
   total:   number;
   page:    number;
   pages:   number;
-  filters: { atsOptions: string[]; sizeOptions: string[] };
+  filters: { atsOptions: string[]; sizeOptions: string[]; industryOptions: string[] };
 }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -313,7 +315,7 @@ export default function DatasetTable() {
   const [data,        setData]        = useState<ApiResponse | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [page,        setPage]        = useState(1);
-  const [filters,     setFilters]     = useState({ ats: "", hq: "", size: "", search: "", enriched: "" });
+  const [filters,     setFilters]     = useState({ ats: "", hq: "", size: "", search: "", enriched: "", industry: "" });
   const [searchInput, setSearchInput] = useState("");   // live input value (debounced into filters.search)
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
@@ -348,7 +350,7 @@ export default function DatasetTable() {
 
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: "50", ats: filters.ats, hq: filters.hq, size: filters.size, search: filters.search, enriched: filters.enriched });
+      const params = new URLSearchParams({ page: String(page), limit: "50", ats: filters.ats, hq: filters.hq, size: filters.size, search: filters.search, enriched: filters.enriched, industry: filters.industry });
       const res  = await fetch(`/api/admin/dataset?${params}`, { signal: controller.signal });
       const json = await res.json() as ApiResponse;
 
@@ -393,7 +395,7 @@ export default function DatasetTable() {
   const prevFiltersRef = useRef(filters);
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    if (prev.ats !== filters.ats || prev.hq !== filters.hq || prev.size !== filters.size || prev.enriched !== filters.enriched) {
+    if (prev.ats !== filters.ats || prev.hq !== filters.hq || prev.size !== filters.size || prev.enriched !== filters.enriched || prev.industry !== filters.industry) {
       setPage(1);
     }
     prevFiltersRef.current = filters;
@@ -719,8 +721,14 @@ export default function DatasetTable() {
           <option value="linkedin">LinkedIn found</option>
         </select>
 
+        <select value={filters.industry} onChange={e => setFilters(f => ({ ...f, industry: e.target.value }))}
+          style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #EAE4EF", fontSize: 13, color: "#220133", outline: "none", background: "#FAFAFA", cursor: "pointer", flex: "0 0 auto" }}>
+          <option value="">All industries</option>
+          {data?.filters.industryOptions.map(i => <option key={i} value={i}>{i}</option>)}
+        </select>
+
         {hasFilters && (
-          <button onClick={() => { setFilters({ ats: "", hq: "", size: "", search: "", enriched: "" }); setSearchInput(""); }}
+          <button onClick={() => { setFilters({ ats: "", hq: "", size: "", search: "", enriched: "", industry: "" }); setSearchInput(""); }}
             style={{ fontSize: 12, color: "#FD5A0F", background: "none", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
             ✕ Clear filters
           </button>
@@ -796,6 +804,11 @@ export default function DatasetTable() {
                     {showEnrichment && (
                       <th style={{ padding: "13px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#0077b5", whiteSpace: "nowrap" }}>
                         LinkedIn
+                      </th>
+                    )}
+                    {showEnrichment && (
+                      <th style={{ padding: "13px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#059669", whiteSpace: "nowrap" }}>
+                        Industry
                       </th>
                     )}
                   </tr>
@@ -1124,6 +1137,25 @@ export default function DatasetTable() {
                                   </div>
                                 ) : row.linkedinStatus === "running" ? (
                                   <span style={{ color: "#f59e0b", fontSize: 12 }}>Searching…</span>
+                                ) : (
+                                  <span style={{ color: "#D0C8D8", fontSize: 12 }}>—</span>
+                                )}
+                              </td>
+                            )}
+
+                            {/* Industry (enrichment column — toggle-hidden) */}
+                            {showEnrichment && (
+                              <td style={{ padding: "14px 16px", minWidth: 140 }}>
+                                {row.industry ? (
+                                  <span style={{
+                                    padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                                    background: "rgba(5,150,105,0.1)", color: "#059669",
+                                    border: "1px solid rgba(5,150,105,0.25)", whiteSpace: "nowrap",
+                                  }}>
+                                    {row.industry}
+                                  </span>
+                                ) : row.industryStatus === "running" ? (
+                                  <span style={{ color: "#f59e0b", fontSize: 12 }}>Detecting…</span>
                                 ) : (
                                   <span style={{ color: "#D0C8D8", fontSize: 12 }}>—</span>
                                 )}

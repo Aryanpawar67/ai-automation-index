@@ -6,6 +6,7 @@ interface Stats {
   total:    number;
   hrStack:  { complete: number; notFound: number; failed: number; pending: number };
   linkedin: { eligible: number; complete: number; notFound: number; failed: number; pending: number };
+  industry: { complete: number; notFound: number; failed: number; pending: number };
 }
 
 function ProgressBar({ value, total, color }: { value: number; total: number; color: string }) {
@@ -116,6 +117,7 @@ export default function EnrichmentPage() {
   const [stats,   setStats]   = useState<Stats | null>(null);
   const [hrLoad,  setHrLoad]  = useState(false);
   const [liLoad,  setLiLoad]  = useState(false);
+  const [indLoad, setIndLoad] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   const loadStats = useCallback(async () => {
@@ -158,7 +160,7 @@ export default function EnrichmentPage() {
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: "#220133" }}>Enrichment</h1>
         <p style={{ margin: "6px 0 0", color: "#9988AA", fontSize: 14 }}>
-          HR tech stack discovery + LinkedIn POC finder &middot; {stats.total.toLocaleString()} total companies
+          HR stack · LinkedIn POC · Industry sector &middot; {stats.total.toLocaleString()} total companies
         </p>
       </div>
 
@@ -192,6 +194,7 @@ export default function EnrichmentPage() {
         <strong>Free tier limit:</strong> Google Custom Search API allows <strong>100 queries/day</strong>.
         HR stack uses ~3 queries/company (≈33 companies/day safe limit).
         LinkedIn uses ~2 queries/company (≈50 companies/day safe limit).
+        Industry uses ~2 queries/company via DuckDuckGo (<strong>free, no daily limit</strong>) + ~$0.001/company for Haiku.
         &nbsp;Run in small batches or use <strong>onlyMissing</strong> daily to stay within quota.
         <br />
         <span style={{ opacity: 0.7 }}>
@@ -224,6 +227,17 @@ export default function EnrichmentPage() {
           loading={liLoad}
           onRunMissing={() => void runEnrichment("/api/admin/dataset/find-linkedin", true,  setLiLoad)}
           onRunAll     ={() => void runEnrichment("/api/admin/dataset/find-linkedin", false, setLiLoad)}
+        />
+        <StatCard
+          title="Industry Sector"
+          icon="🏭"
+          stats={stats.industry}
+          total={stats.total}
+          color="#059669"
+          batchSize={50}
+          loading={indLoad}
+          onRunMissing={() => void runEnrichment("/api/admin/dataset/enrich-industry", true,  setIndLoad)}
+          onRunAll     ={() => void runEnrichment("/api/admin/dataset/enrich-industry", false, setIndLoad)}
         />
       </div>
     </div>
