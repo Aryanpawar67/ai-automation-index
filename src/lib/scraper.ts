@@ -55,6 +55,11 @@ function isSPAJobSite(url: string): boolean {
   return SPA_JOB_SITES.some(re => re.test(url));
 }
 
+/** Detect Taleo ATS on custom domains by characteristic URL patterns. */
+function isTaleoCustomDomain(url: string): boolean {
+  return /createNewAlert=false|\/careersection\//i.test(url);
+}
+
 // Non-job marketing content paths — exclude these even if they contain job keywords
 const NON_JOB_PATH =
   /\/(about|leadership|blog|news|press|investors?|team|culture|life|values|benefits|faq|login|signup|register|privacy|terms|contact|sitemap|resources|guides|docs|support|help|diversity|inclusion)\b/i;
@@ -278,7 +283,7 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       const jds = await scrapeOracleHCM(url);
       if (jds.length > 0) return { success: true, jds };
     }
-    if (atsType === "oracle_taleo" || /taleo\.net/i.test(url)) {
+    if (atsType === "oracle_taleo" || /taleo\.net/i.test(url) || isTaleoCustomDomain(url)) {
       const jds = await scrapeOracleTaleo(url);
       if (jds.length > 0) return { success: true, jds };
     }

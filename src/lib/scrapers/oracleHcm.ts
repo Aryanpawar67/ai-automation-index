@@ -28,12 +28,11 @@ export function extractTaleoTenant(url: string): string | null {
   return m ? m[1] : null;
 }
 
-export async function scrapeOracleTaleo(url: string): Promise<ScrapedJD[]> {
-  const tenant = extractTaleoTenant(url);
-  if (!tenant) return [];
+/** Taleo REST API on any host (covers taleo.net AND custom domains). */
+async function scrapeOracleTaleoOnHost(host: string): Promise<ScrapedJD[]> {
   try {
     const listRes = await fetch(
-      `https://${tenant}.taleo.net/careersection/rest/jobboard/joblist?lang=en&act=showpage&pg=1`,
+      `https://${host}/careersection/rest/jobboard/joblist?lang=en&act=showpage&pg=1`,
       { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12_000) }
     );
     if (!listRes.ok) return [];
@@ -43,7 +42,7 @@ export async function scrapeOracleTaleo(url: string): Promise<ScrapedJD[]> {
     for (const job of jobs) {
       try {
         const jdRes = await fetch(
-          `https://${tenant}.taleo.net/careersection/api/jobdescription/en/detail/${job.jobId}`,
+          `https://${host}/careersection/api/jobdescription/en/detail/${job.jobId}`,
           { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(8_000) }
         );
         if (!jdRes.ok) continue;
@@ -53,11 +52,23 @@ export async function scrapeOracleTaleo(url: string): Promise<ScrapedJD[]> {
         jds.push({
           title:    job.title ?? "Untitled",
           rawText,
-          sourceUrl: `https://${tenant}.taleo.net/careersection/jobdetail.ftl?job=${job.jobId}`,
+          sourceUrl: `https://${host}/careersection/jobdetail.ftl?job=${job.jobId}`,
         });
-      } catch { /* skip */ }
+      } catch { continue; }
     }
     return jds;
+  } catch { return []; }
+}
+
+export async function scrapeOracleTaleo(url: string): Promise<ScrapedJD[]> {
+  // Standard taleo.net hosted
+  const tenant = extractTaleoTenant(url);
+  if (tenant) return scrapeOracleTaleoOnHost(`${tenant}.taleo.net`);
+
+  // Custom domain (e.g. careers.belden.com, careers.yash.com)
+  try {
+    const host = new URL(url).hostname;
+    return scrapeOracleTaleoOnHost(host);
   } catch { return []; }
 }
 

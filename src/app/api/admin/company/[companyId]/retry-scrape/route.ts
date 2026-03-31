@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db }                        from "@/lib/db/client";
-import { companies, pocs }           from "@/lib/db/schema";
+import { companies, pocs, jobDescriptions, batches } from "@/lib/db/schema";
 import { inngest }                   from "@/inngest/client";
-import { eq }                        from "drizzle-orm";
+import { eq, and, notInArray, sql }  from "drizzle-orm";
 
 export async function POST(
   req: NextRequest,
@@ -24,6 +24,24 @@ export async function POST(
     .where(eq(pocs.companyId, companyId));
   if (!poc)
     return NextResponse.json({ error: "Company not in any batch." }, { status: 404 });
+
+  // Delete stale JDs for this company+batch that aren't yet analysed, so
+  // re-scraping produces a clean slate without duplicate/garbage entries.
+  const staleStatuses = ["scraped", "invalid", "pending", "failed"] as const;
+  const deleted = await db.delete(jobDescriptions)
+    .where(and(
+      eq(jobDescriptions.companyId, companyId),
+      eq(jobDescriptions.batchId, batchId),
+      notInArray(jobDescriptions.status, ["complete", "analyzing"]),
+    ))
+    .returning({ id: jobDescriptions.id });
+
+  if (deleted.length > 0) {
+    // Recalculate batch totalJds to reflect the removed rows
+    await db.update(batches)
+      .set({ totalJds: sql`(SELECT COUNT(*) FROM job_descriptions WHERE batch_id = ${batchId} AND status NOT IN ('invalid','cancelled','scraped'))` })
+      .where(eq(batches.id, batchId));
+  }
 
   // Reset scrape state
   await db.update(companies)
