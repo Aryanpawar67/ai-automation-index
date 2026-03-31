@@ -204,14 +204,14 @@ async function fetchWorkdayJobs(
       {
         method:  "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body:    JSON.stringify({ appliedFacets: {}, limit: 10, offset: 0, searchText: "" }),
+        body:    JSON.stringify({ appliedFacets: {}, limit: 15, offset: 0, searchText: "" }),
         signal:  AbortSignal.timeout(12_000),
       }
     );
     if (!res.ok) return { postings: [], total: 0 };
     const data = await res.json();
     return {
-      postings: (data.jobPostings ?? []).slice(0, 10),
+      postings: (data.jobPostings ?? []).slice(0, 15),
       total:    data.total ?? data.totalJobPostings ?? (data.jobPostings?.length ?? 0),
     };
   } catch { return { postings: [], total: 0 }; }

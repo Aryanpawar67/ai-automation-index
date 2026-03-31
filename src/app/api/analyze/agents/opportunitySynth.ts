@@ -31,7 +31,7 @@ const PROMPT = (
 Identify the 4-6 highest-value AI opportunities for this role. Think beyond individual tasks — look for workflow automation clusters.
 
 Role: ${parsedJD.seniority} ${parsedJD.jobTitle}, ${parsedJD.department}
-Hours reclaimed target: ${roiData.hoursReclaimed}h/week
+Hours reclaimed target: ${roiData.estimatedHoursSavedPerWeek}h/week
 
 Scored tasks (with available tools):
 ${scoredTasks.map(t => {

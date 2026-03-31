@@ -144,6 +144,27 @@ export default function BatchListView({
         <span style={{ fontSize: 12, color: "#9988AA", whiteSpace: "nowrap" }}>
           {filtered.length} of {batches.length} batches
         </span>
+
+        {/* Export button */}
+        <a
+          href="/api/admin/export/companies"
+          download
+          className="export-xlsx-btn"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "7px 14px", borderRadius: 9, textDecoration: "none",
+            fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+            background: "#EAF7ED", color: "#24A148",
+            border: "1.5px solid #24A14830",
+            transition: "background 0.15s, color 0.15s",
+          }}
+        >
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Export XLSX
+        </a>
       </div>
 
       {/* ── Batch list ── */}
@@ -340,6 +361,7 @@ export default function BatchListView({
         .new-batch-btn:hover { transform: scale(1.03); box-shadow: 0 6px 24px rgba(253,90,15,0.5) !important; }
         .batch-filename-link:hover { color: #FD5A0F !important; }
         .batch-view-link:hover { background: #220133 !important; color: #fff !important; }
+        .export-xlsx-btn:hover { background: #24A148 !important; color: #fff !important; }
       `}</style>
     </>
   );

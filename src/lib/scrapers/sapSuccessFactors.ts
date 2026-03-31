@@ -38,13 +38,13 @@ export function extractCompanyCode(url: string): string | null {
 async function scrapeViaJobs2Web(tenant: string, fallbackUrl: string): Promise<ScrapedJD[]> {
   try {
     const res = await fetch(
-      `https://${tenant}.jobs2web.com/job-invite/list/api?limit=10&offset=0&lang=en&country=all`,
+      `https://${tenant}.jobs2web.com/job-invite/list/api?limit=15&offset=0&lang=en&country=all`,
       { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12_000) }
     );
     if (!res.ok) return [];
     const data    = await res.json();
     const results = (data?.results ?? []) as Array<Record<string, string>>;
-    return results.slice(0, 10)
+    return results.slice(0, 15)
       .map(item => ({
         title:     item.title ?? "Untitled",
         rawText:   stripHtml(item.description ?? ""),
@@ -82,7 +82,7 @@ async function scrapeViaCsb(companyCode: string, fallbackUrl: string): Promise<S
       if (jobs.length === 0) continue;
 
       const jds: ScrapedJD[] = [];
-      for (const job of jobs.slice(0, 10)) {
+      for (const job of jobs.slice(0, 15)) {
         const jobId = job.jobId ?? job.jobReqId ?? job.id;
         if (!jobId) continue;
         try {
@@ -160,7 +160,7 @@ async function scrapeViaCustomDomainCsb(host: string, companyCode: string): Prom
     const jobs = (listData?.jobs ?? listData?.jobPostings ?? []) as Array<Record<string, unknown>>;
     if (jobs.length === 0) return [];
     const jds: ScrapedJD[] = [];
-    for (const job of jobs.slice(0, 10)) {
+    for (const job of jobs.slice(0, 15)) {
       const jobId = job.jobId ?? job.jobReqId ?? job.id;
       if (!jobId) continue;
       try {

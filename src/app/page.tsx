@@ -395,7 +395,7 @@ function formatSnippet(agent: string, data: Record<string, unknown>): string {
   if (agent === "Job Description Analyser" && data.jobTitle) return `→ ${data.jobTitle} · ${data.department}`;
   if (agent === "Task Decomposer" && data.taskCount) return `→ ${data.taskCount} tasks identified`;
   if (agent.startsWith("Task Scoring") && data.topTask) return `→ Highest: ${data.topTask}`;
-  if (agent === "ROI Calculator" && data.hoursReclaimed) return `→ ${data.hoursReclaimed}h/week reclaimed · ${data.productivity_multiplier} productivity`;
+  if (agent === "ROI Calculator" && data.estimatedHoursSavedPerWeek) return `→ ${data.estimatedHoursSavedPerWeek}h/week reclaimed · ${data.productivity_multiplier} productivity`;
   if (agent === "Opportunity Synthesizer" && data.topOpportunity) return `→ Top: ${data.topOpportunity}`;
   if (agent === "Roadmap Builder") return `→ 3-phase roadmap complete`;
   return "";

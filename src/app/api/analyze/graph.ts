@@ -153,7 +153,7 @@ async function finaliseNode(state: State): Promise<Partial<State>> {
   // failure here never crashes the entire pipeline.
   let executiveSummary =
     `This ${parsedJD!.seniority} ${parsedJD!.jobTitle} role scores ${overallAutomationScore}% for automation potential, ` +
-    `with ${roiData!.hoursReclaimed}h/week reclaimed. ` +
+    `with ${roiData!.estimatedHoursSavedPerWeek}h/week reclaimed. ` +
     `Top opportunity: ${opportunities[0]?.title ?? "workflow automation"}.`;
   try {
     const summaryModel = new ChatAnthropic({ model: "claude-haiku-4-5-20251001", temperature: 0 });
@@ -162,7 +162,7 @@ async function finaliseNode(state: State): Promise<Partial<State>> {
       new SystemMessage("Return ONLY valid JSON with one field. No markdown fences."),
       new HumanMessage(
         `Write a 2-3 sentence executive summary for a ${parsedJD!.seniority} ${parsedJD!.jobTitle} role in ${parsedJD!.department}. ` +
-        `Key metrics: automation score ${overallAutomationScore}/100, ${roiData!.hoursReclaimed}h/week reclaimed, productivity multiplier ${roiData!.productivity_multiplier}. ` +
+        `Key metrics: automation score ${overallAutomationScore}/100, ${roiData!.estimatedHoursSavedPerWeek}h/week reclaimed, productivity multiplier ${roiData!.productivity_multiplier}. ` +
         `Top AI opportunity: ${opportunities[0]?.title ?? "workflow automation"}. ` +
         `Focus shift: ${roiData!.focusShift}. ` +
         `The summary should be specific to this role, business-ready, and highlight the most impactful transformation potential. Avoid generic statements. ` +
@@ -199,7 +199,6 @@ async function finaliseNode(state: State): Promise<Partial<State>> {
     automationByCategory,
     implementationRoadmap: roadmap,
     roiHighlights: {
-      hoursReclaimed:         roiData!.hoursReclaimed,
       focusShift:             roiData!.focusShift,
       productivity_multiplier: roiData!.productivity_multiplier,
       formula:                roiData!.formula,

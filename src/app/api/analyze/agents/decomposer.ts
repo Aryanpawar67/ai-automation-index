@@ -21,7 +21,7 @@ const SYSTEM = `You are an expert job analyst who breaks roles into discrete, me
 Each task must be specific enough to evaluate for AI automation independently.
 Return ONLY valid JSON, no markdown, no explanation.`;
 
-const PROMPT = (parsedJD: ParsedJD) => `Analyze this ${parsedJD.seniority} ${parsedJD.jobTitle} role and decompose it into 6-10 specific tasks.
+const PROMPT = (parsedJD: ParsedJD) => `Analyze this ${parsedJD.seniority} ${parsedJD.jobTitle} role and decompose it into 6-10 specific, day-to-day executable tasks.
 
 Role context:
 - Department: ${parsedJD.department}
@@ -30,10 +30,12 @@ Role context:
 - Tools used: ${parsedJD.toolsMentioned.join(", ")}
 
 Rules for task decomposition:
-1. Each task must come directly from the responsibilities listed above
-2. Tasks must be specific enough to score for AI automation (not vague like "manage projects")
-3. estimatedTimeShare values must sum to exactly 1.0 across all tasks
-4. Use your knowledge of this role type to estimate realistic time distributions
+1. Focus on WHAT THE PERSON ACTUALLY DOES DAILY — the concrete, repeatable execution tasks, not high-level accountabilities
+2. For technical roles (engineers, developers, analysts): include tasks like writing code, writing tests, writing documentation, code reviews, debugging, writing reports/specs — these are where AI tools provide the most leverage
+3. Do NOT create vague strategic tasks like "lead technical direction" or "manage team" unless they represent >20% of actual weekly time
+4. Tasks must be specific enough to assess which AI tools could assist (e.g. "Write unit tests for new features" not "ensure code quality")
+5. estimatedTimeShare values must sum to exactly 1.0 across all tasks
+6. Use your knowledge of this specific role type and seniority to estimate realistic time distributions
 
 Return:
 {

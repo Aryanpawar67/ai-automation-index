@@ -8,7 +8,6 @@ interface CompanyRow {
   companyName:        string;
   scrapeStatus:       string;
   scrapeError:        string | null;
-  reportToken:        string | null;
   totalJobsAvailable: number | null;
   careerPageUrl:      string;
   atsType:            string | null;
@@ -517,7 +516,7 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
 
                   {/* ── Report link ── */}
                   <td style={{ padding: "16px 20px", verticalAlign: "top" }}>
-                    {r.reportToken ? (
+                    {jds.complete > 0 ? (
                       <a
                         href={`/report/${r.slug ?? r.companyId}`}
                         target="_blank" rel="noreferrer"

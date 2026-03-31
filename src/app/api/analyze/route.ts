@@ -129,7 +129,7 @@ function buildPartialData(nodeName: string, nodeOutput: Record<string, unknown>)
       };
     case "roiCalc":
       return {
-        hoursReclaimed:         (nodeOutput.roiData as { hoursReclaimed?: number })?.hoursReclaimed,
+        estimatedHoursSavedPerWeek: (nodeOutput.roiData as { estimatedHoursSavedPerWeek?: number })?.estimatedHoursSavedPerWeek,
         productivity_multiplier: (nodeOutput.roiData as { productivity_multiplier?: string })?.productivity_multiplier,
       };
     case "synthesize":

@@ -33,7 +33,7 @@ const PROMPT = (
 Build a 3-phase AI implementation roadmap for this role.
 
 Role: ${parsedJD.seniority} ${parsedJD.jobTitle}, ${parsedJD.department}
-Target outcome: ${roiData.hoursReclaimed}h/week reclaimed — ${roiData.focusShift}
+Target outcome: ${roiData.estimatedHoursSavedPerWeek}h/week reclaimed — ${roiData.focusShift}
 
 Available tools (from research):
 ${scoredTasks

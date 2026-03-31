@@ -17,7 +17,7 @@ import type { ParsedJD, ScoredTask, ROIData } from "./types";
 
 const WORK_HOURS_PER_WEEK = 40;
 const EFFICIENCY_FACTOR   = 0.65; // accounts for AI errors, setup, human review overhead
-const MAX_HOURS_SAVED     = 12;   // 30% of 40h week — conservative first-year cap
+const MAX_HOURS_SAVED     = 20;   // 50% of 40h week — realistic ceiling for high-automation roles
 
 export function computeROI(scoredTasks: ScoredTask[]): Omit<ROIData, "focusShift"> {
   const taskBreakdown = scoredTasks.map(task => {
@@ -41,7 +41,6 @@ export function computeROI(scoredTasks: ScoredTask[]): Omit<ROIData, "focusShift
 
   return {
     estimatedHoursSavedPerWeek: cappedSaved,
-    hoursReclaimed:             cappedSaved,           // always equal — by design
     productivity_multiplier:    `${multiplier}x`,
     formula,
   };
@@ -62,7 +61,7 @@ export async function runROIAgent(scoredTasks: ScoredTask[], parsedJD: ParsedJD)
   const response = await model.invoke([
     new SystemMessage("Return ONLY valid JSON with one field. No markdown."),
     new HumanMessage(
-      `A ${parsedJD.seniority} ${parsedJD.jobTitle} will reclaim ${mathResult.hoursReclaimed}h/week ` +
+      `A ${parsedJD.seniority} ${parsedJD.jobTitle} will reclaim ${mathResult.estimatedHoursSavedPerWeek}h/week ` +
       `by automating: ${highValueTasks}. ` +
       `What higher-value work can they focus on instead? ` +
       `Return: { "focusShift": "1-2 sentence answer specific to this role" }`

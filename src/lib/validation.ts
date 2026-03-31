@@ -30,7 +30,7 @@ export function isValidContent(rawText: string): boolean {
   const wordCount = lower.split(/\s+/).filter(Boolean).length;
 
   const hits = [
-    // Structural section headers
+    // ── English structural section headers ───────────────────────────────────
     /\bresponsibilit/,                              // responsibilities / responsible
     /\brequirement/,                                // requirements
     /\bqualification/,                              // qualifications
@@ -38,42 +38,85 @@ export function isValidContent(rawText: string): boolean {
     /\bkey (skills?|duties|deliverables|tasks)/,    // key skills / duties
     /\bobjectiv/,                                   // objectives / job objective
 
-    // Role-description phrasing
-    /\bthis role\b/,                                // "this role involves / requires"
-    /\bthe role\b/,                                 // "the role will be responsible"
-    /\bthe position\b/,                             // "the position requires"
-    /\bthe (successful )?(candidate|applicant)\b/,  // "the successful candidate"
+    // ── English role-description phrasing ────────────────────────────────────
+    /\bthis role\b/,
+    /\bthe role\b/,
+    /\bthe position\b/,
+    /\bthe (successful )?(candidate|applicant)\b/,
     /\bjob (description|summary|overview|purpose)/,
-
-    // Who-we-are-looking-for phrasing
     /\bwe (are|re|'re) (looking|hiring|seeking|searching)/,
     /\bwe'?re looking/,
-    /\byou (will|'ll|should|must)\b/,               // "you will be responsible"
+    /\byou (will|'ll|should|must)\b/,
     /\bthe ideal candidate\b/,
-    /\bwhat you('ll| will) (do|bring|need)/,        // "what you'll do"
+    /\bwhat you('ll| will) (do|bring|need)/,
     /\bwhat we('re| are) looking for/,
     /\byour responsibilities\b/,
     /\byour role\b/,
 
-    // Experience / skills
+    // ── English experience / skills ──────────────────────────────────────────
     /\bexperience (with|in|of)\b/,
     /\bproven experience\b/,
     /\byears of experience\b/,
     /\bskills?\b/,
-    /\bproficien/,                                  // proficient / proficiency
+    /\bproficien/,
     /\bknowledge of\b/,
 
-    // Standard JD boilerplate
+    // ── English boilerplate ──────────────────────────────────────────────────
     /\bapply\b/,
     /\bbenefits?\b/,
     /\bsalary\b/,
     /\bcompensation\b/,
     /\bequal opportunity\b/,
+
+    // ── French ──────────────────────────────────────────────────────────────
+    /\bresponsabilit/,                              // responsabilités / responsabilité
+    /\bcompétences?\b/,
+    /\bexpérience\b/,
+    /\bmissions?\b/,
+    /\bprofil\b/,
+    /\bcandidature\b/,
+    /\bposte\b/,
+
+    // ── German ──────────────────────────────────────────────────────────────
+    /\baufgaben\b/,                                 // tasks / responsibilities
+    /\bkenntnisse\b/,                               // knowledge / skills
+    /\berfahrung\b/,                                // experience
+    /\banforderungen\b/,                            // requirements
+    /\bstellenbeschreibung\b/,                      // job description
+    /\bbewerber\b/,                                 // applicant
+
+    // ── Spanish / Portuguese ─────────────────────────────────────────────────
+    /\bresponsabilidades\b/,
+    /\brequisitos\b/,
+    /\bhabilidades\b/,
+    /\bcandidato\b/,
+    /\bexperiên/,                                   // experiência / experiências
+    /\bvaga\b/,                                     // job opening (pt)
+
+    // ── Dutch ────────────────────────────────────────────────────────────────
+    /\bverantwoordelijkheden\b/,
+    /\bkwalificaties\b/,
+    /\bervaring\b/,
+    /\bvacature\b/,
+
+    // ── Italian ──────────────────────────────────────────────────────────────
+    /\bresponsabilità\b/,
+    /\brequisiti\b/,
+    /\besperienza\b/,
   ].filter(re => re.test(lower)).length;
 
-  // Short JDs (< 120 words) only need 1 signal — they're often compact API-returned summaries
+  // Short JDs (< 120 words) only need 1 signal — often compact API-returned summaries
   const threshold = wordCount < 120 ? 1 : 2;
-  return hits >= threshold;
+  if (hits >= threshold) return true;
+
+  // Non-English fallback: long text with Cyrillic / accented characters is almost
+  // certainly a structured JD in another language (Russian, Arabic, CJK, etc.)
+  if (wordCount >= 100 && /[^\x00-\x7F]/.test(rawText)) return true;
+
+  // Very long text with zero signals = non-English JD we don't have patterns for yet
+  if (wordCount >= 250) return true;
+
+  return false;
 }
 
 /** Combined check — both title and content must pass. */

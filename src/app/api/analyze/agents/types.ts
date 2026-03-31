@@ -43,7 +43,6 @@ export interface SkillsAnalysis {
 
 export interface ROIData {
   estimatedHoursSavedPerWeek: number;
-  hoursReclaimed: number;            // always equals estimatedHoursSavedPerWeek
   productivity_multiplier: string;   // "Nx" format
   focusShift: string;
   formula: string;                   // human-readable calculation for CFO
@@ -86,7 +85,6 @@ export interface FinalAnalysis {
   automationByCategory: Array<{ category: string; score: number }>;
   implementationRoadmap: RoadmapPhase[];
   roiHighlights: {
-    hoursReclaimed: number;
     focusShift: string;
     productivity_multiplier: string;
     formula: string;

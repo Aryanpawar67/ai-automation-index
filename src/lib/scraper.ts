@@ -68,7 +68,7 @@ async function scrapeGreenhouse(url: string, boardSlug?: string): Promise<Scrape
   );
   if (!res.ok) return [];
   const data = await res.json() as { jobs?: Array<{ title: string; content: string; absolute_url: string; departments?: Array<{ name: string }> }> };
-  return (data.jobs ?? []).slice(0, 10).map(j => ({
+  return (data.jobs ?? []).slice(0, 15).map(j => ({
     title:      j.title,
     rawText:    stripHtml(j.content ?? j.title),
     sourceUrl:  j.absolute_url,
@@ -81,12 +81,12 @@ async function scrapeLever(url: string): Promise<ScrapedJD[]> {
   if (!match) return [];
   const company = match[1];
   const res     = await fetch(
-    `https://api.lever.co/v0/postings/${company}?mode=json&limit=10`,
+    `https://api.lever.co/v0/postings/${company}?mode=json&limit=15`,
     { signal: AbortSignal.timeout(10_000) }
   );
   if (!res.ok) return [];
   const data = await res.json() as Array<{ text: string; descriptionPlain: string; hostedUrl: string; categories?: { team?: string } }>;
-  return (Array.isArray(data) ? data : []).slice(0, 10).map(j => ({
+  return (Array.isArray(data) ? data : []).slice(0, 15).map(j => ({
     title:      j.text,
     rawText:    stripHtml(j.descriptionPlain ?? j.text),
     sourceUrl:  j.hostedUrl,
@@ -98,21 +98,30 @@ async function scrapeLever(url: string): Promise<ScrapedJD[]> {
 
 // Returns true if the page body looks like an actual job description
 function looksLikeJobContent(text: string): boolean {
-  const lower = text.toLowerCase();
+  const lower     = text.toLowerCase();
+  const wordCount = lower.split(/\s+/).filter(Boolean).length;
   const hits = [
-    /\bresponsibilit/,
-    /\brequirement/,
-    /\bqualification/,
-    /\bwe (are|re) (looking|hiring|seeking)/,
-    /\byou (will|ll|should|must)/,
-    /\bexperience (with|in)/,
-    /\bskills?\b/,
-    /\bbenefits?\b/,
-    /\bsalary\b/,
-    /\bcompensation\b/,
-    /\bapply\b/,
+    // English
+    /\bresponsibilit/, /\brequirement/, /\bqualification/,
+    /\bwe (are|re) (looking|hiring|seeking)/, /\byou (will|ll|should|must)/,
+    /\bexperience (with|in)/, /\bskills?\b/, /\bbenefits?\b/, /\bsalary\b/,
+    /\bcompensation\b/, /\bapply\b/,
+    // French
+    /\bresponsabilit/, /\bcompétences?\b/, /\bexpérience\b/, /\bmissions?\b/,
+    // German
+    /\baufgaben\b/, /\bkenntnisse\b/, /\berfahrung\b/, /\banforderungen\b/,
+    // Spanish / Portuguese
+    /\bresponsabilidades\b/, /\brequisitos\b/, /\bhabilidades\b/,
+    // Dutch / Italian
+    /\bvacature\b/, /\bresponsabilità\b/, /\brequisiti\b/,
   ].filter(re => re.test(lower)).length;
-  return hits >= 2;
+
+  if (hits >= 2) return true;
+  // Non-English fallback: non-ASCII chars (Cyrillic, accented, CJK) in a reasonably long text
+  if (wordCount >= 80 && /[^\x00-\x7F]/.test(text)) return true;
+  // Very long structured text with no known-language signals
+  if (wordCount >= 200) return true;
+  return false;
 }
 
 // Extract the best available title from a JD page
@@ -171,7 +180,7 @@ async function scrapeStatic(url: string): Promise<ScrapedJD[]> {
   });
 
   const jds: ScrapedJD[] = [];
-  for (const link of jobLinks.slice(0, 10)) {
+  for (const link of jobLinks.slice(0, 15)) {
     try {
       const jdRes = await fetch(link, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)" },

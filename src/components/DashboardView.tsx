@@ -44,7 +44,7 @@ export interface Analysis {
   skillsAnalysis: { futureProof: string[]; atRisk: string[]; aiAugmented: string[] };
   automationByCategory: { category: string; score: number }[];
   implementationRoadmap: RoadmapPhase[];
-  roiHighlights: { hoursReclaimed: number; focusShift: string; productivity_multiplier: string; formula?: string };
+  roiHighlights: { focusShift: string; productivity_multiplier: string; formula?: string };
 }
 
 // ── Design helpers ────────────────────────────────────────────────────────────

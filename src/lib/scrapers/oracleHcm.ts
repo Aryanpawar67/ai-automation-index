@@ -38,7 +38,7 @@ export async function scrapeOracleTaleo(url: string): Promise<ScrapedJD[]> {
     );
     if (!listRes.ok) return [];
     const data = await listRes.json();
-    const jobs  = (data?.requisition ?? []).slice(0, 10);
+    const jobs  = (data?.requisition ?? []).slice(0, 15);
     const jds: ScrapedJD[] = [];
     for (const job of jobs) {
       try {
@@ -116,7 +116,7 @@ async function probeRegions(pod: string, siteNumber: string): Promise<OracleCont
 function buildListUrl(base: string, siteNumber: string): string {
   const finder = siteNumber ? `&finder=findReqs;siteNumber=${encodeURIComponent(siteNumber)}` : "";
   return `${base}/hcmRestApi/resources/latest/recruitingCEJobRequisitions` +
-    `?onlyData=true&limit=10&expand=requisitionList${finder}`;
+    `?onlyData=true&limit=15&expand=requisitionList${finder}`;
 }
 
 interface OracleListJob {
@@ -200,7 +200,7 @@ export async function scrapeOracleHCM(url: string): Promise<ScrapedJD[]> {
 
   // Fetch individual JD detail for each job
   const jds: ScrapedJD[] = [];
-  for (const job of jobs.slice(0, 10)) {
+  for (const job of jobs.slice(0, 15)) {
     const rawText = await fetchJobDetail(ctx.base, job.Id);
     if (!rawText || rawText.length < 100) continue;
 

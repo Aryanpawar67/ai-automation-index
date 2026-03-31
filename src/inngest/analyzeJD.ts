@@ -1,10 +1,9 @@
 import { inngest }                         from "./client";
 import { db }                              from "@/lib/db/client";
 import { jobDescriptions, analyses, companies, batches } from "@/lib/db/schema";
-import { generateReportToken }             from "@/lib/token";
 import { createAnalysisGraph }             from "@/app/api/analyze/graph";
 import { isValidJD }                       from "@/lib/validation";
-import { eq, sql }                         from "drizzle-orm";
+import { eq, sql, and }                    from "drizzle-orm";
 import type { FinalAnalysis }              from "@/app/api/analyze/agents/types";
 
 export const analyzeJDFn = inngest.createFunction(
@@ -31,6 +30,45 @@ export const analyzeJDFn = inngest.createFunction(
         await db.update(jobDescriptions)
           .set({ status: "invalid" })
           .where(eq(jobDescriptions.id, jobDescriptionId));
+
+        // Try to pull a reserve JD for the same company from the 'scraped' pool
+        // (extras beyond the initial 10 are left as 'scraped' by the analyse route)
+        const [reserve] = await db
+          .select({ id: jobDescriptions.id })
+          .from(jobDescriptions)
+          .where(and(
+            eq(jobDescriptions.companyId, jd.companyId),
+            eq(jobDescriptions.batchId, batchId),
+            eq(jobDescriptions.status, "scraped"),
+          ))
+          .limit(1);
+
+        if (reserve) {
+          await db.update(jobDescriptions)
+            .set({ status: "pending" })
+            .where(eq(jobDescriptions.id, reserve.id));
+          await db.update(batches)
+            .set({ totalJds: sql`total_jds + 1` })
+            .where(eq(batches.id, batchId));
+          await inngest.send({ name: "jd/analyze" as const, data: { jobDescriptionId: reserve.id, batchId } });
+          return { status: "skipped", reason: "invalid JD — replacement queued", replacementId: reserve.id };
+        }
+
+        // No reserve available — check if this was the last JD in the batch
+        const [counts] = await db
+          .select({
+            total:     sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} NOT IN ('invalid','cancelled','scraped') THEN 1 END)`.mapWith(Number),
+            processed: sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'complete' THEN 1 END)`.mapWith(Number),
+            failed:    sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'failed' THEN 1 END)`.mapWith(Number),
+          })
+          .from(jobDescriptions)
+          .where(eq(jobDescriptions.batchId, batchId));
+        if (counts.total > 0 && counts.processed + counts.failed >= counts.total) {
+          await db.update(batches)
+            .set({ status: counts.failed > 0 ? "partial_failure" : "complete", completedAt: new Date() })
+            .where(eq(batches.id, batchId));
+        }
+
         return { status: "skipped", reason: "did not pass JD validation" };
       }
 
@@ -98,16 +136,6 @@ export const analyzeJDFn = inngest.createFunction(
           .where(eq(batches.id, batchId));
       }
 
-      // Generate report token for the company if not yet set
-      const [company] = await db.select().from(companies)
-        .where(eq(companies.id, jd.companyId));
-      if (company && !company.reportToken) {
-        const { token, expiresAt } = generateReportToken(jd.companyId);
-        await db.update(companies)
-          .set({ reportToken: token, tokenExpiresAt: expiresAt })
-          .where(eq(companies.id, jd.companyId));
-      }
-
       return { status: "complete" };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -117,6 +145,23 @@ export const analyzeJDFn = inngest.createFunction(
       await db.update(batches)
         .set({ failedJds: sql`failed_jds + 1` })
         .where(eq(batches.id, batchId));
+
+      // Check if this failure completes the batch (mirrors the success-path check)
+      const [counts] = await db
+        .select({
+          total:     sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} NOT IN ('invalid','cancelled') THEN 1 END)`.mapWith(Number),
+          processed: sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'complete' THEN 1 END)`.mapWith(Number),
+          failed:    sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'failed' THEN 1 END)`.mapWith(Number),
+        })
+        .from(jobDescriptions)
+        .where(eq(jobDescriptions.batchId, batchId));
+
+      if (counts.total > 0 && counts.processed + counts.failed >= counts.total) {
+        await db.update(batches)
+          .set({ status: "partial_failure", completedAt: new Date() })
+          .where(eq(batches.id, batchId));
+      }
+
       throw err;
     }
   }
