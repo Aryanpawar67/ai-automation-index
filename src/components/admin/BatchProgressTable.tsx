@@ -43,6 +43,32 @@ function avatarColor(name: string): string {
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 }
 
+// ── ATS badge config ──────────────────────────────────────────────────────────
+
+const ATS_BADGE_CFG: Record<string, { label: string; bg: string; color: string }> = {
+  workday:      { label: "Workday",    bg: "#E8F4FD", color: "#0078D4" },
+  sap_sf:       { label: "SAP SF",     bg: "#E8F2F8", color: "#007DB8" },
+  oracle_hcm:   { label: "Oracle HCM", bg: "#FDF0EE", color: "#C74634" },
+  oracle_taleo: { label: "Taleo",      bg: "#FDF0EE", color: "#C74634" },
+  greenhouse:   { label: "Greenhouse", bg: "#EAF7ED", color: "#24A148" },
+  lever:        { label: "Lever",      bg: "#EEF5FB", color: "#4A90D9" },
+};
+
+function AtsBadge({ atsType }: { atsType: string | null }) {
+  if (!atsType) return null;
+  const cfg = ATS_BADGE_CFG[atsType];
+  return (
+    <span style={{
+      display: "inline-block", fontSize: 10, fontWeight: 700,
+      padding: "2px 7px", borderRadius: 5, marginBottom: 5,
+      background: cfg?.bg ?? "#F4EFF6",
+      color: cfg?.color ?? "#9988AA",
+    }}>
+      {cfg?.label ?? atsType}
+    </span>
+  );
+}
+
 // ── Status config ──────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { bg: string; text: string; label: string; dot?: boolean }> = {
@@ -207,6 +233,9 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
   const [done,          setDone]          = useState(false);
   const [error,         setError]         = useState(false);
   const [analyseAllState, setAnalyseAllState] = useState<"idle" | "loading" | "done">("idle");
+  const [filterStatus,  setFilterStatus]  = useState("all");
+  const [filterAts,     setFilterAts]     = useState("all");
+  const [search,        setSearch]        = useState("");
 
   function toggleExpand(companyId: string) {
     setExpandedIds(prev => {
@@ -234,6 +263,15 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
   const failedJDs  = rows.reduce((s, r) => s + (r.jds?.failed   ?? 0), 0);
   const scrapedJDs = rows.reduce((s, r) => s + (r.jds?.scraped  ?? 0), 0);
 
+  const uniqueAtsTypes = Array.from(new Set(rows.map(r => r.atsType).filter(Boolean))) as string[];
+
+  const filteredRows = rows.filter(r => {
+    if (filterStatus !== "all" && r.scrapeStatus !== filterStatus) return false;
+    if (filterAts    !== "all" && r.atsType      !== filterAts)    return false;
+    if (search && !r.companyName.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
   // ── Empty / loading state ──
   if (rows.length === 0) {
     return (
@@ -253,8 +291,40 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
     );
   }
 
+  const selectStyle: React.CSSProperties = {
+    border: "1px solid #EAE4EF", borderRadius: 8, padding: "7px 10px",
+    fontSize: 12, color: "#220133", background: "#fff", cursor: "pointer",
+  };
+
   return (
     <div>
+      {/* ── Filter bar ── */}
+      <div style={{ padding: "12px 24px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #F4EFF6", flexWrap: "wrap" }}>
+        <input
+          type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search company…"
+          style={{ ...selectStyle, padding: "7px 12px", fontSize: 13, minWidth: 180, flex: 1 }}
+        />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
+          <option value="all">All Statuses</option>
+          <option value="complete">Complete</option>
+          <option value="failed">Failed</option>
+          <option value="blocked">Blocked</option>
+          <option value="in_progress">In Progress</option>
+          <option value="pending">Pending</option>
+          <option value="scraped">Scraped</option>
+        </select>
+        <select value={filterAts} onChange={e => setFilterAts(e.target.value)} style={selectStyle}>
+          <option value="all">All ATS</option>
+          {uniqueAtsTypes.map(a => (
+            <option key={a} value={a}>{ATS_BADGE_CFG[a]?.label ?? a}</option>
+          ))}
+        </select>
+        <span style={{ fontSize: 12, color: "#9988AA", whiteSpace: "nowrap" }}>
+          {filteredRows.length} of {rows.length} companies
+        </span>
+      </div>
+
       {/* ── Analyse All banner ── */}
       {scrapedJDs > 0 && analyseAllState !== "done" && (
         <div style={{
@@ -327,7 +397,7 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, idx) => {
+            {filteredRows.map((r, idx) => {
               const jds        = r.jds ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0, scraped: 0, cancelled: 0 };
               const validTotal = jds.total - (jds.invalid ?? 0);
               const rowPct     = validTotal ? Math.round((jds.complete / validTotal) * 100) : 0;
@@ -337,7 +407,7 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
               const hasUrl     = r.atsType && !isDirectApiUrl(r.careerPageUrl, r.atsType);
               const isExpanded = expandedIds.has(r.companyId);
               const canExpand  = jds.complete > 0;
-              const isLast     = idx === rows.length - 1;
+              const isLast     = idx === filteredRows.length - 1;
 
               return (
                 <React.Fragment key={r.companyId}>
@@ -516,6 +586,7 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
 
                   {/* ── Report link ── */}
                   <td style={{ padding: "16px 20px", verticalAlign: "top" }}>
+                    <AtsBadge atsType={r.atsType} />
                     {r.reportToken ? (
                       <a
                         href={`/report/${r.companyId}?token=${r.reportToken}`}
