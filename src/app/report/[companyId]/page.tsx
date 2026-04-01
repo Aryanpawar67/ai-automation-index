@@ -92,11 +92,11 @@ export default async function CompanyReportHub({
         </div>
       </nav>
 
-      {company.totalJobsAvailable != null && company.totalJobsAvailable > cleanAnalyses.length && (
+      {cleanAnalyses.length > 0 && (
         <FullAnalysisHeroStrip
           company={company.name}
           companyId={companyId}
-          totalAvailable={company.totalJobsAvailable}
+          totalAvailable={company.totalJobsAvailable ?? cleanAnalyses.length}
           analysedCount={cleanAnalyses.length}
           token={token}
         />
