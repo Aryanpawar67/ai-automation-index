@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { CopyButton } from "@/components/ui/copy-button";
 
 interface CompanyRow {
   companyId:          string;
@@ -518,28 +519,35 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
                   {/* ── Report link ── */}
                   <td style={{ padding: "16px 20px", verticalAlign: "top" }}>
                     {jds.complete > 0 ? (
-                      <a
-                        href={r.reportToken ? `/report/${r.slug ?? r.companyId}?token=${r.reportToken}` : `/report/${r.slug ?? r.companyId}`}
-                        target="_blank" rel="noreferrer"
-                        style={{
-                          display: "inline-flex", alignItems: "center", gap: 5,
-                          padding: "7px 14px", borderRadius: 8,
-                          fontSize: 12, fontWeight: 700,
-                          background: "#FFF0EA", color: "#FD5A0F",
-                          border: "1px solid #FDBB96", textDecoration: "none",
-                          transition: "all 0.15s",
-                        }}
-                        onMouseEnter={e => {
-                          (e.currentTarget as HTMLAnchorElement).style.background = "#FD5A0F";
-                          (e.currentTarget as HTMLAnchorElement).style.color = "#fff";
-                        }}
-                        onMouseLeave={e => {
-                          (e.currentTarget as HTMLAnchorElement).style.background = "#FFF0EA";
-                          (e.currentTarget as HTMLAnchorElement).style.color = "#FD5A0F";
-                        }}
-                      >
-                        View ↗
-                      </a>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <a
+                          href={r.reportToken ? `/report/${r.slug ?? r.companyId}?token=${r.reportToken}` : `/report/${r.slug ?? r.companyId}`}
+                          target="_blank" rel="noreferrer"
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: 5,
+                            padding: "7px 14px", borderRadius: 8,
+                            fontSize: 12, fontWeight: 700,
+                            background: "#FFF0EA", color: "#FD5A0F",
+                            border: "1px solid #FDBB96", textDecoration: "none",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLAnchorElement).style.background = "#FD5A0F";
+                            (e.currentTarget as HTMLAnchorElement).style.color = "#fff";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLAnchorElement).style.background = "#FFF0EA";
+                            (e.currentTarget as HTMLAnchorElement).style.color = "#FD5A0F";
+                          }}
+                        >
+                          View ↗
+                        </a>
+                        {r.reportToken && (
+                          <CopyButton
+                            content={`${typeof window !== "undefined" ? window.location.origin : ""}/report/${r.slug ?? r.companyId}?token=${r.reportToken}`}
+                          />
+                        )}
+                      </div>
                     ) : (
                       <span style={{ fontSize: 12, color: "#D0C8D8" }}>Pending…</span>
                     )}
