@@ -1,12 +1,12 @@
-// Industry sector detection — two layers:
-// Layer 1 (free):   2× DuckDuckGo searches (→ Google CSE fallback) for company profile snippets
-// Layer 2 (Claude): Haiku classifies snippets into a canonical 28-sector taxonomy
+// Industry sector detection — Haiku-first, DDG fallback only for unknowns.
 //
-// Cost per company: ~$0.001 (Haiku only — web searches are free via DuckDuckGo)
-// Batch cap: 50 companies/run (conservative for Google CSE fallback quota)
+// Pass 1: Claude Haiku from training knowledge (no web search).
+//         Covers ~83% of companies instantly.
+// Pass 2: One DuckDuckGo search for truly obscure companies, then retry Haiku.
+//
+// Cost per company: ~$0.001 (Haiku) — web searches are free via DDG.
 
 import { ChatAnthropic } from "@langchain/anthropic";
-import { webSearchText } from "@/lib/webSearch";
 
 // ── Taxonomy ───────────────────────────────────────────────────────────────────
 
@@ -57,44 +57,68 @@ export interface EnrichIndustryOutput {
   confidence: number;
 }
 
-// ── Claude classification ─────────────────────────────────────────────────────
+// ── Haiku classification ──────────────────────────────────────────────────────
 
-const CLASSIFICATION_PROMPT = `You are an industry classification specialist. Given web search snippets about a company, determine which single industry sector best describes the company's PRIMARY business.
-
-Respond with ONLY a JSON object in this exact shape:
-{"industry": "Insurance", "confidence": 85}
-
-Rules:
-- You MUST pick exactly one industry from this list:
-${INDUSTRY_TAXONOMY.map(i => `  "${i}"`).join(",\n")}
-- "confidence" is 0–100. Use 0 if you cannot determine the industry.
-- If confidence < 50, return {"industry": null, "confidence": 0}
-- Never guess. Use only information present in the snippets provided.
-- "Technology" is a last resort — only use it if the company makes software/hardware as its core product. IT services firms → "Consulting & Professional Services".`;
+const llm = new ChatAnthropic({ model: "claude-haiku-4-5-20251001", maxTokens: 100 });
 
 async function claudeClassify(
   companyName: string,
-  rawText: string,
+  domain: string,
+  extraContext = "",
 ): Promise<{ industry: string | null; confidence: number }> {
   try {
-    const llm = new ChatAnthropic({ model: "claude-haiku-4-5-20251001", maxTokens: 128 });
-    const msg = await llm.invoke([
-      { role: "system", content: CLASSIFICATION_PROMPT },
-      { role: "user",   content: `Company: ${companyName}\n\n---\n\n${rawText.slice(0, 3000)}` },
-    ]);
+    const prompt = `You are an industry classification specialist.
+
+Classify the company into exactly one industry sector from the list below based on your training knowledge.
+
+Company: ${companyName}
+Domain:  ${domain}
+${extraContext ? `Context: ${extraContext}` : ""}
+
+Industry list:
+${INDUSTRY_TAXONOMY.map(i => `- ${i}`).join("\n")}
+
+Rules:
+- Return ONLY valid JSON: {"industry": "Insurance", "confidence": 90}
+- confidence = 0–100. If < 50, return {"industry": null, "confidence": 0}
+- "Technology" is last resort — IT services / consulting → "Consulting & Professional Services"
+- Never guess. If genuinely unknown, return null.`;
+
+    const msg  = await llm.invoke([{ role: "user", content: prompt }]);
     const text = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
-    const json = text.match(/\{[\s\S]*\}/)?.[0];
+    const json = text.match(/\{[\s\S]*?\}/)?.[0];
     if (!json) return { industry: null, confidence: 0 };
+
     const parsed = JSON.parse(json) as { industry?: string | null; confidence?: number };
-    const industry  = parsed.industry ?? null;
+    const industry   = parsed.industry ?? null;
     const confidence = parsed.confidence ?? 0;
-    // Validate the returned label is in the taxonomy
+
     if (industry && !(INDUSTRY_TAXONOMY as readonly string[]).includes(industry)) {
       return { industry: null, confidence: 0 };
     }
     return { industry, confidence };
   } catch {
     return { industry: null, confidence: 0 };
+  }
+}
+
+// ── DuckDuckGo fallback ───────────────────────────────────────────────────────
+
+async function ddgSnippet(companyName: string): Promise<string> {
+  try {
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(`"${companyName}" industry sector company profile`)}&kl=us-en`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return "";
+    const html = await res.text();
+    const snippets = [...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g)]
+      .slice(0, 3)
+      .map(m => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    return snippets.join(" | ");
+  } catch {
+    return "";
   }
 }
 
@@ -106,31 +130,22 @@ export async function enrichIndustry(
   const { companyName, domain } = input;
 
   try {
-    const parts: string[] = [];
-
-    const queries = [
-      `"${companyName}" industry sector company profile about`,
-      `"${domain}" company industry business overview`,
-    ];
-
-    for (const q of queries) {
-      const text = await webSearchText(q, 5);
-      if (text) parts.push(`[Search: ${q}]\n${text}`);
-      await new Promise(r => setTimeout(r, 300));
+    // Pass 1: Haiku from training knowledge alone — fast, no web calls
+    const result = await claudeClassify(companyName, domain);
+    if (result.industry && result.confidence >= 50) {
+      return { status: "complete", industry: result.industry, confidence: result.confidence };
     }
 
-    const rawText = parts.join("\n\n---\n\n");
-    if (rawText.length < 100) {
-      return { status: "not_found", industry: null, confidence: 0 };
+    // Pass 2: one DDG search for extra context, then retry
+    const snippet = await ddgSnippet(companyName);
+    if (snippet) {
+      const result2 = await claudeClassify(companyName, domain, snippet.slice(0, 500));
+      if (result2.industry && result2.confidence >= 50) {
+        return { status: "complete", industry: result2.industry, confidence: result2.confidence };
+      }
     }
 
-    const { industry, confidence } = await claudeClassify(companyName, rawText);
-
-    if (industry && confidence >= 50) {
-      return { status: "complete", industry, confidence };
-    }
     return { status: "not_found", industry: null, confidence: 0 };
-
   } catch {
     return { status: "failed", industry: null, confidence: 0 };
   }
