@@ -12,6 +12,7 @@ interface CompanyRow {
   careerPageUrl:      string;
   atsType:            string | null;
   slug:               string | null;
+  reportToken:        string | null;
   jdTitles:           string[];
   jds: { total: number; complete: number; failed: number; analyzing: number; invalid: number; scraped: number; cancelled: number };
 }
@@ -518,7 +519,7 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
                   <td style={{ padding: "16px 20px", verticalAlign: "top" }}>
                     {jds.complete > 0 ? (
                       <a
-                        href={`/report/${r.slug ?? r.companyId}`}
+                        href={r.reportToken ? `/report/${r.slug ?? r.companyId}?token=${r.reportToken}` : `/report/${r.slug ?? r.companyId}`}
                         target="_blank" rel="noreferrer"
                         style={{
                           display: "inline-flex", alignItems: "center", gap: 5,
