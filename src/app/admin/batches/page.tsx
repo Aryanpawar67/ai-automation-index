@@ -49,6 +49,27 @@ export default async function BatchesPage() {
     .leftJoin(datasetRows, eq(datasetRows.careerPageUrl, companies.careerPageUrl))
     .groupBy(pocs.batchId);
 
+  // Report token per batch — take the first company (by name) that has analyses
+  const reportMeta = await db
+    .select({
+      batchId:     pocs.batchId,
+      slug:        companies.slug,
+      companyId:   companies.id,
+      reportToken: companies.reportToken,
+    })
+    .from(pocs)
+    .innerJoin(companies, eq(companies.id, pocs.companyId))
+    .orderBy(companies.name);
+
+  // One report link per batch: first company with a token and at least one processed JD
+  const reportMetaMap = new Map<string, string>();
+  for (const r of reportMeta) {
+    if (!reportMetaMap.has(r.batchId) && r.reportToken) {
+      const identifier = r.slug ?? r.companyId;
+      reportMetaMap.set(r.batchId, `/report/${identifier}?token=${r.reportToken}`);
+    }
+  }
+
   const industryMetaMap = new Map(industryMeta.map(r => [r.batchId, r.industries ?? []]));
   const atsMetaMap = new Map(atsMeta.map(r => [r.batchId, r]));
 
@@ -67,6 +88,7 @@ export default async function BatchesPage() {
       atsTypes:       meta?.atsTypes  ?? [],
       totalAvailable: meta?.totalAvailable ?? 0,
       industries:     industryMetaMap.get(r.id) ?? [],
+      reportLink:     reportMetaMap.get(r.id) ?? null,
     };
   });
 

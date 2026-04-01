@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import DeleteBatchButton from "./DeleteBatchButton";
+import { CopyButton } from "@/components/ui/copy-button";
 
 export interface BatchItem {
   id:              string;
@@ -19,6 +20,7 @@ export interface BatchItem {
   atsTypes:        string[];
   totalAvailable:  number;
   industries:      string[];
+  reportLink:      string | null;
 }
 
 // ── Status config ──────────────────────────────────────────────────────────────
@@ -302,6 +304,13 @@ export default function BatchListView({
                   )}
 
                   <div className="batch-row-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {b.reportLink && b.processedJds > 0 && (
+                      <CopyButton
+                        content={typeof window !== "undefined"
+                          ? `${window.location.origin}${b.reportLink}`
+                          : b.reportLink}
+                      />
+                    )}
                     <Link href={`/admin/batches/${b.id}`} className="batch-view-link" style={{
                       padding: "7px 16px", borderRadius: 9,
                       fontSize: 12, fontWeight: 700,
