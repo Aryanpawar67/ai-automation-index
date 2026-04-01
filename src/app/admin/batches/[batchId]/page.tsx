@@ -133,6 +133,23 @@ export default async function BatchDetailPage({
             </div>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+              <a
+                href={`/api/admin/batches/${batchId}/export`}
+                download
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 10, fontSize: 12,
+                  fontWeight: 600, color: "rgba(255,255,255,0.7)",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  textDecoration: "none", transition: "background 0.15s",
+                }}
+              >
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+                  <path d="M12 2v10m0 0l-3-3m3 3l3-3M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Export XLSX
+              </a>
               <BatchActionButtons batchId={batchId} status={batch.status} />
             </div>
           </div>

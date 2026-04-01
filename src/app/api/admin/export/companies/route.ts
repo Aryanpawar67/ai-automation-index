@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db }                        from "@/lib/db/client";
 import { batches, companies, pocs, jobDescriptions, analyses } from "@/lib/db/schema";
 import { eq, sql }                   from "drizzle-orm";
+import { generatePermanentToken }    from "@/lib/token";
 import * as XLSX                     from "xlsx";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
       totalJobsAvailable: companies.totalJobsAvailable,
       slug:               companies.slug,
       companyId:          companies.id,
+      reportToken:        companies.reportToken,
       batchName:          batches.filename,
       batchCustomName:    batches.name,
       batchCreatedAt:     batches.createdAt,
@@ -46,9 +48,22 @@ export async function GET(req: NextRequest) {
     lever:        "Lever",
   };
 
+  // Lazy-generate tokens for existing companies that don't have one yet
+  const tokenMap = new Map<string, string>();
+  for (const r of rows) {
+    if (r.reportToken) {
+      tokenMap.set(r.companyId, r.reportToken);
+    } else {
+      const token = generatePermanentToken();
+      await db.update(companies).set({ reportToken: token }).where(eq(companies.id, r.companyId));
+      tokenMap.set(r.companyId, token);
+    }
+  }
+
   const sheetData = rows.map(r => {
     const identifier = r.slug ?? r.companyId;
-    const reportUrl  = `${origin}/report/${identifier}`;
+    const token      = tokenMap.get(r.companyId) ?? "";
+    const reportUrl  = `${origin}/report/${identifier}?token=${token}`;
     const batchLabel = r.batchCustomName ?? r.batchName;
     const batchDate  = r.batchCreatedAt
       ? new Date(r.batchCreatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })

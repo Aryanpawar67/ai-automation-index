@@ -1,7 +1,11 @@
-import { createHmac } from "crypto";
+import { createHmac, randomBytes } from "crypto";
 
 const SECRET      = process.env.HMAC_SECRET ?? "dev-secret-change-in-prod";
 const EXPIRY_DAYS = 7;
+
+export function generatePermanentToken(): string {
+  return randomBytes(32).toString("hex");
+}
 
 export function generateReportToken(companyId: string): {
   token: string;

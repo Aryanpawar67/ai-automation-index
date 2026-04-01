@@ -3,6 +3,7 @@ import { db }                        from "@/lib/db/client";
 import { batches, companies, datasetRows, pocs } from "@/lib/db/schema";
 import { inngest }                   from "@/inngest/client";
 import { generateUniqueSlug }        from "@/lib/slug";
+import { generatePermanentToken }    from "@/lib/token";
 import { inArray, eq }               from "drizzle-orm";
 import { validateCareerUrl }         from "@/lib/urlValidator";
 
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
           scrapeStatus:  "pending",
           atsType:       row.atsType,
           slug,
+          reportToken:   generatePermanentToken(),
         }).returning();
         companyId = newCo.id;
       }

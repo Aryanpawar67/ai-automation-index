@@ -7,11 +7,13 @@ export default function FullAnalysisHeroStrip({
   companyId,
   totalAvailable,
   analysedCount,
+  token,
 }: {
   company:        string;
   companyId:      string;
   totalAvailable: number;
   analysedCount:  number;
+  token:          string;
 }) {
   const [email,   setEmail]   = useState("");
   const [state,   setState]   = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -25,7 +27,7 @@ export default function FullAnalysisHeroStrip({
     setErrMsg("");
     try {
       const res = await fetch(
-        `/api/report/${companyId}/interest`,
+        `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
         {
           method:  "POST",
           headers: { "Content-Type": "application/json" },

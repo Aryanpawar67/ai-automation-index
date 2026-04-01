@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse }          from "next/server";
 import { db }                                 from "@/lib/db/client";
 import { analyses, jobDescriptions, companies } from "@/lib/db/schema";
-import { verifyReportToken }                  from "@/lib/token";
 import { isValidTitle }                       from "@/lib/validation";
 import { eq, and, ne }                        from "drizzle-orm";
 
@@ -12,16 +11,12 @@ export async function GET(
   const { companyId } = await params;
   const token         = req.nextUrl.searchParams.get("token") ?? "";
 
-  if (!verifyReportToken(companyId, token)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
-
-  const [company] = await db.select({ name: companies.name })
+  const [company] = await db.select({ name: companies.name, reportToken: companies.reportToken })
     .from(companies)
     .where(eq(companies.id, companyId));
 
-  if (!company) {
-    return NextResponse.json({ error: "Company not found." }, { status: 404 });
+  if (!company || !company.reportToken || token !== company.reportToken) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   const rows = await db

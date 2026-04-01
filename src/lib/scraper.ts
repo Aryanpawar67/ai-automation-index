@@ -281,15 +281,15 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     }
     if (atsType === "oracle_hcm" || /\.fa\.[a-z0-9]+\.oraclecloud\.com/i.test(url)) {
       const jds = await scrapeOracleHCM(url);
-      if (jds.length > 0) return { success: true, jds };
+      if (jds.length > 0) return { success: true, jds, totalAvailable: jds.length };
     }
     if (atsType === "oracle_taleo" || /taleo\.net/i.test(url) || isTaleoCustomDomain(url)) {
       const jds = await scrapeOracleTaleo(url);
-      if (jds.length > 0) return { success: true, jds };
+      if (jds.length > 0) return { success: true, jds, totalAvailable: jds.length };
     }
     if (atsType === "sap_sf" || /\.jobs2web\.com|successfactors\.com|sapsf\.com/i.test(url)) {
       const jds = await scrapeSAPSuccessFactors(url);
-      if (jds.length > 0) return { success: true, jds };
+      if (jds.length > 0) return { success: true, jds, totalAvailable: jds.length };
     }
 
     // Tier 2 — static HTML (skip for known JS-rendered SPAs)

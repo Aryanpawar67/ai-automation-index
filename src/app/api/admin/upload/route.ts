@@ -4,6 +4,7 @@ import { batches, companies, pocs }   from "@/lib/db/schema";
 import { parseExcel }                 from "@/lib/excel";
 import { inngest }                    from "@/inngest/client";
 import { generateUniqueSlug }         from "@/lib/slug";
+import { generatePermanentToken }     from "@/lib/token";
 import { eq }                         from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
         scrapeStatus:  "pending",
         atsType:       row.atsType,
         slug,
+        reportToken:   generatePermanentToken(),
       }).returning();
       companyId = newCo.id;
     }

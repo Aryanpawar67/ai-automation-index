@@ -23,19 +23,24 @@ function IMochaLogo({ size = 22 }: { size?: number }) {
 
 export default async function CompanyReportHub({
   params,
+  searchParams,
 }: {
   params:       Promise<{ companyId: string }>;
   searchParams: Promise<Record<string, string>>;
 }) {
   const { companyId: identifier } = await params;
+  const { token } = await searchParams;
 
   // Resolve by slug or UUID
   const [company] = await db
-    .select({ id: companies.id, name: companies.name, slug: companies.slug, totalJobsAvailable: companies.totalJobsAvailable })
+    .select({ id: companies.id, name: companies.name, slug: companies.slug, totalJobsAvailable: companies.totalJobsAvailable, reportToken: companies.reportToken })
     .from(companies)
     .where(UUID_RE.test(identifier) ? eq(companies.id, identifier) : eq(companies.slug, identifier));
 
   if (!company) return notFound();
+
+  // Token gate — reject if no token or token doesn't match
+  if (!token || !company.reportToken || token !== company.reportToken) return notFound();
 
   const companyId = company.id;
 
@@ -93,6 +98,7 @@ export default async function CompanyReportHub({
           companyId={companyId}
           totalAvailable={company.totalJobsAvailable}
           analysedCount={cleanAnalyses.length}
+          token={token}
         />
       )}
 
@@ -102,6 +108,7 @@ export default async function CompanyReportHub({
           analyses={cleanAnalyses}
           companyId={companyId}
           identifier={publicIdentifier}
+          token={token}
         />
       </main>
 
