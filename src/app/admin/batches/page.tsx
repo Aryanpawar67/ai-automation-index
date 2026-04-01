@@ -84,19 +84,40 @@ export default async function BatchesPage() {
           </h1>
           <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>{rows.length} total upload{rows.length !== 1 ? "s" : ""}</p>
         </div>
-        <Link href="/admin" className="new-batch-btn" style={{
-          display: "inline-flex", alignItems: "center", gap: 7,
-          padding: "10px 22px", borderRadius: 12,
-          background: "linear-gradient(135deg, #220133, #FD5A0F)",
-          color: "#fff", fontWeight: 700, fontSize: 13,
-          textDecoration: "none", boxShadow: "0 4px 16px rgba(253,90,15,0.35)",
-          transition: "transform 0.15s, box-shadow 0.15s",
-        }}>
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
-          </svg>
-          New Batch
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <a
+            href="/api/admin/dataset/export"
+            download
+            className="export-xlsx-btn"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "10px 18px", borderRadius: 12, textDecoration: "none",
+              fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+              background: "#EAF7ED", color: "#24A148",
+              border: "1.5px solid #24A14830",
+              transition: "background 0.15s, color 0.15s",
+            }}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Export XLSX
+          </a>
+          <Link href="/admin" className="new-batch-btn" style={{
+            display: "inline-flex", alignItems: "center", gap: 7,
+            padding: "10px 22px", borderRadius: 12,
+            background: "linear-gradient(135deg, #220133, #FD5A0F)",
+            color: "#fff", fontWeight: 700, fontSize: 13,
+            textDecoration: "none", boxShadow: "0 4px 16px rgba(253,90,15,0.35)",
+            transition: "transform 0.15s, box-shadow 0.15s",
+          }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+            </svg>
+            New Batch
+          </Link>
+        </div>
       </div>
 
       {/* ── Empty state ── */}
@@ -135,6 +156,7 @@ export default async function BatchesPage() {
 
       <style>{`
         .new-batch-btn:hover { transform: scale(1.03); box-shadow: 0 6px 24px rgba(253,90,15,0.5) !important; }
+        .export-xlsx-btn:hover { background: #24A148 !important; color: #fff !important; }
       `}</style>
     </div>
   );

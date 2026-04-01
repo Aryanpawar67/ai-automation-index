@@ -154,27 +154,6 @@ export default function BatchListView({
         <span style={{ fontSize: 12, color: "#9988AA", whiteSpace: "nowrap" }}>
           {filtered.length} of {batches.length} batches
         </span>
-
-        {/* Export button */}
-        <a
-          href="/api/admin/export/companies"
-          download
-          className="export-xlsx-btn"
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "7px 14px", borderRadius: 9, textDecoration: "none",
-            fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-            background: "#EAF7ED", color: "#24A148",
-            border: "1.5px solid #24A14830",
-            transition: "background 0.15s, color 0.15s",
-          }}
-        >
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Export XLSX
-        </a>
       </div>
 
       {/* ── Batch list ── */}
@@ -245,7 +224,7 @@ export default function BatchListView({
                   </div>
 
                   {/* Meta row */}
-                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#9988AA" }}>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#9988AA", marginBottom: 8 }}>
                     <span title={fullDate} style={{ cursor: "default" }}>🕐 {ago}</span>
                     <span>👤 {b.totalPocs} POC{b.totalPocs !== 1 ? "s" : ""}</span>
                     <span style={{ color: "#10b981", fontWeight: 600 }}>✓ {b.processedJds} done</span>
@@ -259,58 +238,54 @@ export default function BatchListView({
                       </span>
                     )}
                   </div>
-                </div>
 
-                {/* Right — stat cards + actions */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
-                  {/* ATS stat card */}
-                  {b.atsTypes.map(a => {
-                    const cfg = ATS_BADGE_CFG[a];
-                    return (
-                      <div key={a} style={{
-                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                        padding: "8px 14px", borderRadius: 10, minWidth: 90, textAlign: "center",
-                        background: cfg?.bg ?? "#F4EFF6",
-                        border: `1.5px solid ${cfg?.color ?? "#9988AA"}30`,
-                      }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: cfg?.color ?? "#553366", lineHeight: 1 }}>
-                          {cfg?.label ?? a}
+                  {/* Tag row — ATS + industry pills */}
+                  {(b.atsTypes.length > 0 || b.industries.length > 0) && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                      {b.atsTypes.map(a => {
+                        const cfg = ATS_BADGE_CFG[a];
+                        return (
+                          <span key={a} style={{
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                            padding: "3px 9px", borderRadius: 20,
+                            fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+                            background: cfg?.bg ?? "#F4EFF6",
+                            color: cfg?.color ?? "#553366",
+                          }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg?.color ?? "#553366", flexShrink: 0 }} />
+                            {cfg?.label ?? a}
+                          </span>
+                        );
+                      })}
+                      {b.atsTypes.length > 0 && b.industries.length > 0 && (
+                        <span style={{ width: 1, height: 14, background: "#EAE4EF", display: "inline-block", alignSelf: "center", flexShrink: 0 }} />
+                      )}
+                      {b.industries.slice(0, 3).map(ind => (
+                        <span key={ind} style={{
+                          display: "inline-flex", alignItems: "center",
+                          padding: "3px 9px", borderRadius: 20,
+                          fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+                          background: "rgba(5,150,105,0.08)", color: "#059669",
+                          border: "1px solid rgba(5,150,105,0.18)",
+                        }}>
+                          {ind}
                         </span>
-                        <span style={{ fontSize: 10, fontWeight: 500, color: cfg?.color ?? "#9988AA", opacity: 0.7, marginTop: 2 }}>
-                          ATS / HCM
+                      ))}
+                      {b.industries.length > 3 && (
+                        <span style={{
+                          padding: "3px 9px", borderRadius: 20,
+                          fontSize: 11, fontWeight: 700,
+                          background: "#F4EFF6", color: "#7C5C99",
+                        }}>
+                          +{b.industries.length - 3}
                         </span>
-                      </div>
-                    );
-                  })}
-
-                  {/* Industry badges */}
-                  {b.industries.slice(0, 3).map(ind => (
-                    <div key={ind} style={{
-                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                      padding: "8px 14px", borderRadius: 10, minWidth: 90, maxWidth: 130, textAlign: "center",
-                      background: "rgba(5,150,105,0.08)",
-                      border: "1.5px solid rgba(5,150,105,0.2)",
-                    }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#059669", lineHeight: 1.2, wordBreak: "break-word" }}>
-                        {ind}
-                      </span>
-                      <span style={{ fontSize: 10, fontWeight: 500, color: "#059669", opacity: 0.7, marginTop: 2 }}>
-                        industry
-                      </span>
-                    </div>
-                  ))}
-                  {b.industries.length > 3 && (
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "8px 12px", borderRadius: 10,
-                      background: "rgba(5,150,105,0.06)", border: "1.5px solid rgba(5,150,105,0.15)",
-                      fontSize: 12, fontWeight: 700, color: "#059669",
-                    }}>
-                      +{b.industries.length - 3}
+                      )}
                     </div>
                   )}
+                </div>
 
-                  {/* Roles available stat card */}
+                {/* Right — open roles + actions */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                   {b.totalAvailable > 0 && (
                     <div style={{
                       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -326,7 +301,6 @@ export default function BatchListView({
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div className="batch-row-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <Link href={`/admin/batches/${b.id}`} className="batch-view-link" style={{
                       padding: "7px 16px", borderRadius: 9,
@@ -398,7 +372,6 @@ export default function BatchListView({
         .new-batch-btn:hover { transform: scale(1.03); box-shadow: 0 6px 24px rgba(253,90,15,0.5) !important; }
         .batch-filename-link:hover { color: #FD5A0F !important; }
         .batch-view-link:hover { background: #220133 !important; color: #fff !important; }
-        .export-xlsx-btn:hover { background: #24A148 !important; color: #fff !important; }
       `}</style>
     </>
   );
