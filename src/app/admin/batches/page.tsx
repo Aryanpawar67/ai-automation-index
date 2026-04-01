@@ -4,6 +4,7 @@ import Link              from "next/link";
 import { db }            from "@/lib/db/client";
 import { batches, jobDescriptions, pocs, companies } from "@/lib/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
+import { datasetRows } from "@/lib/db/schema";
 import BatchListView, { BatchItem } from "@/components/admin/BatchListView";
 
 export default async function BatchesPage() {
@@ -37,6 +38,18 @@ export default async function BatchesPage() {
     .leftJoin(companies, eq(companies.id, pocs.companyId))
     .groupBy(pocs.batchId);
 
+  // Industries per batch (via pocs → companies ← dataset_rows on career_page_url)
+  const industryMeta = await db
+    .select({
+      batchId:    pocs.batchId,
+      industries: sql<string[]>`array_agg(DISTINCT ${datasetRows.industry}) FILTER (WHERE ${datasetRows.industry} IS NOT NULL)`,
+    })
+    .from(pocs)
+    .leftJoin(companies, eq(companies.id, pocs.companyId))
+    .leftJoin(datasetRows, eq(datasetRows.careerPageUrl, companies.careerPageUrl))
+    .groupBy(pocs.batchId);
+
+  const industryMetaMap = new Map(industryMeta.map(r => [r.batchId, r.industries ?? []]));
   const atsMetaMap = new Map(atsMeta.map(r => [r.batchId, r]));
 
   // Derive effective status and merge ATS metadata
@@ -53,6 +66,7 @@ export default async function BatchesPage() {
       effectiveStatus,
       atsTypes:       meta?.atsTypes  ?? [],
       totalAvailable: meta?.totalAvailable ?? 0,
+      industries:     industryMetaMap.get(r.id) ?? [],
     };
   });
 

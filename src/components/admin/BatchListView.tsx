@@ -18,6 +18,7 @@ export interface BatchItem {
   effectiveStatus: string;
   atsTypes:        string[];
   totalAvailable:  number;
+  industries:      string[];
 }
 
 // ── Status config ──────────────────────────────────────────────────────────────
@@ -71,18 +72,19 @@ export default function BatchListView({
   activeCount:   number;
   failedCount:   number;
 }) {
-  const [search,       setSearch]       = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterAts,    setFilterAts]    = useState("all");
+  const [search,          setSearch]          = useState("");
+  const [filterStatus,    setFilterStatus]    = useState("all");
+  const [filterAts,       setFilterAts]       = useState("all");
+  const [filterIndustry,  setFilterIndustry]  = useState("all");
 
-  const uniqueAts = Array.from(
-    new Set(batches.flatMap(b => b.atsTypes))
-  ).sort();
+  const uniqueAts = Array.from(new Set(batches.flatMap(b => b.atsTypes))).sort();
+  const uniqueIndustries = Array.from(new Set(batches.flatMap(b => b.industries))).sort();
 
   const filtered = batches.filter(b => {
-    if (filterStatus !== "all" && b.effectiveStatus !== filterStatus) return false;
-    if (filterAts !== "all" && !b.atsTypes.includes(filterAts))       return false;
-    if (search && !b.filename.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterStatus   !== "all" && b.effectiveStatus !== filterStatus)          return false;
+    if (filterAts      !== "all" && !b.atsTypes.includes(filterAts))             return false;
+    if (filterIndustry !== "all" && !b.industries.includes(filterIndustry))      return false;
+    if (search && !b.filename.toLowerCase().includes(search.toLowerCase()))      return false;
     return true;
   });
 
@@ -138,6 +140,14 @@ export default function BatchListView({
             <option value="all">All ATS</option>
             {uniqueAts.map(a => (
               <option key={a} value={a}>{ATS_BADGE_CFG[a]?.label ?? a}</option>
+            ))}
+          </select>
+        )}
+        {uniqueIndustries.length > 0 && (
+          <select value={filterIndustry} onChange={e => setFilterIndustry(e.target.value)} style={selectStyle}>
+            <option value="all">All Industries</option>
+            {uniqueIndustries.map(i => (
+              <option key={i} value={i}>{i}</option>
             ))}
           </select>
         )}
@@ -272,6 +282,33 @@ export default function BatchListView({
                       </div>
                     );
                   })}
+
+                  {/* Industry badges */}
+                  {b.industries.slice(0, 3).map(ind => (
+                    <div key={ind} style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                      padding: "8px 14px", borderRadius: 10, minWidth: 90, maxWidth: 130, textAlign: "center",
+                      background: "rgba(5,150,105,0.08)",
+                      border: "1.5px solid rgba(5,150,105,0.2)",
+                    }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#059669", lineHeight: 1.2, wordBreak: "break-word" }}>
+                        {ind}
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 500, color: "#059669", opacity: 0.7, marginTop: 2 }}>
+                        industry
+                      </span>
+                    </div>
+                  ))}
+                  {b.industries.length > 3 && (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "8px 12px", borderRadius: 10,
+                      background: "rgba(5,150,105,0.06)", border: "1.5px solid rgba(5,150,105,0.15)",
+                      fontSize: 12, fontWeight: 700, color: "#059669",
+                    }}>
+                      +{b.industries.length - 3}
+                    </div>
+                  )}
 
                   {/* Roles available stat card */}
                   {b.totalAvailable > 0 && (
