@@ -1,7 +1,7 @@
 import { NextRequest }      from "next/server";
 import { db }               from "@/lib/db/client";
 import { companies, jobDescriptions, pocs } from "@/lib/db/schema";
-import { eq, inArray }      from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 export async function GET(
   req: NextRequest,
@@ -63,31 +63,47 @@ export async function GET(
             }
           }
 
-          const companyRows = await db.select({
-            id:                  companies.id,
-            name:                companies.name,
-            scrapeStatus:        companies.scrapeStatus,
-            scrapeError:         companies.scrapeError,
-            totalJobsAvailable:  companies.totalJobsAvailable,
-            careerPageUrl:       companies.careerPageUrl,
-            atsType:             companies.atsType,
-            slug:                companies.slug,
-            reportToken:         companies.reportToken,
-          }).from(companies).where(inArray(companies.id, batchCompanyIds));
+          const [companyRows, pocRows2] = await Promise.all([
+            db.select({
+              id:                  companies.id,
+              name:                companies.name,
+              scrapeStatus:        companies.scrapeStatus,
+              scrapeError:         companies.scrapeError,
+              totalJobsAvailable:  companies.totalJobsAvailable,
+              careerPageUrl:       companies.careerPageUrl,
+              atsType:             companies.atsType,
+              slug:                companies.slug,
+              reportToken:         companies.reportToken,
+            }).from(companies).where(inArray(companies.id, batchCompanyIds)),
+            db.select({
+              companyId:   pocs.companyId,
+              firstName:   sql<string>`MIN(${pocs.firstName})`,
+              lastName:    sql<string>`MIN(${pocs.lastName})`,
+            }).from(pocs)
+              .where(eq(pocs.batchId, batchId))
+              .groupBy(pocs.companyId),
+          ]);
 
-          const payload = companyRows.map(c => ({
-            companyId:           c.id,
-            companyName:         c.name,
-            scrapeStatus:        c.scrapeStatus,
-            scrapeError:         c.scrapeError,
-            totalJobsAvailable:  c.totalJobsAvailable ?? null,
-            careerPageUrl:       c.careerPageUrl,
-            atsType:             c.atsType ?? null,
-            slug:                c.slug ?? null,
-            reportToken:         c.reportToken ?? null,
-            jdTitles:            jdTitlesByCompany[c.id] ?? [],
-            jds:                 byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0, scraped: 0, cancelled: 0 },
-          }));
+          const pocMap = new Map(pocRows2.map(p => [p.companyId, p]));
+
+          const payload = companyRows.map(c => {
+            const poc = pocMap.get(c.id);
+            return {
+              companyId:           c.id,
+              companyName:         c.name,
+              scrapeStatus:        c.scrapeStatus,
+              scrapeError:         c.scrapeError,
+              totalJobsAvailable:  c.totalJobsAvailable ?? null,
+              careerPageUrl:       c.careerPageUrl,
+              atsType:             c.atsType ?? null,
+              slug:                c.slug ?? null,
+              reportToken:         c.reportToken ?? null,
+              pocFirstName:        poc?.firstName ?? null,
+              pocLastName:         poc?.lastName  ?? null,
+              jdTitles:            jdTitlesByCompany[c.id] ?? [],
+              jds:                 byCompany[c.id] ?? { total: 0, complete: 0, failed: 0, analyzing: 0, invalid: 0, scraped: 0, cancelled: 0 },
+            };
+          });
 
           send({ type: "progress", rows: payload });
 

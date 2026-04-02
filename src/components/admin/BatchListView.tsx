@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import DeleteBatchButton from "./DeleteBatchButton";
-import { CopyButton } from "@/components/ui/copy-button";
+import { CopyButton }          from "@/components/ui/copy-button";
+import { GenerateEmailButton } from "@/components/ui/generate-email-button";
 
 export interface BatchItem {
   id:              string;
@@ -20,7 +21,10 @@ export interface BatchItem {
   atsTypes:        string[];
   totalAvailable:  number;
   industries:      string[];
-  reportLink:      string | null;
+  reportLink:       string | null;
+  emailCompanyName: string | null;
+  pocFirstName:     string | null;
+  pocLastName:      string | null;
 }
 
 // ── Status config ──────────────────────────────────────────────────────────────
@@ -309,6 +313,16 @@ export default function BatchListView({
                         content={typeof window !== "undefined"
                           ? `${window.location.origin}${b.reportLink}`
                           : b.reportLink}
+                      />
+                    )}
+                    {b.reportLink && pct >= 60 && (
+                      <GenerateEmailButton
+                        companyName={b.emailCompanyName ?? b.name ?? b.filename}
+                        reportLink={typeof window !== "undefined"
+                          ? `${window.location.origin}${b.reportLink}`
+                          : b.reportLink}
+                        pocFirstName={b.pocFirstName}
+                        pocLastName={b.pocLastName}
                       />
                     )}
                     <Link href={`/admin/batches/${b.id}`} className="batch-view-link" style={{

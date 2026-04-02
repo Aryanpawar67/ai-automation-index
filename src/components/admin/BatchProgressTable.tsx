@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { CopyButton } from "@/components/ui/copy-button";
+import { CopyButton }          from "@/components/ui/copy-button";
+import { GenerateEmailButton } from "@/components/ui/generate-email-button";
 
 interface CompanyRow {
   companyId:          string;
@@ -14,6 +15,8 @@ interface CompanyRow {
   atsType:            string | null;
   slug:               string | null;
   reportToken:        string | null;
+  pocFirstName:       string | null;
+  pocLastName:        string | null;
   jdTitles:           string[];
   jds: { total: number; complete: number; failed: number; analyzing: number; invalid: number; scraped: number; cancelled: number };
 }
@@ -545,6 +548,14 @@ export default function BatchProgressTable({ batchId }: { batchId: string }) {
                         {r.reportToken && (
                           <CopyButton
                             content={`${typeof window !== "undefined" ? window.location.origin : ""}/report/${r.slug ?? r.companyId}?token=${r.reportToken}`}
+                          />
+                        )}
+                        {r.reportToken && rowPct >= 60 && (
+                          <GenerateEmailButton
+                            companyName={r.companyName}
+                            reportLink={`${typeof window !== "undefined" ? window.location.origin : ""}/report/${r.slug ?? r.companyId}?token=${r.reportToken}`}
+                            pocFirstName={r.pocFirstName}
+                            pocLastName={r.pocLastName}
                           />
                         )}
                       </div>

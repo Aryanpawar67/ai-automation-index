@@ -49,24 +49,37 @@ export default async function BatchesPage() {
     .leftJoin(datasetRows, eq(datasetRows.careerPageUrl, companies.careerPageUrl))
     .groupBy(pocs.batchId);
 
-  // Report token per batch — take the first company (by name) that has analyses
+  // Report token + company name + POC per batch — first company alphabetically with a token
   const reportMeta = await db
     .select({
-      batchId:     pocs.batchId,
-      slug:        companies.slug,
-      companyId:   companies.id,
-      reportToken: companies.reportToken,
+      batchId:      pocs.batchId,
+      slug:         companies.slug,
+      companyId:    companies.id,
+      companyName:  companies.name,
+      reportToken:  companies.reportToken,
+      pocFirstName: pocs.firstName,
+      pocLastName:  pocs.lastName,
     })
     .from(pocs)
     .innerJoin(companies, eq(companies.id, pocs.companyId))
     .orderBy(companies.name);
 
-  // One report link per batch: first company with a token and at least one processed JD
-  const reportMetaMap = new Map<string, string>();
+  // One entry per batch: first company with a token
+  const reportMetaMap = new Map<string, {
+    link:         string;
+    companyName:  string;
+    pocFirstName: string;
+    pocLastName:  string;
+  }>();
   for (const r of reportMeta) {
     if (!reportMetaMap.has(r.batchId) && r.reportToken) {
       const identifier = r.slug ?? r.companyId;
-      reportMetaMap.set(r.batchId, `/report/${identifier}?token=${r.reportToken}`);
+      reportMetaMap.set(r.batchId, {
+        link:         `/report/${identifier}?token=${r.reportToken}`,
+        companyName:  r.companyName,
+        pocFirstName: r.pocFirstName,
+        pocLastName:  r.pocLastName,
+      });
     }
   }
 
@@ -87,8 +100,11 @@ export default async function BatchesPage() {
       effectiveStatus,
       atsTypes:       meta?.atsTypes  ?? [],
       totalAvailable: meta?.totalAvailable ?? 0,
-      industries:     industryMetaMap.get(r.id) ?? [],
-      reportLink:     reportMetaMap.get(r.id) ?? null,
+      industries:       industryMetaMap.get(r.id) ?? [],
+      reportLink:       reportMetaMap.get(r.id)?.link         ?? null,
+      emailCompanyName: reportMetaMap.get(r.id)?.companyName  ?? null,
+      pocFirstName:     reportMetaMap.get(r.id)?.pocFirstName ?? null,
+      pocLastName:      reportMetaMap.get(r.id)?.pocLastName  ?? null,
     };
   });
 
