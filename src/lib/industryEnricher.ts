@@ -59,7 +59,11 @@ export interface EnrichIndustryOutput {
 
 // ── Haiku classification ──────────────────────────────────────────────────────
 
-const llm = new ChatAnthropic({ model: "claude-haiku-4-5-20251001", maxTokens: 100 });
+let llm: ChatAnthropic | null = null;
+function getLlm() {
+  if (!llm) llm = new ChatAnthropic({ model: "claude-haiku-4-5-20251001", maxTokens: 100 });
+  return llm;
+}
 
 async function claudeClassify(
   companyName: string,
@@ -84,7 +88,7 @@ Rules:
 - "Technology" is last resort — IT services / consulting → "Consulting & Professional Services"
 - Never guess. If genuinely unknown, return null.`;
 
-    const msg  = await llm.invoke([{ role: "user", content: prompt }]);
+    const msg  = await getLlm().invoke([{ role: "user", content: prompt }]);
     const text = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
     const json = text.match(/\{[\s\S]*?\}/)?.[0];
     if (!json) return { industry: null, confidence: 0 };
