@@ -10,10 +10,8 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD, RawTask } from "./types";
 
-const model = new ChatAnthropic({
-  model: "claude-sonnet-4-6",
-  temperature: 0,
-});
+let _model: ChatAnthropic | null = null;
+const getModel = () => _model ??= new ChatAnthropic({ model: "claude-sonnet-4-6", temperature: 0 });
 
 const parser = new JsonOutputParser<{ tasks: RawTask[] }>();
 
@@ -54,7 +52,7 @@ export async function runDecomposerAgent(parsedJD: ParsedJD): Promise<RawTask[]>
     throw new Error("No responsibilities extracted from JD — cannot decompose tasks");
   }
 
-  const response = await model.invoke([
+  const response = await getModel().invoke([
     new SystemMessage(SYSTEM),
     new HumanMessage(PROMPT(parsedJD)),
   ]);

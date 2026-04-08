@@ -11,10 +11,8 @@ import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD, SkillsAnalysis } from "./types";
 import { searchWeb } from "./utils";
 
-const model = new ChatAnthropic({
-  model: "claude-sonnet-4-6",
-  temperature: 0,
-});
+let _model: ChatAnthropic | null = null;
+const getModel = () => _model ??= new ChatAnthropic({ model: "claude-sonnet-4-6", temperature: 0 });
 
 const parser = new JsonOutputParser<SkillsAnalysis>();
 
@@ -57,7 +55,7 @@ export async function runSkillsAnalysisAgent(parsedJD: ParsedJD): Promise<Skills
     searchContext = result.slice(0, 2000);
   }
 
-  const response = await model.invoke([
+  const response = await getModel().invoke([
     new SystemMessage(SYSTEM),
     new HumanMessage(PROMPT(parsedJD, searchContext)),
   ]);

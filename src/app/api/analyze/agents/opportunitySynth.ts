@@ -11,10 +11,8 @@ import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD, ScoredTask, ROIData, Opportunity } from "./types";
 import { lookupTools } from "./utils";
 
-const model = new ChatAnthropic({
-  model: "claude-sonnet-4-6",
-  temperature: 0,
-});
+let _model: ChatAnthropic | null = null;
+const getModel = () => _model ??= new ChatAnthropic({ model: "claude-sonnet-4-6", temperature: 0 });
 
 const parser = new JsonOutputParser<{ opportunities: Opportunity[] }>();
 
@@ -65,7 +63,7 @@ export async function runOpportunitySynthAgent(
   roiData: ROIData,
   parsedJD: ParsedJD
 ): Promise<Opportunity[]> {
-  const response = await model.invoke([
+  const response = await getModel().invoke([
     new SystemMessage(SYSTEM),
     new HumanMessage(PROMPT(scoredTasks, toolsMapping, roiData, parsedJD)),
   ]);
