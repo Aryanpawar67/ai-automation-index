@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 
 // ─── CONFIG (swap per prospect) ───
 const COMPANY = "thyssenkrupp AG";
-const COMPANY_LOGO = "https://logo.clearbit.com/thyssenkrupp.com";
+const COMPANY_LOGO = `/api/logo?domain=thyssenkrupp.com`;
 const ROLES_ANALYZED = 10;
 const TOTAL_ROLES = 100;
 const TOP_SCORE = 67;
