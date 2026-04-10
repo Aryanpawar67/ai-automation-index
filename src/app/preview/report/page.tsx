@@ -446,27 +446,29 @@ export default function PreviewReportPage() {
       {/* ── NAV ── */}
       <nav className="no-print" style={{
         position: "sticky", top: 0, zIndex: 50,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 28px", height: 56,
         background: "rgba(255,255,255,0.96)", backdropFilter: "blur(16px)",
         borderBottom: "1px solid #EAE4EF",
         boxShadow: "0 1px 12px rgba(34,1,51,0.06)",
       }}>
+        <div style={{
+          maxWidth: 1200, margin: "0 auto",
+          padding: "0 28px", height: 56,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <a
             href="/preview"
             style={{
-              display: "flex", alignItems: "center", gap: 5,
-              fontSize: 13, color: "#9988AA", fontWeight: 500,
+              display: "flex", alignItems: "center",
+              color: "#9988AA", fontWeight: 500,
               textDecoration: "none", transition: "color 0.15s",
             }}
             onMouseEnter={e => (e.currentTarget.style.color = "#220133")}
             onMouseLeave={e => (e.currentTarget.style.color = "#9988AA")}
           >
-            <svg width="14" height="14" fill="none" viewBox="0 0 16 16">
-              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
+              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Back
           </a>
           <span style={{ color: "#EAE4EF" }}>|</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -510,6 +512,7 @@ export default function PreviewReportPage() {
             </svg>
             Download PDF
           </button>
+        </div>
         </div>
       </nav>
 
@@ -702,37 +705,6 @@ export default function PreviewReportPage() {
                 <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>Classified by exposure to AI automation for this role</p>
               </div>
 
-              {/* EMAIL CAPTURE IN SKILLS SECTION */}
-              <div style={{
-                background: "linear-gradient(135deg, #FFF0EA 0%, #FFF8F5 100%)",
-                border: "1px solid #FDBB96", borderRadius: 14,
-                padding: "14px 18px", marginBottom: 20,
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap",
-              }}>
-                <div>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: "#FD5A0F", margin: "0 0 2px" }}>Want the full workforce intelligence report?</p>
-                  <p style={{ fontSize: 11, color: "#553366", margin: 0 }}>Download the PDF to share with your L&amp;D team or present to leadership.</p>
-                </div>
-                <button
-                  onClick={handleDownloadClick}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "9px 18px", borderRadius: 10, border: "none",
-                    background: "#FD5A0F", color: "#fff", fontWeight: 700, fontSize: 12,
-                    cursor: "pointer", whiteSpace: "nowrap",
-                    boxShadow: "0 2px 10px rgba(253,90,15,0.25)",
-                    transition: "background 0.15s",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#E04E08")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "#FD5A0F")}
-                >
-                  <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-                    <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Download Report
-                </button>
-              </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                 {[
