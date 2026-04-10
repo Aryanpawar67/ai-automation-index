@@ -129,6 +129,16 @@ export const reportLeads = pgTable("report_leads", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const reportDownloads = pgTable("report_downloads", {
+  id:           uuid("id").primaryKey().defaultRandom(),
+  email:        text("email").notNull(),
+  reportSlug:   text("report_slug"),
+  companyName:  text("company_name"),
+  userAgent:    text("user_agent"),
+  referrer:     text("referrer"),
+  downloadedAt: timestamp("downloaded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const analyses = pgTable("analyses", {
   id:               uuid("id").primaryKey().defaultRandom(),
   jobDescriptionId: uuid("job_description_id").notNull()

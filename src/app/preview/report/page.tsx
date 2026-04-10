@@ -10,6 +10,7 @@ const CategoryRadar = dynamic(() => import("@/components/CategoryRadar"), { ssr:
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 
 const COMPANY = "thyssenkrupp AG";
+const REPORT_SLUG = "hr-working-student-werkstudent-hr-administration";
 
 const ANALYSIS = {
   jobTitle: "HR Working Student / Werkstudent HR Administration",
@@ -174,131 +175,6 @@ function SkillsColumnTooltip({
   );
 }
 
-// ─── EMAIL GATE MODAL ─────────────────────────────────────────────────────────
-
-function EmailGateModal({
-  roleTitle,
-  onClose,
-  onSubmit,
-}: {
-  roleTitle: string;
-  onClose: () => void;
-  onSubmit: (email: string) => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.includes("@")) return;
-    setSubmitted(true);
-    setTimeout(() => onSubmit(email), 800);
-  };
-
-  return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 200,
-      background: "rgba(15,0,25,0.6)",
-      backdropFilter: "blur(8px)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 20,
-      animation: "fadeIn 0.2s ease",
-    }}>
-      <div style={{
-        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 460,
-        overflow: "hidden",
-        boxShadow: "0 24px 80px rgba(34,1,51,0.30)",
-        animation: "slideUp 0.3s ease",
-      }}>
-        {/* Top band */}
-        <div style={{
-          background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
-          padding: "18px 24px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <IMochaIcon size={20} color="#FD5A0F" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#FDBB96" }}>AI Automation Report</span>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 28, height: 28, borderRadius: 6,
-              background: "rgba(255,255,255,0.12)", border: "none",
-              color: "rgba(255,255,255,0.6)", fontSize: 16, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "background 0.15s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.22)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
-            title="Close — download will still start"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ padding: "28px 32px 32px" }}>
-          {submitted ? (
-            <div style={{ textAlign: "center", padding: "16px 0" }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>✓</div>
-              <p style={{ fontSize: 16, fontWeight: 700, color: "#220133", margin: "0 0 6px" }}>Starting download…</p>
-              <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>Your report is on its way.</p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: "#220133", margin: "0 0 8px", letterSpacing: "-0.3px" }}>
-                Download Your Report
-              </h2>
-              <p style={{ fontSize: 13, color: "#553366", lineHeight: 1.6, margin: "0 0 22px" }}>
-                Drop your work email and we&apos;ll send you a PDF copy — plus insights on next steps for <strong>{roleTitle}</strong>.
-              </p>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                placeholder="you@company.com"
-                required
-                style={{
-                  width: "100%", boxSizing: "border-box",
-                  padding: "12px 16px", borderRadius: 10, fontSize: 14,
-                  border: `1.5px solid ${focused ? "#FD5A0F" : "#EAE4EF"}`,
-                  outline: "none", marginBottom: 14,
-                  transition: "border-color 0.15s",
-                  color: "#220133",
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  width: "100%", padding: 13, borderRadius: 10,
-                  background: "#FD5A0F", color: "#fff", border: "none",
-                  fontSize: 14, fontWeight: 700, cursor: "pointer",
-                  transition: "background 0.15s, transform 0.1s",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = "#E04E08")}
-                onMouseLeave={e => (e.currentTarget.style.background = "#FD5A0F")}
-              >
-                <svg width="14" height="14" fill="none" viewBox="0 0 16 16">
-                  <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Send me the PDF
-              </button>
-              <p style={{ fontSize: 11, color: "#9988AA", margin: "10px 0 0", textAlign: "center" }}>
-                No spam. Download starts immediately after submitting.
-              </p>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function PreviewReportPage() {
@@ -308,14 +184,17 @@ export default function PreviewReportPage() {
   const [tabsExplored, setTabsExplored]         = useState(false);
   const [hintVisible, setHintVisible]           = useState(true);
   const [skillsTooltip, setSkillsTooltip]       = useState<string | null>(null);
-  const [showEmailModal, setShowEmailModal]      = useState(false);
   const [stickyBarVisible, setStickyBarVisible] = useState(false);
   const [stickyBarDismissed, setStickyBarDismissed] = useState(false);
-  const [stickyEmail, setStickyEmail]           = useState("");
-  const [stickySubmitted, setStickySubmitted]   = useState(false);
-  const [fabVisible, setFabVisible]             = useState(false);
-  const [showBackTooltip, setShowBackTooltip]   = useState(false);
   const [printMode, setPrintMode]               = useState(false);
+
+  // Email gate state
+  const [headerEmail, setHeaderEmail]           = useState("");
+  const [emailSubmitted, setEmailSubmitted]     = useState(false);
+  const [emailValidating, setEmailValidating]   = useState(false);
+  const [emailError, setEmailError]             = useState("");
+  const [emailHighlight, setEmailHighlight]     = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   const tasksHigh   = ANALYSIS.tasks.filter(t => t.automationPotential === "high").length;
   const tasksMedium = ANALYSIS.tasks.filter(t => t.automationPotential === "medium").length;
@@ -331,7 +210,7 @@ export default function PreviewReportPage() {
     const done = localStorage.getItem(key);
     if (done) { setShimmerDone(true); return; }
     const t = setTimeout(() => {
-      setShimmerDone(false); // let shimmer run
+      setShimmerDone(false);
       localStorage.setItem(key, "1");
       setTimeout(() => setShimmerDone(true), 1600);
     }, 1500);
@@ -344,20 +223,24 @@ export default function PreviewReportPage() {
     return () => clearTimeout(t);
   }, []);
 
-  // ── Scroll listeners: sticky bar + FAB ──
+  // ── Scroll listener: sticky bottom bar ──
   useEffect(() => {
     const onScroll = () => {
-      const scrollY   = window.scrollY;
-      const pageH     = document.body.scrollHeight - window.innerHeight;
-      const pct       = pageH > 0 ? scrollY / pageH : 0;
-
-      setFabVisible(scrollY > 100);
-      if (!stickyBarDismissed && pct > 0.6) setStickyBarVisible(true);
+      const pageH = document.body.scrollHeight - window.innerHeight;
+      const pct   = pageH > 0 ? window.scrollY / pageH : 0;
+      if (!stickyBarDismissed && pct > 0.5) setStickyBarVisible(true);
       if (pct < 0.4) setStickyBarVisible(false);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [stickyBarDismissed]);
+
+  // ── Email highlight pulse (3 cycles then reset) ──
+  useEffect(() => {
+    if (!emailHighlight) return;
+    const t = setTimeout(() => setEmailHighlight(false), 2000);
+    return () => clearTimeout(t);
+  }, [emailHighlight]);
 
   const handleTabClick = (tab: "overview" | "tasks" | "opportunities") => {
     setActiveTab(tab);
@@ -368,6 +251,17 @@ export default function PreviewReportPage() {
   };
 
   const triggerDownload = () => {
+    // Fire-and-forget analytics tracking
+    fetch("/api/preview/track-download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: headerEmail.trim().toLowerCase(),
+        reportSlug: REPORT_SLUG,
+        companyName: COMPANY,
+      }),
+    }).catch(() => {});
+
     const prevTitle = document.title;
     document.title = `${ANALYSIS.jobTitle} – ${COMPANY} | AI Automation Report by iMocha`;
     setPrintMode(true);
@@ -377,23 +271,45 @@ export default function PreviewReportPage() {
     }, 300);
   };
 
-  const handleDownloadClick = () => setShowEmailModal(true);
-
-  const handleModalSubmit = (_email: string) => {
-    setShowEmailModal(false);
-    triggerDownload();
+  const handleDownloadClick = () => {
+    if (emailSubmitted) {
+      triggerDownload();
+      return;
+    }
+    // Scroll to and pulse the email input
+    emailInputRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    emailInputRef.current?.focus();
+    setEmailHighlight(true);
   };
 
-  const handleModalClose = () => {
-    setShowEmailModal(false);
-    triggerDownload(); // soft gate: always download on close too
-  };
-
-  const handleStickySubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stickyEmail.includes("@")) return;
-    setStickySubmitted(true);
-    setTimeout(() => { setStickyBarDismissed(true); setStickyBarVisible(false); }, 2500);
+    const email = headerEmail.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError("Enter a valid email");
+      return;
+    }
+    setEmailValidating(true);
+    setEmailError("");
+    try {
+      const res = await fetch("/api/preview/validate-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok) {
+        setEmailError(data.error ?? "Invalid email");
+        setEmailValidating(false);
+        return;
+      }
+      setEmailSubmitted(true);
+      setEmailValidating(false);
+      setTimeout(() => triggerDownload(), 600);
+    } catch {
+      setEmailError("Something went wrong. Try again.");
+      setEmailValidating(false);
+    }
   };
 
   const kpis = [
@@ -420,7 +336,17 @@ export default function PreviewReportPage() {
     },
   ];
 
-  const fabBottom = stickyBarVisible ? 96 : 28;
+  // Download button style — dulled orange when no email, bright when submitted
+  const dlBtnStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 6,
+    fontSize: 12, padding: "7px 16px", borderRadius: 10,
+    fontWeight: 700, color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
+    background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
+    border: "none", cursor: "pointer",
+    boxShadow: emailSubmitted ? "0 2px 10px rgba(253,90,15,0.30)" : "none",
+    transition: "background 0.3s, box-shadow 0.3s",
+    flexShrink: 0,
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#F4EFF6" }}>
@@ -443,115 +369,166 @@ export default function PreviewReportPage() {
         </div>
       </div>
 
-      {/* ── NAV ── */}
-      <nav className="no-print" style={{
+      {/* ── STICKY HERO HEADER ── */}
+      <div className="no-print" style={{
         position: "sticky", top: 0, zIndex: 50,
-        background: "rgba(255,255,255,0.96)", backdropFilter: "blur(16px)",
-        borderBottom: "1px solid #EAE4EF",
-        boxShadow: "0 1px 12px rgba(34,1,51,0.06)",
+        background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
+        borderBottom: "1px solid rgba(255,255,255,0.07)",
+        boxShadow: "0 4px 24px rgba(15,0,25,0.30)",
       }}>
-        <div style={{
-          maxWidth: 1200, margin: "0 auto",
-          padding: "0 28px", height: 56,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <a
-            href="/preview"
-            style={{
-              display: "flex", alignItems: "center",
-              color: "#9988AA", fontWeight: 500,
-              textDecoration: "none", transition: "color 0.15s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#220133")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#9988AA")}
-          >
-            <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
-              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </a>
-          <span style={{ color: "#EAE4EF" }}>|</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <IMochaIcon size={22} color="#FD5A0F" />
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#220133" }}>iMocha</span>
-            <span style={{ color: "#EAE4EF" }}>|</span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: "#553366" }}>AI Automation Index</span>
+        {/* Decorative orbs */}
+        <div style={{ position: "absolute", top: -30, right: 80, width: 180, height: 180, borderRadius: "50%", background: "rgba(253,90,15,0.05)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: -40, right: 20, width: 120, height: 120, borderRadius: "50%", background: "rgba(139,92,246,0.04)", pointerEvents: "none" }} />
+
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "14px 28px 18px", position: "relative" }}>
+
+          {/* Top row: back | branding | company | email | download */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+            <a
+              href="/preview"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30, borderRadius: 8,
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+                color: "rgba(255,255,255,0.7)", textDecoration: "none",
+                transition: "background 0.15s, color 0.15s", flexShrink: 0,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.16)"; (e.currentTarget as HTMLAnchorElement).style.color = "#fff"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.7)"; }}
+            >
+              <svg width="14" height="14" fill="none" viewBox="0 0 16 16">
+                <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </a>
+
+            <span style={{ width: 1, height: 18, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <IMochaIcon size={20} color="#FD5A0F" />
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>iMocha</span>
+              <span style={{ width: 1, height: 14, background: "rgba(255,255,255,0.15)" }} />
+              <span style={{ fontSize: 12, fontWeight: 500, color: "rgba(255,255,255,0.5)" }}>AI Automation Index</span>
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {/* Company pill */}
+            <span style={{
+              fontSize: 12, padding: "4px 12px", borderRadius: 20,
+              color: "rgba(255,255,255,0.7)", background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.12)", fontWeight: 500, flexShrink: 0,
+            }}>
+              {COMPANY}
+            </span>
+
+            {/* Inline email field */}
+            {emailSubmitted ? (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 8,
+                background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)",
+                flexShrink: 0,
+              }}>
+                <svg width="12" height="12" fill="none" viewBox="0 0 16 16">
+                  <path d="M3 8l4 4 6-6" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span style={{ fontSize: 12, color: "#6ee7b7", fontWeight: 500 }}>
+                  {headerEmail.length > 20 ? headerEmail.slice(0, 18) + "…" : headerEmail}
+                </span>
+              </div>
+            ) : (
+              <form onSubmit={handleEmailSubmit} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
+                <div style={{ position: "relative" }}>
+                  <input
+                    ref={emailInputRef}
+                    type="email"
+                    value={headerEmail}
+                    onChange={e => { setHeaderEmail(e.target.value); setEmailError(""); }}
+                    placeholder="work email"
+                    style={{
+                      width: 180, height: 32, padding: "0 12px",
+                      borderRadius: 8, fontSize: 12,
+                      background: "rgba(255,255,255,0.10)",
+                      border: `1.5px solid ${emailHighlight ? "rgba(253,90,15,0.7)" : "rgba(255,255,255,0.15)"}`,
+                      color: "#fff", outline: "none",
+                      animation: emailHighlight ? "emailPulse 0.55s ease 3" : "none",
+                      transition: "border-color 0.2s",
+                    }}
+                    onFocus={e => (e.target.style.borderColor = "rgba(253,90,15,0.6)")}
+                    onBlur={e => (e.target.style.borderColor = emailHighlight ? "rgba(253,90,15,0.7)" : "rgba(255,255,255,0.15)")}
+                  />
+                  {emailError && (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
+                      fontSize: 11, color: "#fca5a5", background: "rgba(15,0,25,0.85)",
+                      padding: "4px 8px", borderRadius: 6, whiteSpace: "nowrap",
+                      zIndex: 10,
+                    }}>
+                      {emailError}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={emailValidating}
+                  style={{
+                    width: 32, height: 32, borderRadius: 8, border: "none",
+                    background: "rgba(253,90,15,0.30)", color: "#FDBB96",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: emailValidating ? "wait" : "pointer",
+                    transition: "background 0.15s",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { if (!emailValidating) (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.50)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.30)"; }}
+                >
+                  {emailValidating ? (
+                    <span style={{ fontSize: 12 }}>…</span>
+                  ) : (
+                    <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+                      <path d="M3 8h10M8 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Download PDF button */}
+            <button onClick={handleDownloadClick} style={dlBtnStyle}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+                <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Download PDF
+            </button>
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{
-            fontSize: 12, padding: "4px 12px", borderRadius: 20,
-            color: "#553366", background: "#F4EFF6", border: "1px solid #EAE4EF", fontWeight: 500,
-          }}>
-            {COMPANY}
-          </span>
-          {/* ORANGE download button */}
-          <button
-            onClick={handleDownloadClick}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              fontSize: 12, padding: "7px 16px", borderRadius: 10,
-              fontWeight: 700, color: "#fff", background: "#FD5A0F",
-              border: "none", cursor: "pointer",
-              boxShadow: "0 2px 10px rgba(253,90,15,0.25)",
-              transition: "background 0.15s, box-shadow 0.15s, transform 0.1s",
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#E04E08";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 16px rgba(253,90,15,0.40)";
-              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#FD5A0F";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 10px rgba(253,90,15,0.25)";
-              (e.currentTarget as HTMLButtonElement).style.transform = "";
-            }}
-          >
-            <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-              <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Download PDF
-          </button>
-        </div>
-        </div>
-      </nav>
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 28px 60px" }}>
+          {/* Role identity row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 10px", borderRadius: 20, background: "rgba(253,90,15,0.2)", color: "#FDBB96", border: "1px solid rgba(253,90,15,0.3)" }}>
+              {ANALYSIS.department}
+            </span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>·</span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>AI Automation Analysis</span>
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px", letterSpacing: "-0.4px", lineHeight: 1.2 }}>
+            {ANALYSIS.jobTitle}
+          </h1>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: 0 }}>{COMPANY}</p>
+        </div>
+      </div>
 
-        {/* ── HERO ── */}
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 28px 60px" }}>
+
+        {/* ── IMPACT SUMMARY (scrolls under sticky header) ── */}
         <div style={{
           background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
-          borderRadius: 24, padding: "32px 36px", marginBottom: 28,
+          borderRadius: 16, padding: "18px 22px", marginBottom: 28,
           border: "1px solid rgba(255,255,255,0.07)",
-          boxShadow: "0 8px 40px rgba(34,1,51,0.18)",
-          position: "relative", overflow: "hidden",
+          boxShadow: "0 4px 20px rgba(34,1,51,0.14)",
           animation: "fadeInUp 0.4s ease both",
         }}>
-          <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(253,90,15,0.06)", pointerEvents: "none" }} />
-          <div style={{ position: "absolute", bottom: -60, right: 60, width: 150, height: 150, borderRadius: "50%", background: "rgba(139,92,246,0.05)", pointerEvents: "none" }} />
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 10px", borderRadius: 20, background: "rgba(253,90,15,0.2)", color: "#FDBB96", border: "1px solid rgba(253,90,15,0.3)" }}>
-                  {ANALYSIS.department}
-                </span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>·</span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>AI Automation Analysis</span>
-              </div>
-              <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", margin: "0 0 6px", letterSpacing: "-0.5px", lineHeight: 1.2 }}>
-                {ANALYSIS.jobTitle}
-              </h1>
-              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", margin: "0 0 16px" }}>{COMPANY}</p>
-              <div style={{ padding: "14px 18px", borderRadius: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(253,90,15,0.8)", margin: "0 0 8px" }}>Impact Summary</p>
-                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", margin: 0, lineHeight: 1.65 }}>{ANALYSIS.executiveSummary}</p>
-              </div>
-            </div>
-            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, background: "rgba(253,90,15,0.15)", border: "1px solid rgba(253,90,15,0.25)" }}>
-              <IMochaIcon size={14} color="#FD5A0F" />
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#FDBB96" }}>iMocha</span>
-            </div>
-          </div>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(253,90,15,0.8)", margin: "0 0 8px" }}>Impact Summary</p>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", margin: 0, lineHeight: 1.65 }}>{ANALYSIS.executiveSummary}</p>
         </div>
 
         {/* ── KPI CARDS ── */}
@@ -602,7 +579,7 @@ export default function PreviewReportPage() {
           ))}
         </div>
 
-        {/* ── ENHANCED TAB BAR (Issue 1) ── */}
+        {/* ── TAB BAR ── */}
         <div className="no-print" style={{ marginBottom: 8 }}>
           <div style={{
             display: "flex", gap: 4, padding: 5,
@@ -633,7 +610,6 @@ export default function PreviewReportPage() {
                   onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = "#FFF8F5"; (e.currentTarget as HTMLButtonElement).style.color = "#FD5A0F"; } }}
                   onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#553366"; } }}
                 >
-                  {/* One-shot shimmer sweep */}
                   {showShimmer && (
                     <span style={{
                       position: "absolute", inset: 0,
@@ -660,7 +636,6 @@ export default function PreviewReportPage() {
             })}
           </div>
 
-          {/* Animated hint arrow */}
           {hintVisible && !tabsExplored && (
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "flex-end",
@@ -697,15 +672,12 @@ export default function PreviewReportPage() {
               </div>
             </div>
 
-            {/* ── ENHANCED SKILLS ANALYSIS (Issue 2) ── */}
+            {/* ── SKILLS ANALYSIS ── */}
             <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20, padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)" }}>
-              {/* Upgraded section header */}
               <div style={{ marginBottom: 20 }}>
                 <p style={{ fontSize: 14, fontWeight: 700, color: "#220133", margin: "0 0 3px" }}>Skills Analysis</p>
                 <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>Classified by exposure to AI automation for this role</p>
               </div>
-
-
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                 {[
                   { key: "futureProof" as const, title: "Future-Proof", items: ANALYSIS.skillsAnalysis.futureProof, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: "✓" },
@@ -713,12 +685,10 @@ export default function PreviewReportPage() {
                   { key: "aiAugmented" as const, title: "AI-Augmented",  items: ANALYSIS.skillsAnalysis.aiAugmented,  color: "#FD5A0F", bg: "#FFF0EA", border: "#FDBB96", icon: "↑" },
                 ].map(col => (
                   <div key={col.title} style={{ borderRadius: 16, padding: "16px 18px", background: col.bg, border: `1px solid ${col.border}` }}>
-                    {/* Column header with ⓘ tooltip */}
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, position: "relative" }}>
                       <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: col.color, margin: 0 }}>
                         {col.title} Skills
                       </p>
-                      {/* Info icon */}
                       <button
                         onMouseEnter={() => setSkillsTooltip(col.key)}
                         onMouseLeave={() => setSkillsTooltip(null)}
@@ -729,8 +699,7 @@ export default function PreviewReportPage() {
                           background: "rgba(255,255,255,0.7)", border: `1px solid ${col.border}`,
                           color: col.color, fontSize: 10, fontWeight: 700,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          cursor: "default", flexShrink: 0,
-                          outline: "none",
+                          cursor: "default", flexShrink: 0, outline: "none",
                         }}
                         aria-label={`What does ${col.title} mean?`}
                       >
@@ -854,90 +823,10 @@ export default function PreviewReportPage() {
         <span style={{ color: "#EAE4EF", fontSize: 10 }}>Preview build · feat/ux-report-improvements</span>
       </footer>
 
-      {/* ── FLOATING ACTION BUTTON CLUSTER (Issue 4) ── */}
-      <div className="no-print" style={{
-        position: "fixed",
-        bottom: fabBottom,
-        right: 28,
-        zIndex: 60,
-        display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10,
-        transition: "bottom 0.35s ease",
-        opacity: fabVisible ? 1 : 0,
-        transform: fabVisible ? "translateX(0)" : "translateX(80px)",
-        pointerEvents: fabVisible ? "auto" : "none",
-        // Delayed entry animation on mount
-      }}>
-        {/* Back button */}
-        <div style={{ position: "relative" }}
-          onMouseEnter={() => setShowBackTooltip(true)}
-          onMouseLeave={() => setShowBackTooltip(false)}
-        >
-          {showBackTooltip && (
-            <div style={{
-              position: "absolute", right: "calc(100% + 10px)", top: "50%",
-              transform: "translateY(-50%)",
-              background: "#220133", color: "#fff",
-              fontSize: 11, fontWeight: 600,
-              padding: "5px 10px", borderRadius: 6,
-              whiteSpace: "nowrap",
-              animation: "fadeIn 0.15s ease",
-            }}>
-              Back to all roles
-              <div style={{ position: "absolute", right: -5, top: "50%", transform: "translateY(-50%) rotate(45deg)", width: 8, height: 8, background: "#220133" }} />
-            </div>
-          )}
-          <a
-            href="/preview"
-            style={{
-              width: 44, height: 44, borderRadius: "50%",
-              background: "#fff", border: "1px solid #EAE4EF",
-              boxShadow: "0 4px 16px rgba(34,1,51,0.10)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              textDecoration: "none", color: "#553366",
-              transition: "box-shadow 0.15s, transform 0.15s",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 6px 24px rgba(34,1,51,0.16)"; (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-1px)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 4px 16px rgba(34,1,51,0.10)"; (e.currentTarget as HTMLAnchorElement).style.transform = ""; }}
-          >
-            <svg width="14" height="14" fill="none" viewBox="0 0 16 16">
-              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </a>
-        </div>
-
-        {/* Download button — orange pill */}
-        <button
-          onClick={handleDownloadClick}
-          style={{
-            height: 44, padding: "0 18px", borderRadius: 12,
-            background: "#FD5A0F", color: "#fff", border: "none",
-            display: "flex", alignItems: "center", gap: 7,
-            fontSize: 13, fontWeight: 700, cursor: "pointer",
-            boxShadow: "0 6px 20px rgba(253,90,15,0.30)",
-            transition: "background 0.15s, box-shadow 0.15s, transform 0.15s",
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "#E04E08";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 28px rgba(253,90,15,0.40)";
-            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "#FD5A0F";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(253,90,15,0.30)";
-            (e.currentTarget as HTMLButtonElement).style.transform = "";
-          }}
-        >
-          <svg width="14" height="14" fill="none" viewBox="0 0 16 16">
-            <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Download PDF
-        </button>
-      </div>
-
-      {/* ── STICKY BOTTOM EMAIL BAR (Issue 3 — secondary capture) ── */}
+      {/* ── STICKY BOTTOM DOWNLOAD BAR ── */}
       <div className="no-print" style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        height: 68, zIndex: 55,
+        height: 64, zIndex: 55,
         background: "#fff", borderTop: "1px solid #EAE4EF",
         boxShadow: "0 -4px 20px rgba(34,1,51,0.08)",
         display: "flex", alignItems: "center",
@@ -949,45 +838,27 @@ export default function PreviewReportPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <IMochaIcon size={18} color="#FD5A0F" />
           <span style={{ fontSize: 13, color: "#553366", fontWeight: 500 }}>
-            Want to share this report with your team?
+            Download your AI Automation Report
           </span>
         </div>
         <div style={{ flex: 1 }} />
-        {stickySubmitted ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#059669", fontSize: 13, fontWeight: 600 }}>
-            <span>✓</span> Sent! Check your inbox.
-          </div>
-        ) : (
-          <form onSubmit={handleStickySubmit} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="email"
-              value={stickyEmail}
-              onChange={e => setStickyEmail(e.target.value)}
-              placeholder="Work email"
-              required
-              style={{
-                width: 220, padding: "8px 14px", borderRadius: 8, fontSize: 13,
-                border: "1.5px solid #EAE4EF", outline: "none", color: "#220133",
-              }}
-              onFocus={e => (e.target.style.borderColor = "#FD5A0F")}
-              onBlur={e => (e.target.style.borderColor = "#EAE4EF")}
-            />
-            <button
-              type="submit"
-              style={{
-                padding: "8px 20px", borderRadius: 8,
-                background: "#FD5A0F", color: "#fff", border: "none",
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-                transition: "background 0.15s",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#E04E08")}
-              onMouseLeave={e => (e.currentTarget.style.background = "#FD5A0F")}
-            >
-              Get PDF
-            </button>
-          </form>
-        )}
+        <button
+          onClick={handleDownloadClick}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 20px", borderRadius: 8, border: "none",
+            background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
+            color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            transition: "background 0.3s",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+            <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Download PDF
+        </button>
         <button
           onClick={() => { setStickyBarDismissed(true); setStickyBarVisible(false); }}
           style={{ background: "none", border: "none", color: "#C4B5D0", fontSize: 18, cursor: "pointer", flexShrink: 0, lineHeight: 1 }}
@@ -995,15 +866,6 @@ export default function PreviewReportPage() {
           ×
         </button>
       </div>
-
-      {/* ── EMAIL GATE MODAL (Issue 3 — primary capture) ── */}
-      {showEmailModal && (
-        <EmailGateModal
-          roleTitle={ANALYSIS.jobTitle}
-          onClose={handleModalClose}
-          onSubmit={handleModalSubmit}
-        />
-      )}
 
       {/* ── PRINT FOOTER ── */}
       <div className="print-only" style={{ display: "none", borderTop: "1px solid #EAE4EF", padding: "8mm 14mm", marginTop: 32, background: "#fff" }}>
@@ -1038,6 +900,11 @@ export default function PreviewReportPage() {
           0%, 100% { opacity: 0.5; }
           50%       { opacity: 1; }
         }
+        @keyframes emailPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(253,90,15,0); }
+          50%      { box-shadow: 0 0 0 6px rgba(253,90,15,0.30); }
+        }
+        input::placeholder { color: rgba(255,255,255,0.35); }
         @media print {
           @page { margin: 0; size: A4; }
           body  { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
