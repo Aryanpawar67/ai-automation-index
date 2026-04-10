@@ -194,6 +194,7 @@ export default function PreviewReportPage() {
   const [emailValidating, setEmailValidating]   = useState(false);
   const [emailError, setEmailError]             = useState("");
   const [emailHighlight, setEmailHighlight]     = useState(false);
+  const [showEmailTooltip, setShowEmailTooltip] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   const tasksHigh   = ANALYSIS.tasks.filter(t => t.automationPotential === "high").length;
@@ -276,7 +277,9 @@ export default function PreviewReportPage() {
       triggerDownload();
       return;
     }
-    // Scroll to and pulse the email input
+    // Show tooltip near the button, pulse the email input
+    setShowEmailTooltip(true);
+    setTimeout(() => setShowEmailTooltip(false), 2800);
     emailInputRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     emailInputRef.current?.focus();
     setEmailHighlight(true);
@@ -349,7 +352,7 @@ export default function PreviewReportPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F4EFF6" }}>
+    <div style={{ minHeight: "100vh", background: "#F4EFF6", padding: "0 20px" }}>
 
       {/* ── PRINT HEADER ── */}
       <div className="print-only" style={{ display: "none", padding: "18mm 14mm 10mm", background: "#fff", borderBottom: "3px solid #FD5A0F", marginBottom: 24 }}>
@@ -371,16 +374,19 @@ export default function PreviewReportPage() {
 
       {/* ── STICKY HERO HEADER ── */}
       <div className="no-print" style={{
-        position: "sticky", top: 0, zIndex: 50,
+        position: "sticky", top: 12, zIndex: 50,
+        maxWidth: 1200, margin: "0 auto",
+        borderRadius: 20,
         background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
-        boxShadow: "0 4px 24px rgba(15,0,25,0.30)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        boxShadow: "0 4px 28px rgba(15,0,25,0.35)",
+        overflow: "hidden",
       }}>
         {/* Decorative orbs */}
         <div style={{ position: "absolute", top: -30, right: 80, width: 180, height: 180, borderRadius: "50%", background: "rgba(253,90,15,0.05)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: -40, right: 20, width: 120, height: 120, borderRadius: "50%", background: "rgba(139,92,246,0.04)", pointerEvents: "none" }} />
 
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "14px 28px 18px", position: "relative" }}>
+        <div style={{ padding: "14px 28px 18px", position: "relative" }}>
 
           {/* Top row: back | branding | company | email | download */}
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
@@ -494,12 +500,33 @@ export default function PreviewReportPage() {
             )}
 
             {/* Download PDF button */}
-            <button onClick={handleDownloadClick} style={dlBtnStyle}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-                <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Download PDF
-            </button>
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              {showEmailTooltip && (
+                <div style={{
+                  position: "absolute", bottom: "calc(100% + 10px)", right: 0,
+                  background: "#220133", color: "#fff",
+                  fontSize: 12, fontWeight: 500, lineHeight: 1.4,
+                  padding: "8px 12px", borderRadius: 10, whiteSpace: "nowrap",
+                  boxShadow: "0 6px 20px rgba(15,0,25,0.35)",
+                  animation: "fadeInUp 0.18s ease both",
+                  zIndex: 80,
+                }}>
+                  Enter your email to start downloading the report
+                  {/* caret */}
+                  <div style={{
+                    position: "absolute", bottom: -5, right: 18,
+                    width: 10, height: 10, transform: "rotate(45deg)",
+                    background: "#220133",
+                  }} />
+                </div>
+              )}
+              <button onClick={handleDownloadClick} style={dlBtnStyle}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+                  <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Download PDF
+              </button>
+            </div>
           </div>
 
           {/* Role identity row */}
@@ -842,23 +869,43 @@ export default function PreviewReportPage() {
           </span>
         </div>
         <div style={{ flex: 1 }} />
-        <button
-          onClick={handleDownloadClick}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 20px", borderRadius: 8, border: "none",
-            background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
-            color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
-            fontSize: 13, fontWeight: 700, cursor: "pointer",
-            transition: "background 0.3s",
-            whiteSpace: "nowrap",
-          }}
-        >
-          <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-            <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Download PDF
-        </button>
+        <div style={{ position: "relative" }}>
+          {showEmailTooltip && (
+            <div style={{
+              position: "absolute", bottom: "calc(100% + 10px)", right: 0,
+              background: "#220133", color: "#fff",
+              fontSize: 12, fontWeight: 500, lineHeight: 1.4,
+              padding: "8px 12px", borderRadius: 10, whiteSpace: "nowrap",
+              boxShadow: "0 6px 20px rgba(15,0,25,0.25)",
+              animation: "fadeInUp 0.18s ease both",
+              zIndex: 80,
+            }}>
+              Enter your email to start downloading the report
+              <div style={{
+                position: "absolute", bottom: -5, right: 18,
+                width: 10, height: 10, transform: "rotate(45deg)",
+                background: "#220133",
+              }} />
+            </div>
+          )}
+          <button
+            onClick={handleDownloadClick}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 20px", borderRadius: 8, border: "none",
+              background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
+              color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
+              fontSize: 13, fontWeight: 700, cursor: "pointer",
+              transition: "background 0.3s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+              <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Download PDF
+          </button>
+        </div>
         <button
           onClick={() => { setStickyBarDismissed(true); setStickyBarVisible(false); }}
           style={{ background: "none", border: "none", color: "#C4B5D0", fontSize: 18, cursor: "pointer", flexShrink: 0, lineHeight: 1 }}
