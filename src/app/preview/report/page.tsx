@@ -186,7 +186,6 @@ export default function PreviewReportPage() {
   const [skillsTooltip, setSkillsTooltip]       = useState<string | null>(null);
   const [stickyBarVisible, setStickyBarVisible] = useState(false);
   const [stickyBarDismissed, setStickyBarDismissed] = useState(false);
-  const [printMode, setPrintMode]               = useState(false);
 
   // Email gate state
   const [headerEmail, setHeaderEmail]           = useState("");
@@ -265,10 +264,9 @@ export default function PreviewReportPage() {
 
     const prevTitle = document.title;
     document.title = `${ANALYSIS.jobTitle} – ${COMPANY} | AI Automation Report by iMocha`;
-    setPrintMode(true);
     setTimeout(() => {
       window.print();
-      setTimeout(() => { setPrintMode(false); document.title = prevTitle; }, 500);
+      setTimeout(() => { document.title = prevTitle; }, 500);
     }, 300);
   };
 
@@ -445,6 +443,25 @@ export default function PreviewReportPage() {
             ) : (
               <form onSubmit={handleEmailSubmit} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
                 <div style={{ position: "relative" }}>
+                  {/* Tooltip anchored below the email input — shown by either download button */}
+                  {showEmailTooltip && (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 10px)", left: 0,
+                      background: "#220133", color: "#fff",
+                      fontSize: 12, fontWeight: 500, lineHeight: 1.4,
+                      padding: "8px 12px", borderRadius: 10, whiteSpace: "nowrap",
+                      boxShadow: "0 6px 20px rgba(15,0,25,0.35)",
+                      animation: "fadeInUp 0.18s ease both",
+                      zIndex: 80,
+                    }}>
+                      Enter your email to start downloading the report
+                      <div style={{
+                        position: "absolute", top: -5, left: 16,
+                        width: 10, height: 10, transform: "rotate(45deg)",
+                        background: "#220133",
+                      }} />
+                    </div>
+                  )}
                   <input
                     ref={emailInputRef}
                     type="email"
@@ -500,33 +517,12 @@ export default function PreviewReportPage() {
             )}
 
             {/* Download PDF button */}
-            <div style={{ position: "relative", flexShrink: 0 }}>
-              {showEmailTooltip && (
-                <div style={{
-                  position: "absolute", bottom: "calc(100% + 10px)", right: 0,
-                  background: "#220133", color: "#fff",
-                  fontSize: 12, fontWeight: 500, lineHeight: 1.4,
-                  padding: "8px 12px", borderRadius: 10, whiteSpace: "nowrap",
-                  boxShadow: "0 6px 20px rgba(15,0,25,0.35)",
-                  animation: "fadeInUp 0.18s ease both",
-                  zIndex: 80,
-                }}>
-                  Enter your email to start downloading the report
-                  {/* caret */}
-                  <div style={{
-                    position: "absolute", bottom: -5, right: 18,
-                    width: 10, height: 10, transform: "rotate(45deg)",
-                    background: "#220133",
-                  }} />
-                </div>
-              )}
-              <button onClick={handleDownloadClick} style={dlBtnStyle}>
-                <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-                  <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Download PDF
-              </button>
-            </div>
+            <button onClick={handleDownloadClick} style={{ ...dlBtnStyle, flexShrink: 0 }}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+                <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Download PDF
+            </button>
           </div>
 
           {/* Role identity row */}
@@ -678,8 +674,7 @@ export default function PreviewReportPage() {
         </div>
 
         {/* ── OVERVIEW TAB ── */}
-        {(activeTab === "overview" || printMode) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
+        <div className="tab-panel" style={{ display: activeTab === "overview" ? "flex" : "none", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
               <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20, padding: 24, boxShadow: "0 2px 12px rgba(34,1,51,0.06)", display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
                 <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: 0, alignSelf: "flex-start" }}>Score Breakdown</p>
@@ -746,11 +741,9 @@ export default function PreviewReportPage() {
               </div>
             </div>
           </div>
-        )}
 
         {/* ── TASKS TAB ── */}
-        {(activeTab === "tasks" || printMode) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
+        <div className="tab-panel" style={{ display: activeTab === "tasks" ? "flex" : "none", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
             <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20, padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
@@ -800,11 +793,9 @@ export default function PreviewReportPage() {
               })}
             </div>
           </div>
-        )}
 
         {/* ── OPPORTUNITIES TAB ── */}
-        {(activeTab === "opportunities" || printMode) && (
-          <div style={{ animation: "fadeIn 0.25s ease" }}>
+        <div className="tab-panel" style={{ display: activeTab === "opportunities" ? "block" : "none", animation: "fadeIn 0.25s ease" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
               {ANALYSIS.aiOpportunities.map((opp, i) => {
                 const impactCfg = IMPACT_CFG[opp.impact] ?? IMPACT_CFG.low;
@@ -839,7 +830,7 @@ export default function PreviewReportPage() {
               })}
             </div>
           </div>
-        )}
+        </div>
 
       </main>
 
@@ -957,6 +948,7 @@ export default function PreviewReportPage() {
           body  { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .no-print    { display: none !important; }
           .print-only  { display: block !important; }
+          .tab-panel   { display: block !important; }
         }
       `}</style>
     </div>
