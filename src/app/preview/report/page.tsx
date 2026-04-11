@@ -193,7 +193,6 @@ export default function PreviewReportPage() {
   const [emailValidating, setEmailValidating]   = useState(false);
   const [emailError, setEmailError]             = useState("");
   const [emailHighlight, setEmailHighlight]     = useState(false);
-  const [showEmailTooltip, setShowEmailTooltip] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   const tasksHigh   = ANALYSIS.tasks.filter(t => t.automationPotential === "high").length;
@@ -275,9 +274,7 @@ export default function PreviewReportPage() {
       triggerDownload();
       return;
     }
-    // Show tooltip near the button, pulse the email input
-    setShowEmailTooltip(true);
-    setTimeout(() => setShowEmailTooltip(false), 2800);
+    // Pulse the email input
     emailInputRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     emailInputRef.current?.focus();
     setEmailHighlight(true);
@@ -443,25 +440,6 @@ export default function PreviewReportPage() {
             ) : (
               <form onSubmit={handleEmailSubmit} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
                 <div style={{ position: "relative" }}>
-                  {/* Tooltip anchored below the email input — shown by either download button */}
-                  {showEmailTooltip && (
-                    <div style={{
-                      position: "absolute", top: "calc(100% + 10px)", left: 0,
-                      background: "#220133", color: "#fff",
-                      fontSize: 12, fontWeight: 500, lineHeight: 1.4,
-                      padding: "8px 12px", borderRadius: 10, whiteSpace: "nowrap",
-                      boxShadow: "0 6px 20px rgba(15,0,25,0.35)",
-                      animation: "fadeInUp 0.18s ease both",
-                      zIndex: 80,
-                    }}>
-                      Enter your email to start downloading the report
-                      <div style={{
-                        position: "absolute", top: -5, left: 16,
-                        width: 10, height: 10, transform: "rotate(45deg)",
-                        background: "#220133",
-                      }} />
-                    </div>
-                  )}
                   <input
                     ref={emailInputRef}
                     type="email"
