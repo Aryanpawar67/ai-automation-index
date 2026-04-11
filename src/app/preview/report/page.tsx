@@ -860,43 +860,23 @@ export default function PreviewReportPage() {
           </span>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ position: "relative" }}>
-          {showEmailTooltip && (
-            <div style={{
-              position: "absolute", bottom: "calc(100% + 10px)", right: 0,
-              background: "#220133", color: "#fff",
-              fontSize: 12, fontWeight: 500, lineHeight: 1.4,
-              padding: "8px 12px", borderRadius: 10, whiteSpace: "nowrap",
-              boxShadow: "0 6px 20px rgba(15,0,25,0.25)",
-              animation: "fadeInUp 0.18s ease both",
-              zIndex: 80,
-            }}>
-              Enter your email to start downloading the report
-              <div style={{
-                position: "absolute", bottom: -5, right: 18,
-                width: 10, height: 10, transform: "rotate(45deg)",
-                background: "#220133",
-              }} />
-            </div>
-          )}
-          <button
-            onClick={handleDownloadClick}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 20px", borderRadius: 8, border: "none",
-              background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
-              color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
-              transition: "background 0.3s",
-              whiteSpace: "nowrap",
-            }}
-          >
+        <button
+          onClick={handleDownloadClick}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 20px", borderRadius: 8, border: "none",
+            background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
+            color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            transition: "background 0.3s",
+            whiteSpace: "nowrap",
+          }}
+        >
             <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
               <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             Download PDF
           </button>
-        </div>
         <button
           onClick={() => { setStickyBarDismissed(true); setStickyBarVisible(false); }}
           style={{ background: "none", border: "none", color: "#C4B5D0", fontSize: 18, cursor: "pointer", flexShrink: 0, lineHeight: 1 }}
