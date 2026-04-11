@@ -378,11 +378,11 @@ export default function PreviewReportPage() {
         background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
         border: "1px solid rgba(255,255,255,0.07)",
         boxShadow: "0 4px 28px rgba(15,0,25,0.35)",
-        overflow: "hidden",
+        // no overflow:hidden — keeps tooltip visible below the header
       }}>
-        {/* Decorative orbs */}
-        <div style={{ position: "absolute", top: -30, right: 80, width: 180, height: 180, borderRadius: "50%", background: "rgba(253,90,15,0.05)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: -40, right: 20, width: 120, height: 120, borderRadius: "50%", background: "rgba(139,92,246,0.04)", pointerEvents: "none" }} />
+        {/* Decorative orbs — kept within bounds so no overflow:hidden needed */}
+        <div style={{ position: "absolute", top: 0, right: 60, width: 140, height: 140, borderRadius: "50%", background: "rgba(253,90,15,0.05)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 0, right: 20, width: 90, height: 90, borderRadius: "50%", background: "rgba(139,92,246,0.04)", pointerEvents: "none" }} />
 
         <div style={{ padding: "14px 28px 18px", position: "relative" }}>
 
