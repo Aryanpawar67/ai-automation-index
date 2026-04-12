@@ -807,7 +807,6 @@ export default function PreviewReportPage() {
                 );
               })}
             </div>
-          </div>
         </div>
 
       </main>
