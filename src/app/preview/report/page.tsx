@@ -193,6 +193,7 @@ export default function PreviewReportPage() {
   const [emailValidating, setEmailValidating]   = useState(false);
   const [emailError, setEmailError]             = useState("");
   const [emailHighlight, setEmailHighlight]     = useState(false);
+  const [emailHint, setEmailHint]               = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   const tasksHigh   = ANALYSIS.tasks.filter(t => t.automationPotential === "high").length;
@@ -241,6 +242,13 @@ export default function PreviewReportPage() {
     return () => clearTimeout(t);
   }, [emailHighlight]);
 
+  // ── Email hint auto-hide ──
+  useEffect(() => {
+    if (!emailHint) return;
+    const t = setTimeout(() => setEmailHint(false), 3000);
+    return () => clearTimeout(t);
+  }, [emailHint]);
+
   const handleTabClick = (tab: "overview" | "tasks" | "opportunities") => {
     setActiveTab(tab);
     if (tab !== "overview") {
@@ -274,7 +282,8 @@ export default function PreviewReportPage() {
       triggerDownload();
       return;
     }
-    // Pulse the email input
+    // Pulse the email input + show hint
+    setEmailHint(true);
     emailInputRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     emailInputRef.current?.focus();
     setEmailHighlight(true);
@@ -466,6 +475,25 @@ export default function PreviewReportPage() {
                       zIndex: 10,
                     }}>
                       {emailError}
+                    </div>
+                  )}
+                  {emailHint && !emailError && (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 8px)", left: -4,
+                      fontSize: 11, fontWeight: 500, color: "#FDBB96",
+                      background: "rgba(15,0,25,0.90)", backdropFilter: "blur(4px)",
+                      padding: "6px 10px", borderRadius: 8, whiteSpace: "nowrap",
+                      zIndex: 10, animation: "fadeInUp 0.15s ease both",
+                      border: "1px solid rgba(253,90,15,0.25)",
+                    }}>
+                      Provide your email to download the report
+                      <div style={{
+                        position: "absolute", top: -4, left: 16,
+                        width: 8, height: 8, transform: "rotate(45deg)",
+                        background: "rgba(15,0,25,0.90)",
+                        borderLeft: "1px solid rgba(253,90,15,0.25)",
+                        borderTop: "1px solid rgba(253,90,15,0.25)",
+                      }} />
                     </div>
                   )}
                 </div>
