@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import ScoreRing from "@/components/ScoreRing";
@@ -160,14 +160,100 @@ export default function DashboardView({
   const [activeTab, setActiveTab]   = useState<"overview" | "tasks" | "opportunities">("overview");
   const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
   const [skillsTooltip, setSkillsTooltip] = useState<string | null>(null);
+  const [stickyBarVisible, setStickyBarVisible] = useState(false);
+  const [stickyBarDismissed, setStickyBarDismissed] = useState(false);
 
-  const handleDownloadPDF = () => {
+  // Email gate state
+  const [headerEmail, setHeaderEmail]       = useState("");
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [emailValidating, setEmailValidating] = useState(false);
+  const [emailError, setEmailError]         = useState("");
+  const [emailHighlight, setEmailHighlight] = useState(false);
+  const [emailHint, setEmailHint]           = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  // Scroll listener: sticky bottom bar
+  useEffect(() => {
+    const onScroll = () => {
+      const pageH = document.body.scrollHeight - window.innerHeight;
+      const pct = pageH > 0 ? window.scrollY / pageH : 0;
+      if (!stickyBarDismissed && pct > 0.5) setStickyBarVisible(true);
+      if (pct < 0.4) setStickyBarVisible(false);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [stickyBarDismissed]);
+
+  // Email highlight pulse auto-reset
+  useEffect(() => {
+    if (!emailHighlight) return;
+    const t = setTimeout(() => setEmailHighlight(false), 2000);
+    return () => clearTimeout(t);
+  }, [emailHighlight]);
+
+  // Email hint auto-hide
+  useEffect(() => {
+    if (!emailHint) return;
+    const t = setTimeout(() => setEmailHint(false), 3000);
+    return () => clearTimeout(t);
+  }, [emailHint]);
+
+  const triggerDownload = () => {
+    // Fire-and-forget analytics
+    fetch("/api/preview/track-download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: headerEmail.trim().toLowerCase(),
+        reportSlug: analysis.jobTitle.toLowerCase().replace(/\s+/g, "-"),
+        companyName: company,
+      }),
+    }).catch(() => {});
+
     const prevTitle = document.title;
     document.title = `${analysis.jobTitle} – ${company} | AI Automation Report by iMocha`;
     setTimeout(() => {
       window.print();
       setTimeout(() => { document.title = prevTitle; }, 500);
     }, 300);
+  };
+
+  const handleDownloadClick = () => {
+    if (emailSubmitted) { triggerDownload(); return; }
+    setEmailHint(true);
+    emailInputRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    emailInputRef.current?.focus();
+    setEmailHighlight(true);
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = headerEmail.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError("Enter a valid email");
+      return;
+    }
+    setEmailValidating(true);
+    setEmailError("");
+    try {
+      const res = await fetch("/api/preview/validate-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok) {
+        setEmailError(data.error ?? "Invalid email");
+        setEmailValidating(false);
+        return;
+      }
+      setEmailSubmitted(true);
+      setEmailValidating(false);
+      setTimeout(() => triggerDownload(), 600);
+    } catch {
+      setEmailError("Something went wrong. Try again.");
+      setEmailValidating(false);
+    }
   };
 
   const tasksHigh   = analysis.tasks.filter(t => t.automationPotential === "high").length;
@@ -285,26 +371,108 @@ export default function DashboardView({
               </span>
             )}
 
+            {/* Inline email field */}
+            {emailSubmitted ? (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 8,
+                background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)",
+                flexShrink: 0,
+              }}>
+                <svg width="12" height="12" fill="none" viewBox="0 0 16 16">
+                  <path d="M3 8l4 4 6-6" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span style={{ fontSize: 12, color: "#6ee7b7", fontWeight: 500 }}>
+                  {headerEmail.length > 20 ? headerEmail.slice(0, 18) + "\u2026" : headerEmail}
+                </span>
+              </div>
+            ) : (
+              <form onSubmit={handleEmailSubmit} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
+                <div style={{ position: "relative" }}>
+                  <input
+                    ref={emailInputRef}
+                    type="email"
+                    value={headerEmail}
+                    onChange={e => { setHeaderEmail(e.target.value); setEmailError(""); }}
+                    placeholder="work email"
+                    style={{
+                      width: 180, height: 32, padding: "0 12px",
+                      borderRadius: 8, fontSize: 12,
+                      background: "rgba(255,255,255,0.10)",
+                      border: `1.5px solid ${emailHighlight ? "rgba(253,90,15,0.7)" : "rgba(255,255,255,0.15)"}`,
+                      color: "#fff", outline: "none",
+                      animation: emailHighlight ? "emailPulse 0.55s ease 3" : "none",
+                      transition: "border-color 0.2s",
+                    }}
+                    onFocus={e => (e.target.style.borderColor = "rgba(253,90,15,0.6)")}
+                    onBlur={e => (e.target.style.borderColor = emailHighlight ? "rgba(253,90,15,0.7)" : "rgba(255,255,255,0.15)")}
+                  />
+                  {emailError && (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
+                      fontSize: 11, color: "#fca5a5", background: "rgba(15,0,25,0.85)",
+                      padding: "4px 8px", borderRadius: 6, whiteSpace: "nowrap", zIndex: 10,
+                    }}>
+                      {emailError}
+                    </div>
+                  )}
+                  {emailHint && !emailError && (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 8px)", left: -4,
+                      fontSize: 11, fontWeight: 500, color: "#FDBB96",
+                      background: "rgba(15,0,25,0.90)", backdropFilter: "blur(4px)",
+                      padding: "6px 10px", borderRadius: 8, whiteSpace: "nowrap",
+                      zIndex: 10, animation: "fadeInUp 0.15s ease both",
+                      border: "1px solid rgba(253,90,15,0.25)",
+                    }}>
+                      Provide your email to download the report
+                      <div style={{
+                        position: "absolute", top: -4, left: 16,
+                        width: 8, height: 8, transform: "rotate(45deg)",
+                        background: "rgba(15,0,25,0.90)",
+                        borderLeft: "1px solid rgba(253,90,15,0.25)",
+                        borderTop: "1px solid rgba(253,90,15,0.25)",
+                      }} />
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={emailValidating}
+                  style={{
+                    width: 32, height: 32, borderRadius: 8, border: "none",
+                    background: "rgba(253,90,15,0.30)", color: "#FDBB96",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: emailValidating ? "wait" : "pointer",
+                    transition: "background 0.15s", flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { if (!emailValidating) (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.50)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.30)"; }}
+                >
+                  {emailValidating ? (
+                    <span style={{ fontSize: 12 }}>{"\u2026"}</span>
+                  ) : (
+                    <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+                      <path d="M3 8h10M8 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Download PDF button — dulled until email submitted */}
             <button
-              onClick={handleDownloadPDF}
+              onClick={handleDownloadClick}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 fontSize: 12, padding: "7px 16px", borderRadius: 10,
-                fontWeight: 700, color: "#fff", background: "#FD5A0F",
+                fontWeight: 700,
+                color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
+                background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
                 border: "none", cursor: "pointer",
-                boxShadow: "0 2px 10px rgba(253,90,15,0.30)",
-                transition: "background 0.15s, box-shadow 0.15s, transform 0.1s",
+                boxShadow: emailSubmitted ? "0 2px 10px rgba(253,90,15,0.30)" : "none",
+                transition: "background 0.3s, box-shadow 0.3s",
                 flexShrink: 0,
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#E04E08";
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 16px rgba(253,90,15,0.40)";
-                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#FD5A0F";
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 10px rgba(253,90,15,0.30)";
-                (e.currentTarget as HTMLButtonElement).style.transform = "";
               }}
             >
               <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
@@ -721,6 +889,49 @@ export default function DashboardView({
         iMocha AI Automation Index &nbsp;·&nbsp; Powered by iMocha &nbsp;·&nbsp; Results are indicative
       </footer>
 
+      {/* ── STICKY BOTTOM DOWNLOAD BAR ── */}
+      <div className="no-print" style={{
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        height: 64, zIndex: 55,
+        background: "#fff", borderTop: "1px solid #EAE4EF",
+        boxShadow: "0 -4px 20px rgba(34,1,51,0.08)",
+        display: "flex", alignItems: "center",
+        padding: "0 28px", gap: 16,
+        transform: stickyBarVisible ? "translateY(0)" : "translateY(100%)",
+        transition: "transform 0.35s ease",
+        pointerEvents: stickyBarVisible ? "auto" : "none",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <IMochaIcon size={18} color="#FD5A0F" />
+          <span style={{ fontSize: 13, color: "#553366", fontWeight: 500 }}>
+            Download your AI Automation Report
+          </span>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={handleDownloadClick}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 20px", borderRadius: 8, border: "none",
+            background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
+            color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            transition: "background 0.3s", whiteSpace: "nowrap",
+          }}
+        >
+          <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+            <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Download PDF
+        </button>
+        <button
+          onClick={() => { setStickyBarDismissed(true); setStickyBarVisible(false); }}
+          style={{ background: "none", border: "none", color: "#C4B5D0", fontSize: 18, cursor: "pointer", flexShrink: 0, lineHeight: 1 }}
+        >
+          ×
+        </button>
+      </div>
+
       <style>{`
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(12px); }
@@ -731,6 +942,10 @@ export default function DashboardView({
           to   { opacity: 1; }
         }
         input::placeholder { color: rgba(255,255,255,0.35); }
+        @keyframes emailPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(253,90,15,0); }
+          50%      { box-shadow: 0 0 0 6px rgba(253,90,15,0.30); }
+        }
         @media print {
           @page { margin: 0; size: A4; }
           body  { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
