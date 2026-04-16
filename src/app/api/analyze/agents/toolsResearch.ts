@@ -12,10 +12,8 @@ import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD, ScoredTask } from "./types";
 import { searchWeb } from "./utils";
 
-const model = new ChatAnthropic({
-  model: "claude-sonnet-4-6",
-  temperature: 0,
-});
+let _model: ChatAnthropic | null = null;
+const getModel = () => _model ??= new ChatAnthropic({ model: "claude-sonnet-4-6", temperature: 0 });
 
 const parser = new JsonOutputParser<{ toolsMapping: Record<string, string[]> }>();
 
@@ -69,7 +67,7 @@ export async function runToolsResearchAgent(
       .slice(0, 3000); // cap context size
   }
 
-  const response = await model.invoke([
+  const response = await getModel().invoke([
     new SystemMessage(SYSTEM),
     new HumanMessage(PROMPT(automatableTasks, context, searchContext)),
   ]);

@@ -47,7 +47,8 @@ export function computeROI(scoredTasks: ScoredTask[]): Omit<ROIData, "focusShift
 }
 
 /** Agent 6 also generates focusShift via a small LLM call */
-const model = new ChatAnthropic({ model: "claude-haiku-4-5-20251001", temperature: 0 });
+let _model: ChatAnthropic | null = null;
+const getModel = () => _model ??= new ChatAnthropic({ model: "claude-haiku-4-5-20251001", temperature: 0 });
 const parser = new JsonOutputParser<{ focusShift: string }>();
 
 export async function runROIAgent(scoredTasks: ScoredTask[], parsedJD: ParsedJD): Promise<ROIData> {
@@ -58,7 +59,7 @@ export async function runROIAgent(scoredTasks: ScoredTask[], parsedJD: ParsedJD)
     .map(t => t.name)
     .join(", ");
 
-  const response = await model.invoke([
+  const response = await getModel().invoke([
     new SystemMessage("Return ONLY valid JSON with one field. No markdown."),
     new HumanMessage(
       `A ${parsedJD.seniority} ${parsedJD.jobTitle} will reclaim ${mathResult.estimatedHoursSavedPerWeek}h/week ` +

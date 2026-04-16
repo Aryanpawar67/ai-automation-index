@@ -9,10 +9,8 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD } from "./types";
 
-const model = new ChatAnthropic({
-  model: "claude-sonnet-4-6",
-  temperature: 0,
-});
+let _model: ChatAnthropic | null = null;
+const getModel = () => _model ??= new ChatAnthropic({ model: "claude-sonnet-4-6", temperature: 0 });
 
 const parser = new JsonOutputParser<ParsedJD>();
 
@@ -38,7 +36,7 @@ Return this exact JSON structure:
 }`;
 
 export async function runParserAgent(jobDescription: string, company: string): Promise<ParsedJD> {
-  const response = await model.invoke([
+  const response = await getModel().invoke([
     new SystemMessage(SYSTEM),
     new HumanMessage(PROMPT(jobDescription, company)),
   ]);

@@ -12,10 +12,8 @@ import { JsonOutputParser } from "@langchain/core/output_parsers";
 import type { ParsedJD, ScoredTask, Opportunity, ROIData, RoadmapPhase } from "./types";
 import { lookupTools } from "./utils";
 
-const model = new ChatAnthropic({
-  model: "claude-sonnet-4-6",
-  temperature: 0,
-});
+let _model: ChatAnthropic | null = null;
+const getModel = () => _model ??= new ChatAnthropic({ model: "claude-sonnet-4-6", temperature: 0 });
 
 const parser = new JsonOutputParser<{ roadmap: RoadmapPhase[] }>();
 
@@ -79,7 +77,7 @@ export async function runRoadmapAgent(
   roiData: ROIData,
   parsedJD: ParsedJD
 ): Promise<RoadmapPhase[]> {
-  const response = await model.invoke([
+  const response = await getModel().invoke([
     new SystemMessage(SYSTEM),
     new HumanMessage(PROMPT(scoredTasks, opportunities, toolsMapping, roiData, parsedJD)),
   ]);

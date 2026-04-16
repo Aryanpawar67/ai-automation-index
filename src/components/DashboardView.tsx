@@ -89,6 +89,60 @@ function Badge({ label, cfg }: { label: string; cfg: { text: string; bg: string;
   );
 }
 
+// ── Skills Tooltip ────────────────────────────────────────────────────────────
+
+const SKILLS_TOOLTIP_CONTENT = {
+  futureProof: {
+    header: "STAYS VALUABLE", headerColor: "#059669",
+    body: "These skills are unlikely to be automated in the next 3\u20135 years. They require human judgment, relational intelligence, or creative reasoning.",
+  },
+  atRisk: {
+    header: "HIGH AUTOMATION EXPOSURE", headerColor: "#dc2626",
+    body: "These skills map directly to tasks flagged as highly automatable. People who rely heavily on them may find their scope narrow as AI tools are adopted.",
+  },
+  aiAugmented: {
+    header: "AMPLIFIED BY AI", headerColor: "#FD5A0F",
+    body: "These skills become significantly more powerful when combined with AI tools \u2014 not replaced by them. This is your highest-ROI upskilling opportunity.",
+  },
+};
+
+function SkillsColumnTooltip({
+  type, borderColor, visible,
+}: {
+  type: keyof typeof SKILLS_TOOLTIP_CONTENT;
+  borderColor: string;
+  visible: boolean;
+}) {
+  const content = SKILLS_TOOLTIP_CONTENT[type];
+  if (!visible) return null;
+  return (
+    <div style={{
+      position: "absolute", zIndex: 100,
+      width: 268, borderRadius: 14, padding: "16px 18px",
+      top: "calc(100% + 10px)", left: 0,
+      background: "#fff",
+      border: `1px solid ${borderColor}`,
+      boxShadow: "0 12px 40px rgba(34,1,51,0.14)",
+      animation: "fadeInUp 0.18s ease both",
+      pointerEvents: "none",
+    }}>
+      <div style={{
+        position: "absolute", top: -7, left: 20,
+        width: 12, height: 12, transform: "rotate(45deg)",
+        background: "#fff",
+        borderLeft: `1px solid ${borderColor}`,
+        borderTop: `1px solid ${borderColor}`,
+      }} />
+      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: content.headerColor, margin: "0 0 8px" }}>
+        {content.header}
+      </p>
+      <p style={{ fontSize: 12, color: "#220133", margin: 0, lineHeight: 1.65 }}>
+        {content.body}
+      </p>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function DashboardView({
@@ -105,18 +159,14 @@ export default function DashboardView({
   const router = useRouter();
   const [activeTab, setActiveTab]   = useState<"overview" | "tasks" | "opportunities">("overview");
   const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
-  const [printMode, setPrintMode]   = useState(false);
+  const [skillsTooltip, setSkillsTooltip] = useState<string | null>(null);
 
   const handleDownloadPDF = () => {
     const prevTitle = document.title;
     document.title = `${analysis.jobTitle} – ${company} | AI Automation Report by iMocha`;
-    setPrintMode(true);
     setTimeout(() => {
       window.print();
-      setTimeout(() => {
-        setPrintMode(false);
-        document.title = prevTitle;
-      }, 500);
+      setTimeout(() => { document.title = prevTitle; }, 500);
     }, 300);
   };
 
@@ -133,27 +183,27 @@ export default function DashboardView({
       label: "Automation Score", value: analysis.overallAutomationScore + "%",
       sub: "of tasks automatable", color: "#ef4444", bg: "#fef2f2",
       borderColor: "rgba(239,68,68,0.2)", glowColor: "rgba(239,68,68,0.08)", icon: "⚡",
-      what: "How much of this role's day-to-day work AI can handle today — across every task in the job description.",
-      how: `Simple average of all ${analysis.tasks.length} task scores (range: ${scoreMin}–${scoreMax}) → ${analysis.overallAutomationScore}%`,
+      what: "How much of this role\u2019s day-to-day work AI can handle today \u2014 across every task in the job description.",
+      how: `Simple average of all ${analysis.tasks.length} task scores (range: ${scoreMin}\u2013${scoreMax}) \u2192 ${analysis.overallAutomationScore}%`,
     },
     {
       label: "Hours Saved/Week", value: analysis.estimatedHoursSavedPerWeek + "h",
       sub: "time reclaimed weekly", color: "#059669", bg: "#ecfdf5",
       borderColor: "rgba(16,185,129,0.2)", glowColor: "rgba(16,185,129,0.08)", icon: "⏱",
-      what: "Hours per week freed up by AI — time this person can redirect to higher-value, strategic work.",
-      how: `Per task: 40h × time share × automation score × 65% efficiency factor. All tasks summed, then capped at 12h/week → ${analysis.estimatedHoursSavedPerWeek}h`,
+      what: "Hours per week freed up by AI \u2014 time this person can redirect to higher-value, strategic work.",
+      how: `Per task: 40h \u00d7 time share \u00d7 automation score \u00d7 65% efficiency factor. All tasks summed, then capped at 12h/week \u2192 ${analysis.estimatedHoursSavedPerWeek}h`,
     },
     {
       label: "High-Impact Tasks", value: `${tasksHigh}/${analysis.tasks.length}`,
       sub: `${tasksHigh} highly automatable`, color: "#220133", bg: "#F4EFF6",
       borderColor: "rgba(34,1,51,0.15)", glowColor: "rgba(34,1,51,0.05)", icon: "🎯",
-      what: "Tasks where AI can take over 70%+ of the work — your best starting points for automation.",
-      how: `${tasksHigh} of ${analysis.tasks.length} tasks scored ≥70, which is the threshold for "High" automation potential`,
+      what: "Tasks where AI can take over 70%+ of the work \u2014 your best starting points for automation.",
+      how: `${tasksHigh} of ${analysis.tasks.length} tasks scored \u226570, which is the threshold for \u201cHigh\u201d automation potential`,
     },
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F4EFF6" }}>
+    <div style={{ minHeight: "100vh", background: "#F4EFF6", padding: "0 20px" }}>
 
       {/* ── Print-only branded header ── */}
       <div className="print-only" style={{
@@ -164,20 +214,15 @@ export default function DashboardView({
         marginBottom: 24,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {/* Logo + wordmark */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <IMochaIcon size={32} color="#FD5A0F" />
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#220133", letterSpacing: "-0.3px" }}>iMocha</div>
-            </div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#220133", letterSpacing: "-0.3px" }}>iMocha</div>
           </div>
-          {/* Report meta */}
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: "#9988AA" }}>{new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
             <div style={{ fontSize: 11, color: "#553366", fontWeight: 600, marginTop: 2 }}>{company}</div>
           </div>
         </div>
-        {/* Role title */}
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: "#220133", letterSpacing: "-0.3px" }}>{analysis.jobTitle}</div>
           {analysis.department && (
@@ -186,154 +231,134 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* ── Nav ── */}
-      <nav className="no-print" style={{
-        position: "sticky", top: 0, zIndex: 50,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 28px", height: 56,
-        background: "rgba(255,255,255,0.96)", backdropFilter: "blur(16px)",
-        borderBottom: "1px solid #EAE4EF",
-        boxShadow: "0 1px 12px rgba(34,1,51,0.06)",
+      {/* ── STICKY HERO HEADER (merged nav + hero) ── */}
+      <div className="no-print" style={{
+        position: "sticky", top: 12, zIndex: 50,
+        maxWidth: 1200, margin: "0 auto",
+        borderRadius: 20,
+        background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        boxShadow: "0 4px 28px rgba(15,0,25,0.35)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <button
-            onClick={() => router.push(backHref)}
-            style={{
-              display: "flex", alignItems: "center", gap: 5,
-              fontSize: 13, color: "#9988AA", fontWeight: 500,
-              background: "none", border: "none", cursor: "pointer", padding: 0,
-              transition: "color 0.15s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#220133")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#9988AA")}
-          >
-            <svg width="14" height="14" fill="none" viewBox="0 0 16 16">
-              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Back
-          </button>
-          <span style={{ color: "#EAE4EF" }}>|</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <IMochaIcon size={22} color="#FD5A0F" />
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#220133" }}>iMocha</span>
-            <span style={{ color: "#EAE4EF" }}>|</span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: "#553366" }}>AI Automation Index</span>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {company && (
-            <span style={{
-              fontSize: 12, padding: "4px 12px", borderRadius: 20,
-              color: "#553366", background: "#F4EFF6", border: "1px solid #EAE4EF",
-              fontWeight: 500,
-            }}>
-              {company}
-            </span>
-          )}
-          <button
-            onClick={handleDownloadPDF}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              fontSize: 12, padding: "6px 14px", borderRadius: 10,
-              fontWeight: 600, color: "#553366", background: "#fff",
-              border: "1px solid #EAE4EF", cursor: "pointer",
-              transition: "background 0.15s, border-color 0.15s",
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#F4EFF6";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#D0C8D8";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#fff";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#EAE4EF";
-            }}
-          >
-            <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-              <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Download PDF
-          </button>
-          {showNewAnalysis && (
+        <div style={{ position: "absolute", top: 0, right: 60, width: 140, height: 140, borderRadius: "50%", background: "rgba(253,90,15,0.05)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 0, right: 20, width: 90, height: 90, borderRadius: "50%", background: "rgba(139,92,246,0.04)", pointerEvents: "none" }} />
+
+        <div style={{ padding: "14px 28px 18px", position: "relative" }}>
+
+          {/* Top row: back | branding | company | download */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push(backHref)}
               style={{
-                fontSize: 12, padding: "6px 14px", borderRadius: 10,
-                fontWeight: 700, color: "#FD5A0F", background: "#FFF0EA",
-                border: "1px solid #FDBB96", cursor: "pointer",
-                transition: "background 0.15s, color 0.15s",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30, borderRadius: 8,
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+                color: "rgba(255,255,255,0.7)", cursor: "pointer",
+                transition: "background 0.15s, color 0.15s", flexShrink: 0,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.16)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.7)"; }}
+            >
+              <svg width="14" height="14" fill="none" viewBox="0 0 16 16">
+                <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            <span style={{ width: 1, height: 18, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <IMochaIcon size={20} color="#FD5A0F" />
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>iMocha</span>
+              <span style={{ width: 1, height: 14, background: "rgba(255,255,255,0.15)" }} />
+              <span style={{ fontSize: 12, fontWeight: 500, color: "rgba(255,255,255,0.5)" }}>AI Automation Index</span>
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {company && (
+              <span style={{
+                fontSize: 12, padding: "4px 12px", borderRadius: 20,
+                color: "rgba(255,255,255,0.7)", background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.12)", fontWeight: 500, flexShrink: 0,
+              }}>
+                {company}
+              </span>
+            )}
+
+            <button
+              onClick={handleDownloadPDF}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                fontSize: 12, padding: "7px 16px", borderRadius: 10,
+                fontWeight: 700, color: "#fff", background: "#FD5A0F",
+                border: "none", cursor: "pointer",
+                boxShadow: "0 2px 10px rgba(253,90,15,0.30)",
+                transition: "background 0.15s, box-shadow 0.15s, transform 0.1s",
+                flexShrink: 0,
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#FD5A0F";
-                (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+                (e.currentTarget as HTMLButtonElement).style.background = "#E04E08";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 16px rgba(253,90,15,0.40)";
+                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#FFF0EA";
-                (e.currentTarget as HTMLButtonElement).style.color = "#FD5A0F";
+                (e.currentTarget as HTMLButtonElement).style.background = "#FD5A0F";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 10px rgba(253,90,15,0.30)";
+                (e.currentTarget as HTMLButtonElement).style.transform = "";
               }}
             >
-              New Analysis
+              <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
+                <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Download PDF
             </button>
+
+            {showNewAnalysis && (
+              <button
+                onClick={() => router.push("/")}
+                style={{
+                  fontSize: 12, padding: "7px 16px", borderRadius: 10,
+                  fontWeight: 700, color: "#FDBB96", background: "rgba(253,90,15,0.15)",
+                  border: "1px solid rgba(253,90,15,0.25)", cursor: "pointer",
+                  transition: "background 0.15s", flexShrink: 0,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(253,90,15,0.25)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "rgba(253,90,15,0.15)")}
+              >
+                New Analysis
+              </button>
+            )}
+          </div>
+
+          {/* Role identity row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 10px", borderRadius: 20, background: "rgba(253,90,15,0.2)", color: "#FDBB96", border: "1px solid rgba(253,90,15,0.3)" }}>
+              {analysis.department}
+            </span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>·</span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>AI Automation Analysis</span>
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px", letterSpacing: "-0.4px", lineHeight: 1.2 }}>
+            {analysis.jobTitle}
+          </h1>
+          {company && (
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: 0 }}>{company}</p>
           )}
         </div>
-      </nav>
+      </div>
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 28px 60px" }}>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 28px 60px" }}>
 
-        {/* ── Hero / Page header ── */}
+        {/* ── IMPACT SUMMARY (scrolls under sticky header) ── */}
         <div style={{
           background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
-          borderRadius: 24, padding: "32px 36px", marginBottom: 28,
+          borderRadius: 16, padding: "18px 22px", marginBottom: 28,
           border: "1px solid rgba(255,255,255,0.07)",
-          boxShadow: "0 8px 40px rgba(34,1,51,0.18)",
-          position: "relative", overflow: "hidden",
+          boxShadow: "0 4px 20px rgba(34,1,51,0.14)",
           animation: "fadeInUp 0.4s ease both",
         }}>
-          {/* Decorative circles */}
-          <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(253,90,15,0.06)", pointerEvents: "none" }} />
-          <div style={{ position: "absolute", bottom: -60, right: 60, width: 150, height: 150, borderRadius: "50%", background: "rgba(139,92,246,0.05)", pointerEvents: "none" }} />
-
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-                  padding: "3px 10px", borderRadius: 20,
-                  background: "rgba(253,90,15,0.2)", color: "#FDBB96",
-                  border: "1px solid rgba(253,90,15,0.3)",
-                }}>
-                  {analysis.department}
-                </span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>·</span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>AI Automation Analysis</span>
-              </div>
-              <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", margin: "0 0 6px", letterSpacing: "-0.5px", lineHeight: 1.2 }}>
-                {analysis.jobTitle}
-              </h1>
-              {company && (
-                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", margin: "0 0 16px" }}>{company}</p>
-              )}
-              <div style={{
-                padding: "14px 18px", borderRadius: 14,
-                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
-              }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(253,90,15,0.8)", margin: "0 0 8px" }}>
-                  Impact Summary
-                </p>
-                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", margin: 0, lineHeight: 1.65 }}>
-                  {analysis.executiveSummary}
-                </p>
-              </div>
-            </div>
-            <div style={{
-              flexShrink: 0,
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 12px", borderRadius: 10,
-              background: "rgba(253,90,15,0.15)", border: "1px solid rgba(253,90,15,0.25)",
-            }}>
-              <IMochaIcon size={14} color="#FD5A0F" />
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#FDBB96" }}>iMocha</span>
-            </div>
-          </div>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(253,90,15,0.8)", margin: "0 0 8px" }}>Impact Summary</p>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", margin: 0, lineHeight: 1.65 }}>{analysis.executiveSummary}</p>
         </div>
 
         {/* ── KPI cards ── */}
@@ -359,8 +384,7 @@ export default function DashboardView({
                   <div style={{
                     width: 40, height: 40, borderRadius: 12,
                     background: k.bg, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 18,
-                    border: `1px solid ${k.borderColor}`,
+                    fontSize: 18, border: `1px solid ${k.borderColor}`,
                   }}>
                     {k.icon}
                   </div>
@@ -371,32 +395,23 @@ export default function DashboardView({
                 <p style={{ fontSize: 14, fontWeight: 700, color: "#220133", margin: "0 0 3px" }}>{k.label}</p>
                 <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>{k.sub}</p>
               </div>
-
-              {/* Tooltip */}
               {hoveredKpi === i && (
                 <div style={{
-                  position: "absolute", zIndex: 50,
-                  width: 280, borderRadius: 16, padding: "16px 18px",
-                  top: "calc(100% + 12px)",
-                  ...(i >= 2 ? { right: 0 } : { left: 0 }),
-                  background: "#fff",
-                  border: `1px solid ${k.borderColor}`,
+                  position: "absolute", zIndex: 50, width: 280, borderRadius: 16, padding: "16px 18px",
+                  top: "calc(100% + 12px)", ...(i >= 2 ? { right: 0 } : { left: 0 }),
+                  background: "#fff", border: `1px solid ${k.borderColor}`,
                   boxShadow: `0 16px 48px rgba(34,1,51,0.16), 0 0 0 1px ${k.glowColor}`,
                   animation: "fadeInUp 0.18s ease both",
                 }}>
                   <div style={{
-                    position: "absolute", top: -7,
-                    ...(i >= 2 ? { right: "1.5rem" } : { left: "1.5rem" }),
+                    position: "absolute", top: -7, ...(i >= 2 ? { right: "1.5rem" } : { left: "1.5rem" }),
                     width: 12, height: 12, transform: "rotate(45deg)",
                     background: "#fff",
-                    borderLeft: `1px solid ${k.borderColor}`,
-                    borderTop: `1px solid ${k.borderColor}`,
+                    borderLeft: `1px solid ${k.borderColor}`, borderTop: `1px solid ${k.borderColor}`,
                   }} />
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                     <span style={{ fontSize: 16 }}>{k.icon}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: k.color }}>
-                      {k.label}
-                    </span>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: k.color }}>{k.label}</span>
                     <span style={{ marginLeft: "auto", fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</span>
                   </div>
                   <p style={{ fontSize: 13, color: "#220133", margin: "0 0 8px", lineHeight: 1.55 }}>{k.what}</p>
@@ -407,272 +422,281 @@ export default function DashboardView({
           ))}
         </div>
 
-        {/* ── Tab bar ── */}
-        <div className="no-print" style={{
-          display: "inline-flex", gap: 4, padding: 5,
-          background: "#fff", borderRadius: 14, border: "1px solid #EAE4EF",
-          marginBottom: 24,
-          boxShadow: "0 2px 8px rgba(34,1,51,0.05)",
-        }}>
-          {(["overview", "tasks", "opportunities"] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: "8px 20px", borderRadius: 10, border: "none", cursor: "pointer",
-                fontSize: 13, fontWeight: 600, textTransform: "capitalize",
-                transition: "background 0.15s, color 0.15s, box-shadow 0.15s",
-                background: activeTab === tab ? "#FD5A0F" : "transparent",
-                color: activeTab === tab ? "#fff" : "#553366",
-                boxShadow: activeTab === tab ? "0 2px 10px rgba(253,90,15,0.3)" : "none",
-              }}
-            >
-              {tab}
-            </button>
-          ))}
+        {/* ── Tab bar (full width, badge counts) ── */}
+        <div className="no-print" style={{ marginBottom: 8 }}>
+          <div style={{
+            display: "flex", gap: 4, padding: 5,
+            background: "#fff", borderRadius: 14, border: "1px solid #EAE4EF",
+            boxShadow: "0 2px 8px rgba(34,1,51,0.05)",
+            width: "100%",
+          }}>
+            {(["overview", "tasks", "opportunities"] as const).map(tab => {
+              const isActive = activeTab === tab;
+              const badgeCount = tab === "tasks" ? analysis.tasks.length : tab === "opportunities" ? analysis.aiOpportunities.length : null;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    flex: 1,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                    padding: "9px 20px", borderRadius: 10, border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 600, textTransform: "capitalize",
+                    transition: "background 0.15s, color 0.15s, box-shadow 0.15s",
+                    background: isActive ? "#FD5A0F" : "transparent",
+                    color: isActive ? "#fff" : "#553366",
+                    boxShadow: isActive ? "0 2px 10px rgba(253,90,15,0.3)" : "none",
+                  }}
+                  onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = "#FFF8F5"; (e.currentTarget as HTMLButtonElement).style.color = "#FD5A0F"; } }}
+                  onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#553366"; } }}
+                >
+                  <span>{tab}</span>
+                  {badgeCount !== null && (
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      minWidth: 20, height: 18, borderRadius: 9,
+                      background: isActive ? "rgba(255,255,255,0.25)" : "#FFF0EA",
+                      color: isActive ? "#fff" : "#FD5A0F",
+                      border: isActive ? "1px solid rgba(255,255,255,0.3)" : "1px solid #FDBB96",
+                      fontSize: 9, fontWeight: 700, padding: "0 5px",
+                    }}>
+                      {badgeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── OVERVIEW tab ── */}
-        {(activeTab === "overview" || printMode) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
-
-              {/* Score ring card */}
-              <div style={{
-                background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
-                padding: "24px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
-                breakInside: "avoid", pageBreakInside: "avoid",
-              }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: 0, alignSelf: "flex-start" }}>
-                  Score Breakdown
-                </p>
-                <ScoreRing score={analysis.overallAutomationScore} color="auto" label="Automation" sublabel="Tasks automatable" />
-                <div style={{
-                  display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8,
-                  width: "100%", paddingTop: 16, borderTop: "1px solid #EAE4EF",
-                  textAlign: "center",
-                }}>
-                  {[
-                    { count: tasksHigh,   label: "High",   color: "#ef4444" },
-                    { count: tasksMedium, label: "Medium", color: "#f59e0b" },
-                    { count: tasksLow,    label: "Low",    color: "#10b981" },
-                  ].map(item => (
-                    <div key={item.label}>
-                      <p style={{ fontSize: 22, fontWeight: 800, color: item.color, margin: "0 0 2px" }}>{item.count}</p>
-                      <p style={{ fontSize: 11, color: "#9988AA", margin: 0 }}>{item.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Category radar */}
-              <div style={{
-                background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
-                padding: "24px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
-                breakInside: "avoid", pageBreakInside: "avoid",
-              }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: "0 0 16px" }}>
-                  Automation by Category
-                </p>
-                <CategoryRadar data={analysis.automationByCategory} />
-              </div>
-            </div>
-
-            {/* Skills analysis */}
+        <div className="tab-panel" style={{ display: activeTab === "overview" ? "flex" : "none", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
             <div style={{
               background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
-              padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
+              padding: "24px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
               breakInside: "avoid", pageBreakInside: "avoid",
             }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: "0 0 20px" }}>
-                Skills Analysis
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: 0, alignSelf: "flex-start" }}>
+                Score Breakdown
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+              <ScoreRing score={analysis.overallAutomationScore} color="auto" label="Automation" sublabel="Tasks automatable" />
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8,
+                width: "100%", paddingTop: 16, borderTop: "1px solid #EAE4EF", textAlign: "center",
+              }}>
                 {[
-                  { title: "Future-Proof", items: analysis.skillsAnalysis.futureProof, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: "✓" },
-                  { title: "At Risk",       items: analysis.skillsAnalysis.atRisk,       color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "!" },
-                  { title: "AI-Augmented",  items: analysis.skillsAnalysis.aiAugmented,  color: "#FD5A0F", bg: "#FFF0EA", border: "#FDBB96", icon: "↑" },
-                ].map(col => (
-                  <div key={col.title} style={{
-                    borderRadius: 16, padding: "16px 18px",
-                    background: col.bg, border: `1px solid ${col.border}`,
-                  }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: col.color, margin: "0 0 12px" }}>
-                      {col.title} Skills
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {col.items.map((s, i) => (
-                        <span key={i} style={{
-                          fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 500,
-                          background: col.bg, color: col.color, border: `1px solid ${col.border}`,
-                        }}>
-                          {col.icon} {s}
-                        </span>
-                      ))}
-                    </div>
+                  { count: tasksHigh, label: "High", color: "#ef4444" },
+                  { count: tasksMedium, label: "Medium", color: "#f59e0b" },
+                  { count: tasksLow, label: "Low", color: "#10b981" },
+                ].map(item => (
+                  <div key={item.label}>
+                    <p style={{ fontSize: 22, fontWeight: 800, color: item.color, margin: "0 0 2px" }}>{item.count}</p>
+                    <p style={{ fontSize: 11, color: "#9988AA", margin: 0 }}>{item.label}</p>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* ── TASKS tab ── */}
-        {(activeTab === "tasks" || printMode) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease", breakBefore: printMode ? "page" : "auto", pageBreakBefore: printMode ? "always" : "auto" }}>
-            {printMode && (
-              <p className="print-only" style={{ fontSize: 15, fontWeight: 800, color: "#220133", margin: "0 0 4px" }}>
-                Task Automation Breakdown
-              </p>
-            )}
-
-            {/* Chart card */}
             <div style={{
               background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
-              padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
+              padding: "24px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
               breakInside: "avoid", pageBreakInside: "avoid",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: "0 0 4px" }}>
-                    Task Automation Potential
-                  </p>
-                  <p style={{ fontSize: 11, color: "#C4B5D0", margin: 0 }}>Sorted by automation score · hover bars for AI opportunity</p>
-                </div>
-                <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#553366" }}>
-                  {[
-                    { label: "High",   color: "#f87171" },
-                    { label: "Medium", color: "#fbbf24" },
-                    { label: "Low",    color: "#34d399" },
-                  ].map(item => (
-                    <span key={item.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 3, background: item.color, display: "inline-block" }} />
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <TasksChart tasks={analysis.tasks} />
-            </div>
-
-            {/* Task cards grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-              {[...analysis.tasks].sort((a, b) => b.automationScore - a.automationScore).map((task, i) => {
-                const color = taskColor(task.automationScore);
-                const impactCfg = IMPACT_CFG[task.automationPotential] ?? IMPACT_CFG.low;
-                return (
-                  <div key={i} style={{
-                    background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16,
-                    padding: "18px 18px 16px",
-                    boxShadow: "0 2px 8px rgba(34,1,51,0.05)",
-                    transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
-                    animation: `fadeInUp 0.35s ease ${i * 0.04}s both`,
-                    cursor: "default",
-                    breakInside: "avoid", pageBreakInside: "avoid",
-                  }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-                      (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px rgba(34,1,51,0.1)";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLDivElement).style.transform = "";
-                      (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(34,1,51,0.05)";
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                      <Badge label={task.automationPotential} cfg={impactCfg} />
-                      <span style={{ fontSize: 28, fontWeight: 800, color, letterSpacing: "-0.5px", lineHeight: 1 }}>
-                        {task.automationScore}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 3px" }}>{task.name}</p>
-                    <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 10px" }}>{task.category}</p>
-                    <div style={{
-                      height: 4, borderRadius: 2, background: "#F4EFF6", overflow: "hidden", marginBottom: 10,
-                    }}>
-                      <div style={{
-                        height: "100%", width: `${task.automationScore}%`,
-                        background: color, borderRadius: 2,
-                      }} />
-                    </div>
-                    <p style={{ fontSize: 11, color: "#FD5A0F", margin: "0 0 4px", fontWeight: 500 }}>{task.aiOpportunity}</p>
-                    {task.scoringRationale && (
-                      <p style={{ fontSize: 11, color: "#9988AA", margin: 0, lineHeight: 1.5 }}>
-                        {task.scoringRationale.split(". ")[0]}.
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: "0 0 16px" }}>
+                Automation by Category
+              </p>
+              <CategoryRadar data={analysis.automationByCategory} />
             </div>
           </div>
-        )}
+
+          {/* Skills analysis with tooltips */}
+          <div style={{
+            background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
+            padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
+            breakInside: "avoid", pageBreakInside: "avoid",
+          }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "#220133", margin: "0 0 3px" }}>Skills Analysis</p>
+              <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>Classified by exposure to AI automation for this role</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+              {[
+                { key: "futureProof" as const, title: "Future-Proof", items: analysis.skillsAnalysis.futureProof, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: "✓" },
+                { key: "atRisk"      as const, title: "At Risk",       items: analysis.skillsAnalysis.atRisk,       color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "!" },
+                { key: "aiAugmented" as const, title: "AI-Augmented",  items: analysis.skillsAnalysis.aiAugmented,  color: "#FD5A0F", bg: "#FFF0EA", border: "#FDBB96", icon: "↑" },
+              ].map(col => (
+                <div key={col.title} style={{ borderRadius: 16, padding: "16px 18px", background: col.bg, border: `1px solid ${col.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, position: "relative" }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: col.color, margin: 0 }}>
+                      {col.title} Skills
+                    </p>
+                    <button
+                      onMouseEnter={() => setSkillsTooltip(col.key)}
+                      onMouseLeave={() => setSkillsTooltip(null)}
+                      onFocus={() => setSkillsTooltip(col.key)}
+                      onBlur={() => setSkillsTooltip(null)}
+                      style={{
+                        width: 16, height: 16, borderRadius: "50%",
+                        background: "rgba(255,255,255,0.7)", border: `1px solid ${col.border}`,
+                        color: col.color, fontSize: 10, fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "default", flexShrink: 0, outline: "none",
+                      }}
+                      aria-label={`What does ${col.title} mean?`}
+                    >
+                      i
+                    </button>
+                    <SkillsColumnTooltip type={col.key} borderColor={col.border} visible={skillsTooltip === col.key} />
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {col.items.map((s, i) => (
+                      <span key={i} style={{
+                        fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 500,
+                        background: col.bg, color: col.color, border: `1px solid ${col.border}`,
+                      }}>
+                        {col.icon} {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── TASKS tab ── */}
+        <div className="tab-panel tab-tasks" style={{ display: activeTab === "tasks" ? "flex" : "none", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
+          <div style={{
+            background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
+            padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
+            breakInside: "avoid", pageBreakInside: "avoid",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9988AA", margin: "0 0 4px" }}>
+                  Task Automation Potential
+                </p>
+                <p style={{ fontSize: 11, color: "#C4B5D0", margin: 0 }}>Sorted by automation score · hover bars for AI opportunity</p>
+              </div>
+              <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#553366" }}>
+                {[
+                  { label: "High", color: "#f87171" },
+                  { label: "Medium", color: "#fbbf24" },
+                  { label: "Low", color: "#34d399" },
+                ].map(item => (
+                  <span key={item.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 3, background: item.color, display: "inline-block" }} />
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <TasksChart tasks={analysis.tasks} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+            {[...analysis.tasks].sort((a, b) => b.automationScore - a.automationScore).map((task, i) => {
+              const color = taskColor(task.automationScore);
+              const impactCfg = IMPACT_CFG[task.automationPotential] ?? IMPACT_CFG.low;
+              return (
+                <div key={i} style={{
+                  background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16,
+                  padding: "18px 18px 16px",
+                  boxShadow: "0 2px 8px rgba(34,1,51,0.05)",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  animation: `fadeInUp 0.35s ease ${i * 0.04}s both`,
+                  cursor: "default",
+                  breakInside: "avoid", pageBreakInside: "avoid",
+                }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px rgba(34,1,51,0.1)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLDivElement).style.transform = "";
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(34,1,51,0.05)";
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <Badge label={task.automationPotential} cfg={impactCfg} />
+                    <span style={{ fontSize: 28, fontWeight: 800, color, letterSpacing: "-0.5px", lineHeight: 1 }}>
+                      {task.automationScore}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 3px" }}>{task.name}</p>
+                  <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 10px" }}>{task.category}</p>
+                  <div style={{ height: 4, borderRadius: 2, background: "#F4EFF6", overflow: "hidden", marginBottom: 10 }}>
+                    <div style={{ height: "100%", width: `${task.automationScore}%`, background: color, borderRadius: 2 }} />
+                  </div>
+                  <p style={{ fontSize: 11, color: "#FD5A0F", margin: "0 0 4px", fontWeight: 500 }}>{task.aiOpportunity}</p>
+                  {task.scoringRationale && (
+                    <p style={{ fontSize: 11, color: "#9988AA", margin: 0, lineHeight: 1.5 }}>
+                      {task.scoringRationale.split(". ")[0]}.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {/* ── OPPORTUNITIES tab ── */}
-        {(activeTab === "opportunities" || printMode) && (
-          <div style={{ animation: "fadeIn 0.25s ease", breakBefore: printMode ? "page" : "auto", pageBreakBefore: printMode ? "always" : "auto" }}>
-            {printMode && (
-              <p className="print-only" style={{ fontSize: 15, fontWeight: 800, color: "#220133", margin: "0 0 16px" }}>
-                AI Opportunities
-              </p>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
-              {analysis.aiOpportunities.map((opp, i) => {
-                const impactCfg  = IMPACT_CFG[opp.impact]  ?? IMPACT_CFG.low;
-                return (
-                  <div key={i} style={{
-                    background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
-                    padding: "22px 24px",
-                    boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
-                    transition: "transform 0.15s, box-shadow 0.15s",
-                    animation: `fadeInUp 0.35s ease ${i * 0.06}s both`,
-                    cursor: "default",
-                    breakInside: "avoid", pageBreakInside: "avoid",
+        <div className="tab-panel tab-opps" style={{ display: activeTab === "opportunities" ? "block" : "none", animation: "fadeIn 0.25s ease" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+            {analysis.aiOpportunities.map((opp, i) => {
+              const impactCfg = IMPACT_CFG[opp.impact] ?? IMPACT_CFG.low;
+              return (
+                <div key={i} style={{
+                  background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
+                  padding: "22px 24px",
+                  boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  animation: `fadeInUp 0.35s ease ${i * 0.06}s both`,
+                  cursor: "default",
+                  breakInside: "avoid", pageBreakInside: "avoid",
+                }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 32px rgba(34,1,51,0.1)";
                   }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-                      (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 32px rgba(34,1,51,0.1)";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLDivElement).style.transform = "";
-                      (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(34,1,51,0.06)";
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <Badge label={`${opp.impact} impact`} cfg={impactCfg} />
-                        <span style={{
-                          display: "inline-flex", alignItems: "center",
-                          padding: "3px 10px", borderRadius: 20,
-                          fontSize: 10, fontWeight: 700, letterSpacing: "0.05em",
-                          background: "#F4EFF6", color: "#553366", border: "1px solid #EAE4EF",
-                        }}>
-                          {EFFORT_LABEL[opp.effort]}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#059669", whiteSpace: "nowrap", marginLeft: 8 }}>
-                        {opp.estimatedTimeSaving}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLDivElement).style.transform = "";
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(34,1,51,0.06)";
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <Badge label={`${opp.impact} impact`} cfg={impactCfg} />
+                      <span style={{
+                        display: "inline-flex", alignItems: "center",
+                        padding: "3px 10px", borderRadius: 20,
+                        fontSize: 10, fontWeight: 700, letterSpacing: "0.05em",
+                        background: "#F4EFF6", color: "#553366", border: "1px solid #EAE4EF",
+                      }}>
+                        {EFFORT_LABEL[opp.effort]}
                       </span>
                     </div>
-                    <h3 style={{ fontSize: 15, fontWeight: 800, color: "#220133", margin: "0 0 8px" }}>{opp.title}</h3>
-                    <p style={{ fontSize: 13, color: "#553366", margin: "0 0 16px", lineHeight: 1.6 }}>{opp.description}</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {opp.tools.map((tool, j) => (
-                        <span key={j} style={{
-                          fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600,
-                          background: "#FFF0EA", border: "1px solid #FDBB96", color: "#FD5A0F",
-                        }}>
-                          {tool}
-                        </span>
-                      ))}
-                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#059669", whiteSpace: "nowrap", marginLeft: 8 }}>
+                      {opp.estimatedTimeSaving}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                  <h3 style={{ fontSize: 15, fontWeight: 800, color: "#220133", margin: "0 0 8px" }}>{opp.title}</h3>
+                  <p style={{ fontSize: 13, color: "#553366", margin: "0 0 16px", lineHeight: 1.6 }}>{opp.description}</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {opp.tools.map((tool, j) => (
+                      <span key={j} style={{
+                        fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600,
+                        background: "#FFF0EA", border: "1px solid #FDBB96", color: "#FD5A0F",
+                      }}>
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
 
       </main>
 
@@ -706,11 +730,15 @@ export default function DashboardView({
           from { opacity: 0; }
           to   { opacity: 1; }
         }
+        input::placeholder { color: rgba(255,255,255,0.35); }
         @media print {
           @page { margin: 0; size: A4; }
           body  { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
+          .no-print    { display: none !important; }
+          .print-only  { display: block !important; }
+          .tab-panel   { display: block !important; }
+          .tab-tasks   { break-before: page; page-break-before: always; }
+          .tab-opps    { break-before: page; page-break-before: always; }
         }
       `}</style>
     </div>
