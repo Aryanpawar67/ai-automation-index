@@ -98,7 +98,6 @@ textarea:focus, input:focus { outline: none; }
 .recharts-tooltip-wrapper { outline: none !important; }
 
 /* Print / PDF styles */
-.no-print { }
 .print-only { display: none; }
 
 @media print {

@@ -108,7 +108,7 @@ export default async function CompanyReportHub({
           analyses={cleanAnalyses}
           companyId={companyId}
           identifier={publicIdentifier}
-          token={token}
+          token={token as string}
         />
       </main>
 
