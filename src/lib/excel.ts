@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { HCM_MAP } from "@/lib/ats";
 
 export interface DatasetRow {
   rowNumber:     number;
@@ -75,16 +76,6 @@ export interface POCRow {
   careerPageUrl: string;
   atsType:       string | null;
 }
-
-const HCM_MAP: Record<string, string> = {
-  "workday":               "workday",
-  "oracle hcm":            "oracle_hcm",
-  "oracle hcm cloud":      "oracle_hcm",
-  "oracle taleo":          "oracle_taleo",
-  "taleo":                 "oracle_taleo",
-  "sap successfactors":    "sap_sf",
-  "successfactors":        "sap_sf",
-};
 
 const REQUIRED = ["first_name", "last_name", "email", "company_name", "career_page_url"];
 

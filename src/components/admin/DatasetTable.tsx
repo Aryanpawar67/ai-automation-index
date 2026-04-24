@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter }         from "next/navigation";
 import FlushDatasetButton    from "./FlushDatasetButton";
+import { ATS_OPTIONS, resolveAtsValue } from "@/lib/ats";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,12 +83,44 @@ function avatarColor(name: string) {
 
 // ── Upload Modal ──────────────────────────────────────────────────────────────
 
+interface ManualRow {
+  companyName:   string;
+  careerPageUrl: string;
+  atsType:       string;
+  headquarters:  string;
+  employeeSize:  string;
+  pocFirstName:  string;
+  pocLastName:   string;
+  pocEmail:      string;
+  _errors?:      Partial<Record<keyof ManualRow, string>>;
+}
+
+function emptyManualRow(): ManualRow {
+  return {
+    companyName: "", careerPageUrl: "", atsType: "",
+    headquarters: "", employeeSize: "",
+    pocFirstName: "", pocLastName: "", pocEmail: "",
+  };
+}
+
+type ManualField = Exclude<keyof ManualRow, "_errors">;
+
+// Column order used when pasting TSV/CSV blobs from Excel/Sheets.
+// Must match the visible header order in ManualEntryTable.
+const MANUAL_COLS: readonly ManualField[] = [
+  "companyName", "careerPageUrl", "atsType",
+  "headquarters", "employeeSize",
+  "pocFirstName", "pocLastName", "pocEmail",
+];
+
 function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [mode,  setMode]  = useState<"file" | "manual">("file");
   const [stage, setStage] = useState<"pick" | "preview" | "uploading" | "done">("pick");
   const [stats, setStats] = useState<{ total: number; newRows: number; duplicates: number; existingInDb: number } | null>(null);
   const [file,  setFile]  = useState<File | null>(null);
   const [error, setError] = useState("");
   const [drag,  setDrag]  = useState(false);
+  const [manualRows, setManualRows] = useState<ManualRow[]>([emptyManualRow()]);
   const inputRef          = useRef<HTMLInputElement>(null);
 
   const handleFile = async (f: File) => {
@@ -101,6 +134,7 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   };
 
   const handleConfirm = async () => {
+    if (mode === "manual") return handleManualConfirm();
     if (!file) return;
     setStage("uploading");
     const fd  = new FormData(); fd.append("file", file);
@@ -111,6 +145,121 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     setTimeout(() => { onDone(); onClose(); }, 1200);
   };
 
+  // ── Manual entry helpers ────────────────────────────────────────────────────
+  const updateManualRow = (i: number, patch: Partial<ManualRow>) => {
+    setManualRows(rows => rows.map((r, idx) => {
+      if (idx !== i) return r;
+      const next = { ...r, ...patch };
+      if (next._errors) {
+        const cleared = { ...next._errors };
+        for (const key of Object.keys(patch) as (keyof ManualRow)[]) delete cleared[key];
+        next._errors = cleared;
+      }
+      return next;
+    }));
+  };
+
+  const addManualRow    = () => setManualRows(rows => [...rows, emptyManualRow()]);
+  const removeManualRow = (i: number) => setManualRows(rows => rows.length <= 1 ? rows : rows.filter((_, idx) => idx !== i));
+
+  // Excel/Sheets paste: TSV with \n row delimiter and \t cell delimiter.
+  // Anchor at the cell the user pasted into, fill rightwards + downwards,
+  // auto-adding rows as needed. Header row (first cell starts with "company") is skipped.
+  const handlePaste = (rowIndex: number, colIndex: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const raw = e.clipboardData.getData("text");
+    if (!raw.includes("\n") && !raw.includes("\t")) return; // single-cell paste — native
+
+    e.preventDefault();
+
+    const lines = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.length > 0);
+    if (lines.length === 0) return;
+
+    const firstCell = (lines[0].split("\t")[0] ?? "").trim().toLowerCase();
+    const dataLines = firstCell.startsWith("company") ? lines.slice(1) : lines;
+    if (dataLines.length === 0) return;
+
+    const patches: Partial<ManualRow>[] = dataLines.map(line => {
+      const cells = line.split("\t");
+      const patch: Partial<ManualRow> = {};
+      for (let i = 0; i < cells.length; i++) {
+        const target = colIndex + i;
+        if (target >= MANUAL_COLS.length) break;
+        const field = MANUAL_COLS[target];
+        let value = (cells[i] ?? "").trim();
+        if (field === "atsType") value = resolveAtsValue(value) ?? "";
+        (patch as Record<string, string>)[field] = value;
+      }
+      return patch;
+    });
+
+    setManualRows(rows => {
+      const needed = rowIndex + patches.length;
+      const next = rows.length < needed
+        ? [...rows, ...Array.from({ length: needed - rows.length }, () => emptyManualRow())]
+        : [...rows];
+      for (let i = 0; i < patches.length; i++) {
+        const target = rowIndex + i;
+        next[target] = { ...next[target], ...patches[i], _errors: {} };
+      }
+      return next;
+    });
+  };
+
+  const validateManualRows = (): { valid: boolean; rows: ManualRow[] } => {
+    let valid = true;
+    const validated = manualRows.map(r => {
+      const errs: Partial<Record<keyof ManualRow, string>> = {};
+      if (!r.companyName.trim())   { errs.companyName   = "Required"; valid = false; }
+      if (!r.careerPageUrl.trim()) { errs.careerPageUrl = "Required"; valid = false; }
+      else {
+        try { new URL(r.careerPageUrl.trim()); }
+        catch { errs.careerPageUrl = "Invalid URL"; valid = false; }
+      }
+      if (!r.atsType.trim()) { errs.atsType = "Required"; valid = false; }
+      return { ...r, _errors: errs };
+    });
+    return { valid, rows: validated };
+  };
+
+  const stripErrors = (rows: ManualRow[]) => rows.map(({ _errors, ...rest }) => rest); // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  const handleManualSubmit = async () => {
+    setError("");
+    const { valid, rows } = validateManualRows();
+    setManualRows(rows);
+    if (!valid) { setError("Please fix the highlighted fields."); return; }
+    setStage("uploading");
+    const res = await fetch("/api/admin/dataset/manual?dryRun=true", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ rows: stripErrors(rows) }),
+    });
+    const d = await res.json();
+    if (!res.ok) {
+      setError(d.error ?? "Validation failed.");
+      setStage("pick");
+      return;
+    }
+    setStats(d); setStage("preview");
+  };
+
+  const handleManualConfirm = async () => {
+    setStage("uploading");
+    const res = await fetch("/api/admin/dataset/manual", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ rows: stripErrors(manualRows) }),
+    });
+    const d = await res.json();
+    if (!res.ok) { setError(d.error ?? "Save failed."); setStage("preview"); return; }
+    setStage("done");
+    setTimeout(() => { onDone(); onClose(); }, 1200);
+  };
+
+  const inPick          = stage === "pick";
+  const modalMaxWidth   = mode === "manual" && inPick ? 960 : 500;
+  const totalManualRows = manualRows.length;
+
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 100,
@@ -118,13 +267,16 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
       display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
     }}>
       <div style={{
-        width: "100%", maxWidth: 500, background: "#fff",
+        width: "100%", maxWidth: modalMaxWidth, background: "#fff",
         borderRadius: 20, boxShadow: "0 24px 60px rgba(34,1,51,0.25)",
         padding: 32, animation: "modalIn 0.22s ease",
+        maxHeight: "90vh", overflowY: "auto",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
           <div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: "#220133", margin: "0 0 4px" }}>Upload Dataset</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: "#220133", margin: "0 0 4px" }}>
+              {mode === "manual" ? "Add Companies Manually" : "Upload Dataset"}
+            </h2>
             <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>
               New companies are appended. Duplicates (matched by domain) are skipped.
             </p>
@@ -132,12 +284,37 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #EAE4EF", background: "#F9F7FB", cursor: "pointer", fontSize: 16, color: "#9988AA", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
         </div>
 
+        {/* Mode tabs — only shown on pick stage */}
+        {inPick && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 18, padding: 4, background: "#F4EFF6", borderRadius: 12, border: "1px solid #EAE4EF" }}>
+            {(["file", "manual"] as const).map(m => {
+              const active = mode === m;
+              return (
+                <button
+                  key={m}
+                  onClick={() => { setMode(m); setError(""); }}
+                  style={{
+                    flex: 1, padding: "9px 0", borderRadius: 9, border: "none",
+                    background: active ? "#fff" : "transparent",
+                    boxShadow:  active ? "0 2px 6px rgba(34,1,51,0.08)" : "none",
+                    color:      active ? "#220133" : "#9988AA",
+                    fontSize:   13, fontWeight: 700, cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {m === "file" ? "📂 Upload File" : "✍️ Enter Manually"}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div style={{ background: "#F4EFF6", borderRadius: 10, padding: "10px 14px", marginBottom: 20, fontSize: 12, color: "#553366", lineHeight: 1.6 }}>
           <strong>How it works:</strong> Your existing dataset is preserved. Only companies with a domain not already in the dataset will be added.
         </div>
 
-        {/* Pick */}
-        {stage === "pick" && (
+        {/* Pick — File mode */}
+        {inPick && mode === "file" && (
           <div
             onClick={() => inputRef.current?.click()}
             onDragOver={e => { e.preventDefault(); setDrag(true); }}
@@ -158,6 +335,115 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           </div>
         )}
 
+        {/* Pick — Manual mode */}
+        {inPick && mode === "manual" && (
+          <div>
+            <div style={{ overflowX: "auto", border: "1px solid #EAE4EF", borderRadius: 12 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: "#FAFAFA", borderBottom: "1px solid #EAE4EF" }}>
+                    {[
+                      { label: "Company Name *",   width: 150 },
+                      { label: "Career URL *",     width: 190 },
+                      { label: "HCM / ATS *",      width: 130 },
+                      { label: "Headquarters",     width: 120 },
+                      { label: "Employee Size",    width: 100 },
+                      { label: "POC First",        width: 100 },
+                      { label: "POC Last",         width: 100 },
+                      { label: "POC Email",        width: 150 },
+                      { label: "",                 width: 36  },
+                    ].map(h => (
+                      <th key={h.label} style={{ padding: "10px 10px", textAlign: "left", fontWeight: 700, color: "#553366", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.05em", minWidth: h.width }}>
+                        {h.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {manualRows.map((row, i) => {
+                    const err = row._errors ?? {};
+                    const inputStyle = (hasError: boolean): React.CSSProperties => ({
+                      width: "100%", padding: "7px 9px", fontSize: 12,
+                      borderRadius: 7, boxSizing: "border-box",
+                      border: `1px solid ${hasError ? "#dc2626" : "#EAE4EF"}`,
+                      background: hasError ? "#fef2f2" : "#fff",
+                      color: "#220133", outline: "none",
+                      transition: "border-color 0.15s",
+                    });
+                    return (
+                      <tr key={i} style={{ borderBottom: i === manualRows.length - 1 ? "none" : "1px solid #F4EFF6" }}>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <input value={row.companyName} onChange={e => updateManualRow(i, { companyName: e.target.value })} onPaste={e => handlePaste(i, 0, e)} placeholder="Acme Co" style={inputStyle(!!err.companyName)} />
+                          {err.companyName && <div style={{ fontSize: 10, color: "#dc2626", marginTop: 3 }}>{err.companyName}</div>}
+                        </td>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <input value={row.careerPageUrl} onChange={e => updateManualRow(i, { careerPageUrl: e.target.value })} onPaste={e => handlePaste(i, 1, e)} placeholder="https://jobs.example.com" style={inputStyle(!!err.careerPageUrl)} />
+                          {err.careerPageUrl && <div style={{ fontSize: 10, color: "#dc2626", marginTop: 3 }}>{err.careerPageUrl}</div>}
+                        </td>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <select value={row.atsType} onChange={e => updateManualRow(i, { atsType: e.target.value })} style={inputStyle(!!err.atsType)}>
+                            <option value="">— select —</option>
+                            {ATS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                          {err.atsType && <div style={{ fontSize: 10, color: "#dc2626", marginTop: 3 }}>{err.atsType}</div>}
+                        </td>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <input value={row.headquarters} onChange={e => updateManualRow(i, { headquarters: e.target.value })} onPaste={e => handlePaste(i, 3, e)} placeholder="London, UK" style={inputStyle(false)} />
+                        </td>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <input value={row.employeeSize} onChange={e => updateManualRow(i, { employeeSize: e.target.value })} onPaste={e => handlePaste(i, 4, e)} placeholder="1000-5000" style={inputStyle(false)} />
+                        </td>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <input value={row.pocFirstName} onChange={e => updateManualRow(i, { pocFirstName: e.target.value })} onPaste={e => handlePaste(i, 5, e)} placeholder="Jane" style={inputStyle(false)} />
+                        </td>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <input value={row.pocLastName} onChange={e => updateManualRow(i, { pocLastName: e.target.value })} onPaste={e => handlePaste(i, 6, e)} placeholder="Doe" style={inputStyle(false)} />
+                        </td>
+                        <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                          <input type="email" value={row.pocEmail} onChange={e => updateManualRow(i, { pocEmail: e.target.value })} onPaste={e => handlePaste(i, 7, e)} placeholder="jane@example.com" style={inputStyle(false)} />
+                        </td>
+                        <td style={{ padding: "8px 6px", verticalAlign: "top", textAlign: "center" }}>
+                          <button
+                            onClick={() => removeManualRow(i)}
+                            disabled={manualRows.length <= 1}
+                            title="Delete row"
+                            style={{
+                              width: 26, height: 26, borderRadius: 7, fontSize: 13,
+                              border: "1px solid #EAE4EF",
+                              background: manualRows.length <= 1 ? "#F9F7FB" : "#fff",
+                              color:      manualRows.length <= 1 ? "#D0C8D8" : "#dc2626",
+                              cursor:     manualRows.length <= 1 ? "not-allowed" : "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto",
+                            }}
+                          >✕</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, gap: 12 }}>
+              <button
+                onClick={addManualRow}
+                style={{ padding: "8px 14px", borderRadius: 8, border: "1px dashed #FD5A0F", background: "#FFF8F5", color: "#FD5A0F", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >+ Add row</button>
+              <div style={{ fontSize: 11, color: "#9988AA", textAlign: "right", lineHeight: 1.5 }}>
+                {totalManualRows} row{totalManualRows === 1 ? "" : "s"} · * = required<br />
+                <span style={{ color: "#7c3aed" }}>Tip:</span> copy cells from Excel/Sheets and paste into any text cell.
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid #EAE4EF", background: "#fff", fontSize: 13, fontWeight: 600, color: "#553366", cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleManualSubmit} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #220133, #FD5A0F)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(253,90,15,0.3)" }}>
+                Review {totalManualRows} {totalManualRows === 1 ? "entry" : "entries"} →
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Uploading */}
         {stage === "uploading" && (
           <div style={{ textAlign: "center", padding: "36px 0" }}>
@@ -165,7 +451,7 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.2"/>
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
-            <p style={{ fontSize: 13, color: "#9988AA", marginTop: 12 }}>Analysing file…</p>
+            <p style={{ fontSize: 13, color: "#9988AA", marginTop: 12 }}>{mode === "manual" ? "Validating entries…" : "Analysing file…"}</p>
           </div>
         )}
 
@@ -174,7 +460,7 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
               {[
-                { label: "Rows in file",       value: stats.total,         color: "#220133" },
+                { label: mode === "manual" ? "Rows submitted" : "Rows in file", value: stats.total, color: "#220133" },
                 { label: "New to add",          value: stats.newRows,       color: "#059669" },
                 { label: "Already in DB",       value: stats.existingInDb,  color: "#9988AA" },
                 { label: "Duplicates skipped",  value: stats.duplicates,    color: "#d97706" },
@@ -209,50 +495,6 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         {error && (
           <p style={{ marginTop: 12, fontSize: 12, color: "#dc2626", background: "#fef2f2", padding: "8px 12px", borderRadius: 8, border: "1px solid #fecaca" }}>{error}</p>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ── Batch Modal ───────────────────────────────────────────────────────────────
-
-function BatchModal({ count, onClose, onConfirm }: { count: number; onClose: () => void; onConfirm: (name: string) => void }) {
-  const [name, setName] = useState("");
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(22,0,34,0.6)", backdropFilter: "blur(6px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div style={{ width: "100%", maxWidth: 440, background: "#fff", borderRadius: 20, boxShadow: "0 24px 60px rgba(34,1,51,0.25)", padding: 32, animation: "modalIn 0.22s ease" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(253,90,15,0.1)", border: "1px solid rgba(253,90,15,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🚀</div>
-          <div>
-            <h2 style={{ fontSize: 17, fontWeight: 800, color: "#220133", margin: 0 }}>Create Batch</h2>
-            <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>{count} compan{count === 1 ? "y" : "ies"} selected</p>
-          </div>
-        </div>
-        <p style={{ fontSize: 13, color: "#553366", marginBottom: 16, lineHeight: 1.5 }}>Give this batch a name so you can find it later.</p>
-        <input
-          autoFocus
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && name.trim() && onConfirm(name.trim())}
-          placeholder="e.g. Workday Q2 2026"
-          style={{
-            width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 14,
-            border: "1.5px solid #EAE4EF", color: "#220133", outline: "none",
-            background: "#FAFAFA", boxSizing: "border-box", marginBottom: 18,
-            transition: "border-color 0.15s",
-          }}
-          onFocus={e  => { e.currentTarget.style.borderColor = "#FD5A0F"; e.currentTarget.style.background = "#fff"; }}
-          onBlur={e   => { e.currentTarget.style.borderColor = "#EAE4EF"; e.currentTarget.style.background = "#FAFAFA"; }}
-        />
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid #EAE4EF", background: "#fff", fontSize: 13, fontWeight: 600, color: "#553366", cursor: "pointer" }}>Cancel</button>
-          <button
-            onClick={() => name.trim() && onConfirm(name.trim())}
-            disabled={!name.trim()}
-            style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: name.trim() ? "linear-gradient(135deg, #220133, #FD5A0F)" : "#EAE4EF", color: name.trim() ? "#fff" : "#9988AA", fontSize: 13, fontWeight: 700, cursor: name.trim() ? "pointer" : "not-allowed", boxShadow: name.trim() ? "0 4px 14px rgba(253,90,15,0.3)" : "none", transition: "all 0.15s" }}>
-            Create Batch →
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -325,7 +567,6 @@ export default function DatasetTable() {
   });
 
   const [showUpload,   setShowUpload]   = useState(false);
-  const [showBatch,    setShowBatch]    = useState(false);
   const [creating,     setCreating]     = useState(false);
   const [reprocess,    setReprocess]    = useState<DatasetRow | null>(null);
 
@@ -419,14 +660,21 @@ export default function DatasetTable() {
     }
   }
 
-  async function handleCreateBatch(name: string) {
-    setShowBatch(false); setCreating(true); setBatchError(null);
+  async function handleCreateBatch() {
+    if (selected.size === 0 || creating) return;
+    setCreating(true); setBatchError(null);
     try {
-      const res = await fetch("/api/admin/dataset/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rowIds: Array.from(selected), name }) });
+      const res = await fetch("/api/admin/dataset/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rowIds: Array.from(selected) }) });
       const text = await res.text();
       const d = text ? JSON.parse(text) : {};
       setCreating(false);
-      if (res.ok) { setSelected(new Set()); router.push(`/admin/batches/${d.batchId}`); return; }
+      if (res.ok) {
+        setSelected(new Set());
+        const batchIds: string[] = Array.isArray(d.batchIds) ? d.batchIds : (d.batchId ? [d.batchId] : []);
+        if (batchIds.length === 1) router.push(`/admin/batches/${batchIds[0]}`);
+        else                       router.push(`/admin/batches`);
+        return;
+      }
       if (d.error === "URL_VALIDATION_FAILED") {
         setBatchError({ message: d.message, failed: d.failed });
       } else {
@@ -532,7 +780,6 @@ export default function DatasetTable() {
 
       {/* Modals */}
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onDone={() => { setSelected(new Set()); fetchData(); }} />}
-      {showBatch  && <BatchModal count={selected.size} onClose={() => setShowBatch(false)} onConfirm={handleCreateBatch} />}
 
       {/* Batch creation URL validation error */}
       {batchError && (
@@ -643,7 +890,7 @@ export default function DatasetTable() {
           </button>
           {selected.size > 0 && (
             <button
-              onClick={() => setShowBatch(true)}
+              onClick={handleCreateBatch}
               disabled={creating}
               style={{
                 padding: "9px 20px", borderRadius: 10, border: "none",
@@ -659,7 +906,7 @@ export default function DatasetTable() {
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.03)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 22px rgba(253,90,15,0.5)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 16px rgba(253,90,15,0.35)"; }}
             >
-              🚀 {creating ? "Creating…" : `Create Batch (${selected.size})`}
+              🚀 {creating ? "Starting…" : `Start (${selected.size})`}
             </button>
           )}
         </div>

@@ -7,17 +7,18 @@ import { generatePermanentToken }    from "@/lib/token";
 import { inArray, eq }               from "drizzle-orm";
 import { validateCareerUrl }         from "@/lib/urlValidator";
 
+// Creates one batch per selected dataset row. Each batch has exactly one company
+// and one stub POC (so SSE progress streams can find the company via batchId).
+// Name/filename are auto-derived from the company name — no popup needed.
 export async function POST(req: NextRequest) {
-  let body: { rowIds: string[]; name: string };
+  let body: { rowIds: string[] };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { rowIds, name } = body;
+  const { rowIds } = body;
 
-  if (!name?.trim())
-    return NextResponse.json({ error: "Batch name is required." }, { status: 400 });
   if (!rowIds?.length)
     return NextResponse.json({ error: "No rows selected." }, { status: 400 });
 
@@ -53,18 +54,21 @@ export async function POST(req: NextRequest) {
       }, { status: 422 });
     }
 
-    // Create named batch
-    const [batch] = await db.insert(batches).values({
-      filename:  name.trim(),
-      name:      name.trim(),
-      totalPocs: selected.length,
-      status:    "scraping",
-    }).returning();
-
     const scrapeEvents: { name: "company/scrape"; data: { companyId: string; batchId: string } }[] = [];
 
+    // One batch per row. neon-http does not support transactions, so run sequentially.
+    const batchIds: string[] = [];
+
     for (const row of selected) {
-      // Find or create company record
+      const batchName = row.companyName;
+
+      const [batch] = await db.insert(batches).values({
+        filename:  batchName,
+        name:      batchName,
+        totalPocs: 1,
+        status:    "scraping",
+      }).returning();
+
       const existing = await db
         .select()
         .from(companies)
@@ -74,7 +78,6 @@ export async function POST(req: NextRequest) {
       let companyId: string;
       if (existing.length > 0) {
         companyId = existing[0].id;
-        // Reset scrape status for reprocessing
         await db.update(companies).set({
           scrapeStatus: "pending",
           scrapeError:  null,
@@ -93,7 +96,6 @@ export async function POST(req: NextRequest) {
         companyId = newCo.id;
       }
 
-      // Insert a stub poc so batch-progress SSE can find this company via batchId
       await db.insert(pocs).values({
         batchId:   batch.id,
         companyId,
@@ -104,16 +106,17 @@ export async function POST(req: NextRequest) {
       });
 
       scrapeEvents.push({ name: "company/scrape", data: { companyId, batchId: batch.id } });
+      batchIds.push(batch.id);
     }
 
     try {
       if (scrapeEvents.length > 0) await inngest.send(scrapeEvents);
     } catch (err) {
       console.error("[batch] inngest.send failed:", err);
-      // Batch and companies are already created — return success so the UI can navigate
+      // Batches and companies are already committed — return success so the UI can navigate.
     }
 
-    return NextResponse.json({ batchId: batch.id, queued: scrapeEvents.length });
+    return NextResponse.json({ batchIds, queued: scrapeEvents.length });
 
   } catch (err) {
     console.error("[batch] Unhandled error:", err);

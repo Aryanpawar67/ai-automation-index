@@ -168,9 +168,8 @@ export default function BatchListView({
           const sc  = getStatusCfg(b.effectiveStatus);
           const pct = b.totalJds ? Math.round((b.processedJds / b.totalJds) * 100) : 0;
           const ago = relativeTime(new Date(b.createdAt));
-          const fullDate = new Date(b.createdAt).toLocaleString("en-GB", {
-            day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-          });
+          const _d = new Date(b.createdAt);
+          const fullDate = `${_d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}, ${_d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
 
           return (
             <div

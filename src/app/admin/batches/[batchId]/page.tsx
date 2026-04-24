@@ -123,10 +123,7 @@ export default async function BatchDetailPage({
                 </span>
               </div>
               <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
-                Uploaded {new Date(batch.createdAt).toLocaleString("en-GB", {
-                  day: "numeric", month: "short", year: "numeric",
-                  hour: "2-digit", minute: "2-digit",
-                })}
+                Uploaded {(() => { const d = new Date(batch.createdAt); return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}, ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`; })()}
                 &nbsp;·&nbsp; {batch.totalPocs} POC{batch.totalPocs !== 1 ? "s" : ""}
                 &nbsp;·&nbsp; {companiesInBatch} {companiesInBatch === 1 ? "company" : "companies"}
               </p>
