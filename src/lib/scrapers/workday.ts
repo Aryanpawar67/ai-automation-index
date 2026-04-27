@@ -23,14 +23,22 @@ export interface WorkdayTenant {
 
 // ── URL extraction helpers ─────────────────────────────────────────────────
 
-/** Extract tenant + jobSite from a direct myworkdayjobs.com URL. */
+/** Extract tenant + jobSite from a direct Workday-hosted URL. */
 export function extractWorkdayTenant(url: string): WorkdayTenant | null {
-  // Handles: company.wd5.myworkdayjobs.com/[locale/]JobSite[/...]
-  //      and: company.myworkdayjobs.com/[locale/]JobSite[/...]
-  const m = url.match(
+  // 1. company.wd5.myworkdayjobs.com/[locale/]JobSite[/...]
+  //    company.myworkdayjobs.com/[locale/]JobSite[/...]
+  const jobs = url.match(
     /https?:\/\/([^.]+\.((?:wd\d+\.)?myworkdayjobs\.com))\/(?:[a-z]{2}-[A-Z]{2}\/)?([^/?#\s]+)/
   );
-  if (m) return { tenant: m[1].split(".")[0], host: m[1], jobSite: m[3] };
+  if (jobs) return { tenant: jobs[1].split(".")[0], host: jobs[1], jobSite: jobs[3] };
+
+  // 2. wd5.myworkdaysite.com/[locale/]recruiting/<tenant>/<jobSite>[/...]
+  //    Workday hosted-careers domain — same CxS API at /wday/cxs/<tenant>/<jobSite>/jobs
+  const site = url.match(
+    /https?:\/\/(wd\d+\.myworkdaysite\.com)\/(?:[a-z]{2}-[A-Z]{2}\/)?recruiting\/([a-z0-9_-]+)\/([a-z0-9_-]+)/i
+  );
+  if (site) return { tenant: site[2], host: site[1], jobSite: site[3] };
+
   return null;
 }
 
@@ -312,7 +320,9 @@ export async function scrapeWorkday(url: string): Promise<{ jds: ScrapedJD[]; re
     jds.push({
       title:     posting.title,
       rawText,
-      sourceUrl: `https://${host}/${jobSite}${posting.externalPath}`,
+      sourceUrl: host.endsWith("myworkdaysite.com")
+        ? `https://${host}/en-US/recruiting/${tenant}/${jobSite}${posting.externalPath}`
+        : `https://${host}/${jobSite}${posting.externalPath}`,
     });
   }
 

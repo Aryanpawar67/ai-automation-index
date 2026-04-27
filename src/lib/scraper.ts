@@ -44,6 +44,8 @@ const SPA_JOB_SITES = [
   /meta\.com\/careers/i,
   /careers\.microsoft\.com/i,
   /workday\.com/i,
+  /myworkdaysite\.com/i,
+  /myworkdayjobs\.com/i,
   /smartrecruiters\.com/i,
   /icims\.com/i,
   /taleo\.net/i,
@@ -275,7 +277,7 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     }
 
     // Tier 1b — enterprise HCM platforms (atsType from companies table takes priority over URL detection)
-    if (atsType === "workday" || /myworkdayjobs\.com/i.test(url)) {
+    if (atsType === "workday" || /myworkdayjobs\.com|myworkdaysite\.com/i.test(url)) {
       const result = await scrapeWorkday(url);
       if (result.jds.length > 0) return { success: true, jds: result.jds, resolvedUrl: result.resolvedUrl, totalAvailable: result.totalAvailable };
     }
