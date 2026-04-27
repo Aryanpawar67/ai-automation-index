@@ -11,6 +11,12 @@
 
 import { stripHtml } from "../stripHtml";
 import type { ScrapedJD } from "../scraper";
+import { LARGE_SCRAPE, targetScrapeCount } from "../jdLimits";
+
+export interface SapScrapeResult {
+  jds:             ScrapedJD[];
+  totalAvailable?: number;
+}
 
 // CDN / infrastructure subdomains that are never real career tenants
 const SF_INFRA_RE = /^rmkcdn\.|^rmk-map-|^cdn\.|^static\.|^assets\./i;
@@ -35,30 +41,35 @@ export function extractCompanyCode(url: string): string | null {
 
 // ── Jobs2Web list API ─────────────────────────────────────────────────────────
 
-async function scrapeViaJobs2Web(tenant: string, fallbackUrl: string): Promise<ScrapedJD[]> {
+async function scrapeViaJobs2Web(tenant: string, fallbackUrl: string): Promise<SapScrapeResult> {
+  void fallbackUrl;
   try {
     const res = await fetch(
-      `https://${tenant}.jobs2web.com/job-invite/list/api?limit=15&offset=0&lang=en&country=all`,
+      `https://${tenant}.jobs2web.com/job-invite/list/api?limit=${LARGE_SCRAPE}&offset=0&lang=en&country=all`,
       { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12_000) }
     );
-    if (!res.ok) return [];
+    if (!res.ok) return { jds: [] };
     const data    = await res.json();
     const results = (data?.results ?? []) as Array<Record<string, string>>;
-    return results.slice(0, 15)
+    const reportedTotal = Number(data?.total ?? data?.totalResults ?? data?.totalCount ?? 0);
+    const total = Math.max(Number.isFinite(reportedTotal) ? reportedTotal : 0, results.length);
+    const keep  = targetScrapeCount(total);
+    const jds = results.slice(0, keep)
       .map(item => ({
         title:     item.title ?? "Untitled",
         rawText:   stripHtml(item.description ?? ""),
         sourceUrl: item.applyUrl ?? `https://${tenant}.jobs2web.com`,
       }))
       .filter(jd => jd.rawText.length > 100);
-  } catch { return []; }
+    return { jds, totalAvailable: Math.max(total, jds.length) };
+  } catch { return { jds: [] }; }
 }
 
 // ── SF Career Site Builder REST API ──────────────────────────────────────────
 // Used by career10.successfactors.com and similar modern SF deployments.
 // Endpoint: POST /api/rest/listjobs/v4/job?companyId={code}&language=en_US
 
-async function scrapeViaCsb(companyCode: string, fallbackUrl: string): Promise<ScrapedJD[]> {
+async function scrapeViaCsb(companyCode: string, fallbackUrl: string): Promise<SapScrapeResult> {
   // Prefer the host embedded in the source URL (e.g. career44.sapsf.com)
   const urlHost = extractSfHost(fallbackUrl);
   const defaultHosts = [
@@ -73,7 +84,7 @@ async function scrapeViaCsb(companyCode: string, fallbackUrl: string): Promise<S
   for (const host of hosts) {
     try {
       const listRes = await fetch(
-        `https://${host}/api/rest/listjobs/v4/job?companyId=${encodeURIComponent(companyCode)}&language=en_US&pageSize=10&pageNo=0`,
+        `https://${host}/api/rest/listjobs/v4/job?companyId=${encodeURIComponent(companyCode)}&language=en_US&pageSize=${LARGE_SCRAPE}&pageNo=0`,
         { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(10_000) }
       );
       if (!listRes.ok) continue;
@@ -81,8 +92,12 @@ async function scrapeViaCsb(companyCode: string, fallbackUrl: string): Promise<S
       const jobs = (listData?.jobs ?? listData?.jobPostings ?? []) as Array<Record<string, unknown>>;
       if (jobs.length === 0) continue;
 
+      const reportedTotal = Number(listData?.totalCount ?? listData?.total ?? 0);
+      const total = Math.max(Number.isFinite(reportedTotal) ? reportedTotal : 0, jobs.length);
+      const keep  = targetScrapeCount(total);
+
       const jds: ScrapedJD[] = [];
-      for (const job of jobs.slice(0, 15)) {
+      for (const job of jobs.slice(0, keep)) {
         const jobId = job.jobId ?? job.jobReqId ?? job.id;
         if (!jobId) continue;
         try {
@@ -106,15 +121,15 @@ async function scrapeViaCsb(companyCode: string, fallbackUrl: string): Promise<S
           });
         } catch { continue; }
       }
-      if (jds.length > 0) return jds;
+      if (jds.length > 0) return { jds, totalAvailable: Math.max(total, jds.length) };
     } catch { continue; }
   }
-  return [];
+  return { jds: [] };
 }
 
 // ── OData v2 (legacy SF, still works for some tenants) ───────────────────────
 
-async function scrapeViaOData(companyCode: string, fallbackUrl: string): Promise<ScrapedJD[]> {
+async function scrapeViaOData(companyCode: string, fallbackUrl: string): Promise<SapScrapeResult> {
   const hosts = [
     "performancemanager.successfactors.com",
     "performancemanager4.successfactors.com",
@@ -125,42 +140,48 @@ async function scrapeViaOData(companyCode: string, fallbackUrl: string): Promise
       const res = await fetch(
         `https://${host}/odata/v2/JobRequisitionLocale` +
         `?$format=json&$select=jobReqId,externalTitle,jobDescription,country` +
-        `&$filter=lang eq 'en_US'&company='${encodeURIComponent(companyCode)}'&$top=10`,
+        `&$filter=lang eq 'en_US'&company='${encodeURIComponent(companyCode)}'&$top=${LARGE_SCRAPE}&$inlinecount=allpages`,
         { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12_000) }
       );
       if (!res.ok) continue;
       const data  = await res.json();
       const items = (data?.d?.results ?? []) as Array<Record<string, string>>;
       if (items.length === 0) continue;
-      const jds = items
+      const reportedTotal = Number(data?.d?.__count ?? data?.d?.["@odata.count"] ?? 0);
+      const total = Math.max(Number.isFinite(reportedTotal) ? reportedTotal : 0, items.length);
+      const keep  = targetScrapeCount(total);
+      const jds = items.slice(0, keep)
         .map(item => ({
           title:     item.externalTitle ?? "Untitled",
           rawText:   stripHtml(item.jobDescription ?? ""),
           sourceUrl: fallbackUrl,
         }))
         .filter(jd => jd.rawText.length > 100);
-      if (jds.length > 0) return jds;
+      if (jds.length > 0) return { jds, totalAvailable: Math.max(total, jds.length) };
     } catch { continue; }
   }
-  return [];
+  return { jds: [] };
 }
 
 // ── SF Career Site Builder REST API on a custom domain ───────────────────────
 // Some companies host SF CSB on their own domain (e.g. jobs.atos.net).
 // The API surface is identical to career{N}.successfactors.com — only the host differs.
 
-async function scrapeViaCustomDomainCsb(host: string, companyCode: string): Promise<ScrapedJD[]> {
+async function scrapeViaCustomDomainCsb(host: string, companyCode: string): Promise<SapScrapeResult> {
   try {
     const listRes = await fetch(
-      `https://${host}/api/rest/listjobs/v4/job?companyId=${encodeURIComponent(companyCode)}&language=en_US&pageSize=10&pageNo=0`,
+      `https://${host}/api/rest/listjobs/v4/job?companyId=${encodeURIComponent(companyCode)}&language=en_US&pageSize=${LARGE_SCRAPE}&pageNo=0`,
       { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(10_000) }
     );
-    if (!listRes.ok) return [];
+    if (!listRes.ok) return { jds: [] };
     const listData = await listRes.json();
     const jobs = (listData?.jobs ?? listData?.jobPostings ?? []) as Array<Record<string, unknown>>;
-    if (jobs.length === 0) return [];
+    if (jobs.length === 0) return { jds: [] };
+    const reportedTotal = Number(listData?.totalCount ?? listData?.total ?? 0);
+    const total = Math.max(Number.isFinite(reportedTotal) ? reportedTotal : 0, jobs.length);
+    const keep  = targetScrapeCount(total);
     const jds: ScrapedJD[] = [];
-    for (const job of jobs.slice(0, 15)) {
+    for (const job of jobs.slice(0, keep)) {
       const jobId = job.jobId ?? job.jobReqId ?? job.id;
       if (!jobId) continue;
       try {
@@ -184,8 +205,8 @@ async function scrapeViaCustomDomainCsb(host: string, companyCode: string): Prom
         });
       } catch { continue; }
     }
-    return jds;
-  } catch { return []; }
+    return { jds, totalAvailable: Math.max(total, jds.length) };
+  } catch { return { jds: [] }; }
 }
 
 // ── Company code extraction from HTML ────────────────────────────────────────
@@ -213,7 +234,7 @@ function extractCompanyCodeFromHtml(html: string): string | null {
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
-export async function scrapeSAPSuccessFactors(url: string): Promise<ScrapedJD[]> {
+export async function scrapeSAPSuccessFactors(url: string): Promise<SapScrapeResult> {
   // 1. Direct jobs2web tenant URL
   const tenant = extractSapTenant(url);
   if (tenant) return scrapeViaJobs2Web(tenant, url);
@@ -222,7 +243,7 @@ export async function scrapeSAPSuccessFactors(url: string): Promise<ScrapedJD[]>
   const companyCode = extractCompanyCode(url);
   if (companyCode) {
     const csb = await scrapeViaCsb(companyCode, url);
-    if (csb.length > 0) return csb;
+    if (csb.jds.length > 0) return csb;
     return scrapeViaOData(companyCode, url);
   }
 
@@ -237,15 +258,15 @@ export async function scrapeSAPSuccessFactors(url: string): Promise<ScrapedJD[]>
       headers: { "User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)" },
       signal:  AbortSignal.timeout(10_000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { jds: [] };
     const html = await res.text();
 
     // jobs2web tenant in HTML (exclude CDN/infra subdomains)
     const j2wMatches = [...html.matchAll(/([a-z0-9_-]+)\.jobs2web\.com/gi)];
     for (const m of j2wMatches) {
       if (SF_INFRA_RE.test(m[1])) continue;
-      const jds = await scrapeViaJobs2Web(m[1], url);
-      if (jds.length > 0) return jds;
+      const result = await scrapeViaJobs2Web(m[1], url);
+      if (result.jds.length > 0) return result;
       break; // found a tenant but returned empty — don't loop
     }
 
@@ -254,12 +275,12 @@ export async function scrapeSAPSuccessFactors(url: string): Promise<ScrapedJD[]>
     if (code) {
       const host = new URL(url).hostname;
       const customDomain = await scrapeViaCustomDomainCsb(host, code);
-      if (customDomain.length > 0) return customDomain;
+      if (customDomain.jds.length > 0) return customDomain;
       const csb = await scrapeViaCsb(code, url);
-      if (csb.length > 0) return csb;
+      if (csb.jds.length > 0) return csb;
       return scrapeViaOData(code, url);
     }
   } catch { /* fall through to Firecrawl */ }
 
-  return [];
+  return { jds: [] };
 }
