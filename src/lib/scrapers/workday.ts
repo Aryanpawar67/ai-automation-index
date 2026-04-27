@@ -13,6 +13,7 @@
 
 import { stripHtml } from "../stripHtml";
 import type { ScrapedJD } from "../scraper";
+import { LARGE_SCRAPE, targetScrapeCount } from "../jdLimits";
 
 export interface WorkdayTenant {
   tenant:       string;
@@ -43,19 +44,38 @@ export function extractWorkdayTenant(url: string): WorkdayTenant | null {
 }
 
 /** Extract Workday config from page HTML (custom domain). */
-export function extractTenantFromHtml(html: string): WorkdayTenant | null {
+export function extractTenantFromHtml(html: string, pageUrl?: string): WorkdayTenant | null {
+  // Fast path: if pageUrl is itself a Workday hosted-careers URL, try parsing it directly
+  if (pageUrl) {
+    const direct = extractWorkdayTenant(pageUrl);
+    if (direct) return direct;
+  }
+
+  // Determine if the pageUrl host is a Workday hosted-careers domain (wdN.myworkdaysite.com
+  // or wdN.myworkdayjobs.com). When true we preserve that host instead of rewriting to
+  // ${tenant}.myworkdayjobs.com, because the CxS API lives at the same host.
+  let pageUrlHost: string | undefined;
+  if (pageUrl) {
+    try {
+      const hostname = new URL(pageUrl).hostname;
+      if (/^wd\d+\.(myworkdaysite|myworkdayjobs)\.com$/i.test(hostname)) {
+        pageUrlHost = hostname;
+      }
+    } catch { /* ignore invalid URLs */ }
+  }
+
   // 1. <script id="wd-app"> JSON blob
   const jsonMatch = html.match(/<script[^>]+id="wd-app"[^>]*>([\s\S]*?)<\/script>/i);
   if (jsonMatch) {
     try {
       const cfg = JSON.parse(jsonMatch[1]);
-      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, host: `${cfg.tenant}.myworkdayjobs.com`, jobSite: cfg.jobSite };
+      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, host: pageUrlHost ?? `${cfg.tenant}.myworkdayjobs.com`, jobSite: cfg.jobSite };
     } catch { /* ignore */ }
   }
 
   // 2. CxS API URL embedded in page scripts/network calls — most reliable signal
   const cxsMatch = html.match(/\/wday\/cxs\/([a-z0-9_-]+)\/([a-z0-9_-]+)\/jobs/i);
-  if (cxsMatch) return { tenant: cxsMatch[1], host: `${cxsMatch[1]}.myworkdayjobs.com`, jobSite: cxsMatch[2] };
+  if (cxsMatch) return { tenant: cxsMatch[1], host: pageUrlHost ?? `${cxsMatch[1]}.myworkdayjobs.com`, jobSite: cxsMatch[2] };
 
   // 3. Direct myworkdayjobs.com URL in any href/src/script — capture full host with wd shard
   const wdLinkMatch = html.match(
@@ -72,7 +92,7 @@ export function extractTenantFromHtml(html: string): WorkdayTenant | null {
   if (cfgMatch) {
     try {
       const cfg = JSON.parse(cfgMatch[1]);
-      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, host: `${cfg.tenant}.myworkdayjobs.com`, jobSite: cfg.jobSite };
+      if (cfg.tenant && cfg.jobSite) return { tenant: cfg.tenant, host: pageUrlHost ?? `${cfg.tenant}.myworkdayjobs.com`, jobSite: cfg.jobSite };
     } catch { /* ignore */ }
   }
 
@@ -80,7 +100,7 @@ export function extractTenantFromHtml(html: string): WorkdayTenant | null {
   const scriptMatch = html.match(
     /["']tenant["']\s*:\s*["']([^"']+)["'][\s\S]{0,300}["']jobSite["']\s*:\s*["']([^"']+)["']/i
   );
-  if (scriptMatch) return { tenant: scriptMatch[1], host: `${scriptMatch[1]}.myworkdayjobs.com`, jobSite: scriptMatch[2] };
+  if (scriptMatch) return { tenant: scriptMatch[1], host: pageUrlHost ?? `${scriptMatch[1]}.myworkdayjobs.com`, jobSite: scriptMatch[2] };
 
   return null;
 }
@@ -116,7 +136,7 @@ export async function resolveWorkdayEntryPoint(url: string): Promise<WorkdayTena
   } catch { return null; }
 
   // Scan this page for embedded Workday config / links
-  const fromHtml = extractTenantFromHtml(html);
+  const fromHtml = extractTenantFromHtml(html, url);
   if (fromHtml) return fromHtml;
 
   // 3. Collect candidate "jobs" links from the page for one-hop follow
@@ -186,7 +206,7 @@ export async function resolveWorkdayEntryPoint(url: string): Promise<WorkdayTena
         if (t) return { ...t, resolvedUrl: wdLinkMatch[0] };
       }
 
-      const fromHop = extractTenantFromHtml(hopHtml);
+      const fromHop = extractTenantFromHtml(hopHtml, res.url ?? candidate);
       if (fromHop) return { ...fromHop, resolvedUrl: candidate };
     } catch { continue; }
   }
@@ -202,7 +222,9 @@ interface WorkdayPosting {
   locationsText?: string;
 }
 
-/** POST to Workday CxS jobs search API. Returns up to 10 postings + total available count. */
+/** POST to Workday CxS jobs search API. Always requests LARGE_SCRAPE so we
+ *  can learn the real tenant-wide `total` in one round-trip and decide whether
+ *  to keep 15 (small) or 20 (large) postings based on it. */
 async function fetchWorkdayJobs(
   host: string, tenant: string, jobSite: string
 ): Promise<{ postings: WorkdayPosting[]; total: number }> {
@@ -212,16 +234,23 @@ async function fetchWorkdayJobs(
       {
         method:  "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body:    JSON.stringify({ appliedFacets: {}, limit: 15, offset: 0, searchText: "" }),
+        body:    JSON.stringify({ appliedFacets: {}, limit: LARGE_SCRAPE, offset: 0, searchText: "" }),
         signal:  AbortSignal.timeout(12_000),
       }
     );
     if (!res.ok) return { postings: [], total: 0 };
     const data = await res.json();
-    return {
-      postings: (data.jobPostings ?? []).slice(0, 15),
-      total:    data.total ?? data.totalJobPostings ?? (data.jobPostings?.length ?? 0),
-    };
+    const postings = (data.jobPostings ?? []) as WorkdayPosting[];
+    // Max-with-floor: some tenants return `total: 0` while still returning postings.
+    // We floor on the postings length we actually received so totalAvailable is
+    // never silently misreported as 0 when we have roles in hand.
+    const total = Math.max(
+      typeof data.total === "number" ? data.total : 0,
+      typeof data.totalJobPostings === "number" ? data.totalJobPostings : 0,
+      postings.length,
+    );
+    const keep = targetScrapeCount(total);
+    return { postings: postings.slice(0, keep), total };
   } catch { return { postings: [], total: 0 }; }
 }
 
@@ -302,10 +331,33 @@ async function fetchWorkdayJD(
   return "";
 }
 
+/**
+ * Fetches `url` as HTML and tries to extract a Workday tenant config from it.
+ * Preserves the actual request host when the page is itself Workday-hosted.
+ * Used by the adaptive fallback in scraper.ts after garbage-output detection.
+ */
+export async function findWorkdayConfigOnPage(url: string): Promise<WorkdayTenant | null> {
+  // Fast path: direct Workday URL needs no fetch
+  const direct = extractWorkdayTenant(url);
+  if (direct) return direct;
+
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    return extractTenantFromHtml(html, res.url ?? url);
+  } catch {
+    return null;
+  }
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────
 
-export async function scrapeWorkday(url: string): Promise<{ jds: ScrapedJD[]; resolvedUrl?: string; totalAvailable?: number }> {
-  const tenantInfo = await resolveWorkdayEntryPoint(url);
+export async function scrapeWorkday(url: string, preResolved?: WorkdayTenant): Promise<{ jds: ScrapedJD[]; resolvedUrl?: string; totalAvailable?: number }> {
+  const tenantInfo = preResolved ?? await resolveWorkdayEntryPoint(url);
   if (!tenantInfo) return { jds: [] };
 
   const { host, tenant, jobSite } = tenantInfo;
@@ -326,5 +378,8 @@ export async function scrapeWorkday(url: string): Promise<{ jds: ScrapedJD[]; re
     });
   }
 
-  return { jds, resolvedUrl: tenantInfo.resolvedUrl, totalAvailable: total };
+  // Floor totalAvailable on the JD count we actually produced so a tenant
+  // returning `total: 0` never erases a populated list downstream.
+  const totalAvailable = Math.max(total, jds.length);
+  return { jds, resolvedUrl: tenantInfo.resolvedUrl, totalAvailable };
 }

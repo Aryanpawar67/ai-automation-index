@@ -1,8 +1,9 @@
 import * as cheerio from "cheerio";
 import { stripHtml }              from "./stripHtml";
-import { scrapeWorkday }          from "./scrapers/workday";
+import { scrapeWorkday, findWorkdayConfigOnPage } from "./scrapers/workday";
 import { scrapeOracleHCM, scrapeOracleTaleo } from "./scrapers/oracleHcm";
 import { scrapeSAPSuccessFactors } from "./scrapers/sapSuccessFactors";
+import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
   title:      string;
@@ -14,6 +15,19 @@ export interface ScrapedJD {
 export type ScrapeResult =
   | { success: true;  jds: ScrapedJD[]; resolvedUrl?: string; totalAvailable?: number }
   | { success: false; error: string; blocked: boolean };
+
+const NAV_TITLE_RE = /^(skip to (main )?content|search( for jobs)?|filters?|jobs page (is )?loaded|view (all )?jobs?|all jobs?|jump to|menu|home|login|sign[- ]?in|apply now|next page|previous page)$/i;
+
+function looksLikeListingNoise(jds: ScrapedJD[]): boolean {
+  if (jds.some(j => NAV_TITLE_RE.test(j.title.trim()))) return true;
+  // Noise signal: all JDs point to the same sourceUrl (nav anchors / fallback entries)
+  const uniqueUrls = new Set(jds.map(j => j.sourceUrl ?? ""));
+  if (jds.length >= 2 && uniqueUrls.size === 1) return true;
+  // Listing-page marker in rawText with multiple markdown links
+  const listingMarker = /\b\d+\s+JOBS\s+FOUND\b/i;
+  if (jds.some(j => listingMarker.test(j.rawText) && (j.rawText.match(/###\s+\[/g) ?? []).length >= 3)) return true;
+  return false;
+}
 
 // ── Tier 1: Known ATS public APIs ─────────────────────────────────────────────
 
@@ -66,39 +80,48 @@ function isTaleoCustomDomain(url: string): boolean {
 const NON_JOB_PATH =
   /\/(about|leadership|blog|news|press|investors?|team|culture|life|values|benefits|faq|login|signup|register|privacy|terms|contact|sitemap|resources|guides|docs|support|help|diversity|inclusion)\b/i;
 
-async function scrapeGreenhouse(url: string, boardSlug?: string): Promise<ScrapedJD[]> {
+async function scrapeGreenhouse(url: string, boardSlug?: string): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
   const slug = boardSlug ?? url.match(/greenhouse\.io\/([^/?#]+)/i)?.[1];
-  if (!slug) return [];
+  if (!slug) return { jds: [], totalAvailable: 0 };
   const res = await fetch(
     `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`,
     { signal: AbortSignal.timeout(10_000) }
   );
-  if (!res.ok) return [];
+  if (!res.ok) return { jds: [], totalAvailable: 0 };
   const data = await res.json() as { jobs?: Array<{ title: string; content: string; absolute_url: string; departments?: Array<{ name: string }> }> };
-  return (data.jobs ?? []).slice(0, 15).map(j => ({
+  const all = data.jobs ?? [];
+  const totalAvailable = all.length;
+  const keep = targetScrapeCount(totalAvailable);
+  const jds = all.slice(0, keep).map(j => ({
     title:      j.title,
     rawText:    stripHtml(j.content ?? j.title),
     sourceUrl:  j.absolute_url,
     department: j.departments?.[0]?.name,
   }));
+  return { jds, totalAvailable };
 }
 
-async function scrapeLever(url: string): Promise<ScrapedJD[]> {
+async function scrapeLever(url: string): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
   const match = url.match(/lever\.co\/([^/?#]+)/i);
-  if (!match) return [];
+  if (!match) return { jds: [], totalAvailable: 0 };
   const company = match[1];
+  // Fetch up to 100 so `data.length` is a credible "total" for tier decisions.
   const res     = await fetch(
-    `https://api.lever.co/v0/postings/${company}?mode=json&limit=15`,
+    `https://api.lever.co/v0/postings/${company}?mode=json&limit=100`,
     { signal: AbortSignal.timeout(10_000) }
   );
-  if (!res.ok) return [];
+  if (!res.ok) return { jds: [], totalAvailable: 0 };
   const data = await res.json() as Array<{ text: string; descriptionPlain: string; hostedUrl: string; categories?: { team?: string } }>;
-  return (Array.isArray(data) ? data : []).slice(0, 15).map(j => ({
+  const all = Array.isArray(data) ? data : [];
+  const totalAvailable = all.length;
+  const keep = targetScrapeCount(totalAvailable);
+  const jds = all.slice(0, keep).map(j => ({
     title:      j.text,
     rawText:    stripHtml(j.descriptionPlain ?? j.text),
     sourceUrl:  j.hostedUrl,
     department: j.categories?.team,
   }));
+  return { jds, totalAvailable };
 }
 
 // ── Tier 2: Static HTML scraping with cheerio ─────────────────────────────────
@@ -240,6 +263,7 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
     while ((match = jobLinkRegex.exec(markdown)) !== null) {
       const title  = match[1].trim();
       const jobUrl = match[2].trim();
+      if (NAV_TITLE_RE.test(title)) continue;
       if (seen.has(jobUrl)) continue;
       seen.add(jobUrl);
       jds.push({ title, rawText: markdown.slice(0, 8000), sourceUrl: jobUrl });
@@ -248,11 +272,15 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
 
     // Fallback: treat the whole page as one entry
     if (jds.length === 0) {
-      jds.push({
-        title:     data?.data?.metadata?.title ?? "Job Listing",
-        rawText:   markdown.slice(0, 8000),
-        sourceUrl: url,
-      });
+      const isListingPage = /\b\d+\s+JOBS\s+FOUND\b/i.test(markdown) &&
+        (markdown.match(/###\s+\[/g) ?? []).length >= 3;
+      if (!isListingPage) {
+        jds.push({
+          title:     data?.data?.metadata?.title ?? "Job Listing",
+          rawText:   markdown.slice(0, 8000),
+          sourceUrl: url,
+        });
+      }
     }
 
     return jds;
@@ -268,12 +296,12 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // Tier 1a — known ATS APIs (direct Greenhouse/Lever or custom-domain companies)
     const detected = detectATS(url);
     if (detected?.ats === "greenhouse") {
-      const jds = await scrapeGreenhouse(url, detected.boardSlug);
-      if (jds.length > 0) return { success: true, jds };
+      const { jds, totalAvailable } = await scrapeGreenhouse(url, detected.boardSlug);
+      if (jds.length > 0) return { success: true, jds, totalAvailable: Math.max(totalAvailable, jds.length) };
     }
     if (detected?.ats === "lever") {
-      const jds = await scrapeLever(url);
-      if (jds.length > 0) return { success: true, jds };
+      const { jds, totalAvailable } = await scrapeLever(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable: Math.max(totalAvailable, jds.length) };
     }
 
     // Tier 1b — enterprise HCM platforms (atsType from companies table takes priority over URL detection)
@@ -290,19 +318,35 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       if (jds.length > 0) return { success: true, jds, totalAvailable: jds.length };
     }
     if (atsType === "sap_sf" || /\.jobs2web\.com|successfactors\.com|sapsf\.com/i.test(url)) {
-      const jds = await scrapeSAPSuccessFactors(url);
-      if (jds.length > 0) return { success: true, jds, totalAvailable: jds.length };
+      const result = await scrapeSAPSuccessFactors(url);
+      if (result.jds.length > 0) return {
+        success: true,
+        jds: result.jds,
+        totalAvailable: Math.max(result.totalAvailable ?? 0, result.jds.length),
+      };
     }
 
     // Tier 2 — static HTML (skip for known JS-rendered SPAs)
     if (!isSPAJobSite(url)) {
       const staticJds = await scrapeStatic(url);
-      if (staticJds.length > 0) return { success: true, jds: staticJds };
+      if (staticJds.length > 0) return { success: true, jds: staticJds, totalAvailable: staticJds.length };
     }
 
     // Tier 3 — Firecrawl for JS-rendered pages
     const firecrawlJds = await scrapeFirecrawl(url);
-    if (firecrawlJds.length > 0) return { success: true, jds: firecrawlJds };
+    if (firecrawlJds.length > 0) {
+      if (looksLikeListingNoise(firecrawlJds)) {
+        const wd = await findWorkdayConfigOnPage(url);
+        if (wd) {
+          const retry = await scrapeWorkday(url, wd);
+          if (retry.jds.length > 0 && !looksLikeListingNoise(retry.jds)) {
+            return { success: true, jds: retry.jds, resolvedUrl: retry.resolvedUrl, totalAvailable: retry.totalAvailable };
+          }
+        }
+        return { success: false, error: "Scraped content looks like listing-page noise; no JDs extracted.", blocked: false };
+      }
+      return { success: true, jds: firecrawlJds, totalAvailable: firecrawlJds.length };
+    }
 
     return { success: false, error: "No job listings found on this page.", blocked: false };
   } catch (err: unknown) {
