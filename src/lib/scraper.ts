@@ -23,9 +23,6 @@ function looksLikeListingNoise(jds: ScrapedJD[]): boolean {
   // Noise signal: all JDs point to the same sourceUrl (nav anchors / fallback entries)
   const uniqueUrls = new Set(jds.map(j => j.sourceUrl ?? ""));
   if (jds.length >= 2 && uniqueUrls.size === 1) return true;
-  // Listing-page marker in rawText with multiple markdown links
-  const listingMarker = /\b\d+\s+JOBS\s+FOUND\b/i;
-  if (jds.some(j => listingMarker.test(j.rawText) && (j.rawText.match(/###\s+\[/g) ?? []).length >= 3)) return true;
   return false;
 }
 
