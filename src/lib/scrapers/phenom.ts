@@ -99,6 +99,33 @@ function roleFamilyKey(title: string): string {
     .trim();
 }
 
+/** Quick language sniff for listing-level filtering. Some Phenom tenants
+ *  (e.g. Marsh's MAMCGLOBAL with business=Marsh Risk) tag every job with the
+ *  global locale `en_global` even when the actual posting is in Spanish /
+ *  Japanese / French — so we can't rely on an API-level language facet alone.
+ *
+ *  Heuristic: presence of any 2 high-frequency English stop-tokens in the
+ *  descriptionTeaser (or title as fallback). This works because the same
+ *  tokens are extremely uncommon in Romance / CJK language postings.
+ *  Also rejects strings dominated by CJK characters as a fast pre-check.
+ */
+const EN_STOP = ["the","and","for","with","you","our","this","are","will","that"];
+function isLikelyEnglish(text: string | undefined): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  // Fast reject: CJK / Cyrillic / Arabic / Devanagari runs dominate
+  const nonLatin = (text.match(/[぀-ヿ一-鿿Ѐ-ӿ؀-ۿऀ-ॿ]/g) ?? []).length;
+  if (nonLatin > 8) return false;
+  let hits = 0;
+  for (const w of EN_STOP) {
+    if (new RegExp(`\\b${w}\\b`).test(lower)) {
+      hits++;
+      if (hits >= 2) return true;
+    }
+  }
+  return false;
+}
+
 function jobDetailUrl(cfg: PhenomConfig, jobSeqNo: string): string {
   return `https://${cfg.host}/${cfg.locale ?? "us/en"}/job/${jobSeqNo}`;
 }
@@ -177,11 +204,12 @@ async function mapWithConcurrency<T, R>(
 export async function scrapePhenom(
   cfg: PhenomConfig,
 ): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
-  // Walk pages until we have enough unique role families (or hit end of list).
-  // Tenants with heavy city-fanout (MMA: 458 jobs but maybe ~80 unique roles)
-  // need >1 page to fill the LARGE_SCRAPE budget after dedup.
+  // Walk pages until we have enough unique English-language role families
+  // (or hit end of list). Bumped to 12 pages because the English filter can
+  // reject a lot of postings on multilingual tenants (e.g. Marsh Risk where
+  // ~40% of listings are Spanish/French/Japanese despite an en_* facet tag).
   const PAGE_SIZE   = 50;
-  const MAX_PAGES   = 6;        // covers up to 300 listings
+  const MAX_PAGES   = 12;       // covers up to 600 listings
   const seen: Set<string> = new Set();
   const deduped: PhenomJob[] = [];
   let totalAvailable = 0;
@@ -202,6 +230,13 @@ export async function scrapePhenom(
     for (const j of jobs) {
       const key = roleFamilyKey(j.title || "");
       if (!key || seen.has(key)) continue;
+      // Skip non-English postings — fall through to next role rather than
+      // shrinking the budget. Use teaser when available (most discriminative);
+      // fall back to title for very short listings.
+      const sample = (j.descriptionTeaser?.length ?? 0) > 30
+        ? j.descriptionTeaser
+        : j.title;
+      if (!isLikelyEnglish(sample)) continue;
       seen.add(key);
       deduped.push(j);
     }

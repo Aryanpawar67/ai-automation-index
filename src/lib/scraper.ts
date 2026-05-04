@@ -371,6 +371,27 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       });
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
+    // Marsh (parent / Marsh Risk) — same Phenom tenant, business=Marsh Risk
+    // (~614 jobs across many languages). We additionally restrict by
+    // language to en_* codes so we don't end up reporting Japanese / French
+    // JDs (the LLM treats them poorly and the customer-facing report is
+    // English-only). Sum of en_* buckets ≈ 378.
+    if (/careers\.marsh\.com.*marsh-search/i.test(url)) {
+      const { jds, totalAvailable } = await scrapePhenom({
+        host:   "careers.marsh.com",
+        refNum: "MAMCGLOBAL",
+        lang:   "en_global",
+        locale: "global/en",
+        selectedFields: {
+          business: ["Marsh Risk"],
+          language: [
+            "en_US","en_GB","en_AU","en_SG","en_IN","en_PH",
+            "en_CA","en_IE","en_NZ","en_ZA",
+          ],
+        },
+      });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
     if (/careers\.amica\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeAmica();
       if (jds.length > 0) return { success: true, jds, totalAvailable };
