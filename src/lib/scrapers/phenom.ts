@@ -91,9 +91,10 @@ function buildSearchPayload(cfg: PhenomConfig, from: number, size: number) {
  *  across many locations with city/branch suffixes after a dash. Strips the
  *  first " - " or " -- " suffix, lowercases, collapses whitespace. */
 function roleFamilyKey(title: string): string {
+  // Permissive split — also catches "Title-City" (no space before dash).
   return title
     .toLowerCase()
-    .split(/\s+--?\s+/)[0]
+    .split(/\s*[-–—]+\s*/)[0]
     .replace(/\s+/g, " ")
     .trim();
 }

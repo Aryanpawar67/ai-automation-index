@@ -75,9 +75,10 @@ function extractJobLinks(md: string): Array<{ url: string; title: string; id: nu
  * vs "Field Claims Adjuster") stay distinct.
  */
 function roleFamilyKey(title: string): string {
+  // Permissive split — also catches "Title-City" (no space before dash).
   return title
     .toLowerCase()
-    .split(/\s+--?\s+/)[0]
+    .split(/\s*[-–—]+\s*/)[0]
     .replace(/\s+/g, " ")
     .trim();
 }

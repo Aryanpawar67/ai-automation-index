@@ -233,16 +233,24 @@ interface WorkdayPosting {
  * vs "Field Claims Adjuster") stay separate.
  */
 function roleFamilyKey(title: string): string {
+  // Split on any dash with optional surrounding whitespace — covers both
+  // "Claims Adjuster - Senior" (TTC style) and "Licensed Insurance Agent-Houston
+  // West" (Kemper style, no space before the dash). Conservative still, because
+  // we only drop the tail after the FIRST dash, so "Claims Adjuster Senior"
+  // (no dash) stays intact.
   return title
     .toLowerCase()
-    .split(/\s+--?\s+/)[0]
+    .split(/\s*[-–—]+\s*/)[0]
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/** POST to Workday CxS jobs search API. Always requests LARGE_SCRAPE so we
- *  can learn the real tenant-wide `total` in one round-trip and decide whether
- *  to keep 15 (small) or 20 (large) postings based on it.
+/** POST to Workday CxS jobs search API. Walks pages until we have enough
+ *  unique role families (or hit end of listings).
+ *
+ *  Tenants like Kemper (492 postings, ~5 unique families per 20-row page) need
+ *  many pages to fill the LARGE_SCRAPE budget after dedup; without pagination
+ *  we'd report just 5 JDs from a 492-job site.
  *
  *  Some tenants (e.g. geico.wd1) reject this POST with 500 unless the request
  *  includes browser-style Origin + Referer headers — Workday's CSRF check
@@ -250,49 +258,60 @@ function roleFamilyKey(title: string): string {
 async function fetchWorkdayJobs(
   host: string, tenant: string, jobSite: string
 ): Promise<{ postings: WorkdayPosting[]; total: number }> {
-  const siteUrl = `https://${host}/${jobSite}`;
-  try {
-    const res = await fetch(
-      `https://${host}/wday/cxs/${tenant}/${jobSite}/jobs`,
-      {
+  const siteUrl  = `https://${host}/${jobSite}`;
+  const PAGE     = 20;     // Workday CxS hard cap per request
+  const MAX_PAGES = 8;     // covers up to 160 raw postings per scrape
+  const headers  = {
+    "Content-Type":    "application/json",
+    "Accept":          "application/json",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin":          `https://${host}`,
+    "Referer":         siteUrl,
+    "User-Agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
+  };
+
+  const seen: Set<string> = new Set();
+  const deduped: WorkdayPosting[] = [];
+  let total = 0;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    try {
+      const res = await fetch(`https://${host}/wday/cxs/${tenant}/${jobSite}/jobs`, {
         method:  "POST",
-        headers: {
-          "Content-Type":    "application/json",
-          "Accept":          "application/json",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Origin":          `https://${host}`,
-          "Referer":         siteUrl,
-          "User-Agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
-        },
-        body:    JSON.stringify({ appliedFacets: {}, limit: LARGE_SCRAPE, offset: 0, searchText: "" }),
+        headers,
+        body:    JSON.stringify({ appliedFacets: {}, limit: PAGE, offset: page * PAGE, searchText: "" }),
         signal:  AbortSignal.timeout(12_000),
+      });
+      if (!res.ok) break;
+      const data = await res.json();
+      const postings = (data.jobPostings ?? []) as WorkdayPosting[];
+      if (page === 0) {
+        // Max-with-floor: some tenants return `total: 0` while still returning postings.
+        total = Math.max(
+          typeof data.total === "number" ? data.total : 0,
+          typeof data.totalJobPostings === "number" ? data.totalJobPostings : 0,
+          postings.length,
+        );
       }
-    );
-    if (!res.ok) return { postings: [], total: 0 };
-    const data = await res.json();
-    const postings = (data.jobPostings ?? []) as WorkdayPosting[];
-    // Max-with-floor: some tenants return `total: 0` while still returning postings.
-    // We floor on the postings length we actually received so totalAvailable is
-    // never silently misreported as 0 when we have roles in hand.
-    const total = Math.max(
-      typeof data.total === "number" ? data.total : 0,
-      typeof data.totalJobPostings === "number" ? data.totalJobPostings : 0,
-      postings.length,
-    );
-    // Dedup by role family before slicing — large tenants post the same role
-    // across many cities (e.g. "Claims Adjuster - NY" / "Claims Adjuster - TX").
-    // Without this, targetScrapeCount(total) returns 20 near-identical JDs.
-    const seen: Set<string> = new Set();
-    const deduped: WorkdayPosting[] = [];
-    for (const p of postings) {
-      const key = roleFamilyKey(p.title || "");
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(p);
-    }
-    const keep = targetScrapeCount(total);
-    return { postings: deduped.slice(0, keep), total };
-  } catch { return { postings: [], total: 0 }; }
+      if (postings.length === 0) break;
+
+      for (const p of postings) {
+        const key = roleFamilyKey(p.title || "");
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(p);
+      }
+
+      const target = targetScrapeCount(total || deduped.length);
+      if (deduped.length >= target) break;
+      if (postings.length < PAGE) break;  // hit end of listings
+    } catch { break; }
+  }
+
+  if (deduped.length === 0) return { postings: [], total: 0 };
+  total = total || deduped.length;
+  const keep = targetScrapeCount(total);
+  return { postings: deduped.slice(0, keep), total };
 }
 
 /**
