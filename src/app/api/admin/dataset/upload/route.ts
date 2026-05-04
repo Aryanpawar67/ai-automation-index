@@ -32,14 +32,21 @@ export async function POST(req: NextRequest) {
   // Find which domains already exist in dataset_rows
   const incomingDomains = parsed.map(r => r.domain).filter(Boolean);
   const existing = await db
-    .select({ id: datasetRows.id, domain: datasetRows.domain })
+    .select({ id: datasetRows.id, domain: datasetRows.domain, companyName: datasetRows.companyName, careerPageUrl: datasetRows.careerPageUrl, atsType: datasetRows.atsType })
     .from(datasetRows)
     .where(inArray(datasetRows.domain, incomingDomains));
 
-  const existingByDomain = new Map(existing.map(r => [r.domain, r.id]));
+  const existingByDomain = new Map(existing.map(r => [r.domain, r]));
   const newRows           = parsed.filter(r => !existingByDomain.has(r.domain));
   const updateRows        = parsed.filter(r => existingByDomain.has(r.domain) && (r.pocFirstName || r.pocLastName || r.pocEmail));
   const duplicateCount    = parsed.length - newRows.length;
+
+  const existingDetails = existing.map(r => ({
+    companyName:   r.companyName,
+    domain:        r.domain,
+    careerPageUrl: r.careerPageUrl,
+    atsType:       r.atsType,
+  }));
 
   // Dry run — return stats only
   if (dryRun) {
@@ -48,6 +55,7 @@ export async function POST(req: NextRequest) {
       newRows:        newRows.length,
       duplicates:     duplicateCount,
       existingInDb:   existingByDomain.size,
+      existingDetails,
     });
   }
 
@@ -73,11 +81,11 @@ export async function POST(req: NextRequest) {
 
   // Update POC fields on existing rows (one query per row — typically small batch)
   for (const r of updateRows) {
-    const id = existingByDomain.get(r.domain)!;
+    const rec = existingByDomain.get(r.domain)!;
     await db
       .update(datasetRows)
       .set({ pocFirstName: r.pocFirstName, pocLastName: r.pocLastName, pocEmail: r.pocEmail })
-      .where(eq(datasetRows.id, id));
+      .where(eq(datasetRows.id, rec.id));
   }
 
   return NextResponse.json({

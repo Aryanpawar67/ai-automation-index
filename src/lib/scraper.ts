@@ -3,6 +3,15 @@ import { stripHtml }              from "./stripHtml";
 import { scrapeWorkday, findWorkdayConfigOnPage } from "./scrapers/workday";
 import { scrapeOracleHCM, scrapeOracleTaleo } from "./scrapers/oracleHcm";
 import { scrapeSAPSuccessFactors } from "./scrapers/sapSuccessFactors";
+import { scrapeSmartRecruiters }  from "./scrapers/smartRecruiters";
+import { scrapeICIMS }            from "./scrapers/icims";
+import { extractTeamtailorLinks, scrapeTeamtailorFromLinks } from "./scrapers/teamtailor";
+import { scrapeJibeStateFarm }     from "./scrapers/jibeStateFarm";
+import { scrapeAvatureMetLife }    from "./scrapers/avatureMetLife";
+import { scrapeGlobeLife }         from "./scrapers/globeLife";
+import { scrapeUHGOptum }          from "./scrapers/uhgOptum";
+import { scrapeAllstateNationalGeneral } from "./scrapers/allstateNationalGeneral";
+import { scrapeAxaUs }                  from "./scrapers/axaUs";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -16,7 +25,7 @@ export type ScrapeResult =
   | { success: true;  jds: ScrapedJD[]; resolvedUrl?: string; totalAvailable?: number }
   | { success: false; error: string; blocked: boolean };
 
-const NAV_TITLE_RE = /^(skip to (main )?content|search( for jobs)?|filters?|jobs page (is )?loaded|view (all )?jobs?|all jobs?|jump to|menu|home|login|sign[- ]?in|apply now|next page|previous page)$/i;
+const NAV_TITLE_RE = /^(skip to\b.*|search( for jobs)?|filters?|jobs page (is )?loaded|view (all )?jobs?|all jobs?|jump to|menu|home|login|sign[- ]?in|apply now|next page|previous page|.*[-_]banner$|banner)$/i;
 
 function looksLikeListingNoise(jds: ScrapedJD[]): boolean {
   if (jds.some(j => NAV_TITLE_RE.test(j.title.trim()))) return true;
@@ -35,10 +44,11 @@ const CUSTOM_GREENHOUSE_BOARDS: Array<[RegExp, string]> = [
 ];
 
 function detectATS(url: string): { ats: string; boardSlug?: string } | null {
-  if (/greenhouse\.io/i.test(url))  return { ats: "greenhouse" };
-  if (/lever\.co/i.test(url))       return { ats: "lever" };
-  if (/teamtailor\.com/i.test(url)) return { ats: "teamtailor" };
-  if (/workable\.com/i.test(url))   return { ats: "workable" };
+  if (/greenhouse\.io/i.test(url))       return { ats: "greenhouse" };
+  if (/lever\.co/i.test(url))            return { ats: "lever" };
+  if (/smartrecruiters\.com/i.test(url)) return { ats: "smartrecruiters" };
+  if (/teamtailor\.com/i.test(url))      return { ats: "teamtailor" };
+  if (/workable\.com/i.test(url))        return { ats: "workable" };
 
   for (const [re, slug] of CUSTOM_GREENHOUSE_BOARDS) {
     if (re.test(url)) return { ats: "greenhouse", boardSlug: slug };
@@ -58,6 +68,7 @@ const SPA_JOB_SITES = [
   /myworkdaysite\.com/i,
   /myworkdayjobs\.com/i,
   /smartrecruiters\.com/i,
+  /teamtailor\.com/i,
   /icims\.com/i,
   /taleo\.net/i,
   /successfactors/i,
@@ -89,7 +100,15 @@ async function scrapeGreenhouse(url: string, boardSlug?: string): Promise<{ jds:
   const all = data.jobs ?? [];
   const totalAvailable = all.length;
   const keep = targetScrapeCount(totalAvailable);
-  const jds = all.slice(0, keep).map(j => ({
+  // Deduplicate by normalised title — Greenhouse often posts the same role multiple times
+  const seenTitles = new Set<string>();
+  const unique = all.filter(j => {
+    const key = j.title.trim().toLowerCase();
+    if (seenTitles.has(key)) return false;
+    seenTitles.add(key);
+    return true;
+  });
+  const jds = unique.slice(0, keep).map(j => ({
     title:      j.title,
     rawText:    stripHtml(j.content ?? j.title),
     sourceUrl:  j.absolute_url,
@@ -230,8 +249,8 @@ async function scrapeStatic(url: string): Promise<ScrapedJD[]> {
 
 // ── Tier 3: Firecrawl (handles JS-rendered pages) ────────────────────────────
 
-async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
-  if (!process.env.FIRECRAWL_API_KEY) return [];
+async function scrapeFirecrawl(url: string): Promise<{ jds: ScrapedJD[]; rawHtml: string }> {
+  if (!process.env.FIRECRAWL_API_KEY) return { jds: [], rawHtml: "" };
   try {
     const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method:  "POST",
@@ -241,15 +260,16 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
       },
       body: JSON.stringify({
         url,
-        formats: ["markdown"],
+        formats: ["markdown", "rawHtml"],
         waitFor: 6000,
       }),
       signal: AbortSignal.timeout(45_000),
     });
-    if (!res.ok) return [];
-    const data = await res.json() as { success?: boolean; data?: { markdown?: string; metadata?: { title?: string } } };
+    if (!res.ok) return { jds: [], rawHtml: "" };
+    const data = await res.json() as { success?: boolean; data?: { markdown?: string; rawHtml?: string; metadata?: { title?: string } } };
     const markdown = data?.data?.markdown ?? "";
-    if (!markdown || markdown.length < 100) return [];
+    const rawHtml  = data?.data?.rawHtml  ?? "";
+    if (!markdown || markdown.length < 100) return { jds: [], rawHtml };
 
     // Extract individual job links from markdown
     const jobLinkRegex = /\[([^\]]{5,120})\]\((https?:\/\/[^\)]+(?:job|career|requisition|req_id|jobReqId|career_job_req_id)[^\)]*)\)/gi;
@@ -280,9 +300,9 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
       }
     }
 
-    return jds;
+    return { jds, rawHtml };
   } catch {
-    return [];
+    return { jds: [], rawHtml: "" };
   }
 }
 
@@ -290,7 +310,41 @@ async function scrapeFirecrawl(url: string): Promise<ScrapedJD[]> {
 
 export async function scrapeCareerPage(url: string, atsType?: string | null): Promise<ScrapeResult> {
   try {
-    // Tier 1a — known ATS APIs (direct Greenhouse/Lever or custom-domain companies)
+    // Tier 0 — custom scrapers for sites with known-incompatible generic paths
+    if (/jobs\.statefarm\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeJibeStateFarm();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/metlifecareers\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeAvatureMetLife();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/careers\.globelifeinsurance\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeGlobeLife();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/careers\.unitedhealthgroup\.com\/search-jobs/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeUHGOptum();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/allstate\.jobs.*brand.*National[\s%+]General/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeAllstateNationalGeneral();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/jobs\.azblue\.com/i.test(url)) {
+      const result = await scrapeWorkday(url, {
+        tenant: "bcbsaz",
+        jobSite: "BCBSAZCareers",
+        host: "bcbsaz.wd1.myworkdayjobs.com",
+      });
+      if (result.jds.length > 0) return { success: true, jds: result.jds, totalAvailable: result.totalAvailable };
+    }
+    if (/careers\.axa\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeAxaUs();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+
+    // Tier 1a — known ATS APIs (direct Greenhouse/Lever/SmartRecruiters or custom-domain companies)
     const detected = detectATS(url);
     if (detected?.ats === "greenhouse") {
       const { jds, totalAvailable } = await scrapeGreenhouse(url, detected.boardSlug);
@@ -300,15 +354,19 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       const { jds, totalAvailable } = await scrapeLever(url);
       if (jds.length > 0) return { success: true, jds, totalAvailable: Math.max(totalAvailable, jds.length) };
     }
+    if (detected?.ats === "smartrecruiters") {
+      const { jds, totalAvailable } = await scrapeSmartRecruiters(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable: Math.max(totalAvailable, jds.length) };
+    }
 
     // Tier 1b — enterprise HCM platforms (atsType from companies table takes priority over URL detection)
     if (atsType === "workday" || /myworkdayjobs\.com|myworkdaysite\.com/i.test(url)) {
       const result = await scrapeWorkday(url);
       if (result.jds.length > 0) return { success: true, jds: result.jds, resolvedUrl: result.resolvedUrl, totalAvailable: result.totalAvailable };
     }
-    if (atsType === "oracle_hcm" || /\.fa\.[a-z0-9]+\.oraclecloud\.com/i.test(url)) {
-      const jds = await scrapeOracleHCM(url);
-      if (jds.length > 0) return { success: true, jds, totalAvailable: jds.length };
+    if (atsType === "oracle_hcm" || /\.fa\.[a-z0-9-]+\.oraclecloud\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeOracleHCM(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     if (atsType === "oracle_taleo" || /taleo\.net/i.test(url) || isTaleoCustomDomain(url)) {
       const jds = await scrapeOracleTaleo(url);
@@ -322,6 +380,10 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
         totalAvailable: Math.max(result.totalAvailable ?? 0, result.jds.length),
       };
     }
+    if (atsType === "icims" || /icims\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeICIMS(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable: Math.max(totalAvailable, jds.length) };
+    }
 
     // Tier 2 — static HTML (skip for known JS-rendered SPAs)
     if (!isSPAJobSite(url)) {
@@ -330,7 +392,17 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     }
 
     // Tier 3 — Firecrawl for JS-rendered pages
-    const firecrawlJds = await scrapeFirecrawl(url);
+    const { jds: firecrawlJds, rawHtml } = await scrapeFirecrawl(url);
+
+    // Teamtailor detection: custom domains (e.g. makers.lemonade.com) embed /recipe/ links in HTML
+    if (rawHtml) {
+      const recipeLinks = extractTeamtailorLinks(rawHtml, url);
+      if (recipeLinks.length >= 3) {
+        const { jds, totalAvailable } = await scrapeTeamtailorFromLinks(recipeLinks);
+        if (jds.length > 0) return { success: true, jds, totalAvailable };
+      }
+    }
+
     if (firecrawlJds.length > 0) {
       if (looksLikeListingNoise(firecrawlJds)) {
         const wd = await findWorkdayConfigOnPage(url);
