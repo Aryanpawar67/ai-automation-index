@@ -18,6 +18,7 @@ import { scrapeAflac }                  from "./scrapers/aflac";
 import { scrapeAssurant }               from "./scrapers/assurant";
 import { scrapeTTCPortals }             from "./scrapers/ttcPortals";
 import { scrapeJibe }                   from "./scrapers/jibe";
+import { scrapeEightfold }              from "./scrapers/eightfold";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -389,6 +390,14 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
             "en_CA","en_IE","en_NZ","en_ZA",
           ],
         },
+      });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // New York Life — Eightfold ATS at careers.newyorklife.com (~241 jobs)
+    if (/careers\.newyorklife\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeEightfold({
+        host:   "careers.newyorklife.com",
+        domain: "newyorklife.com",
       });
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
