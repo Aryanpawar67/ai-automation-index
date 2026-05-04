@@ -12,6 +12,12 @@ import { scrapeGlobeLife }         from "./scrapers/globeLife";
 import { scrapeUHGOptum }          from "./scrapers/uhgOptum";
 import { scrapeAllstateNationalGeneral } from "./scrapers/allstateNationalGeneral";
 import { scrapeAxaUs }                  from "./scrapers/axaUs";
+import { scrapePhenom }                 from "./scrapers/phenom";
+import { scrapeAmica }                  from "./scrapers/amica";
+import { scrapeAflac }                  from "./scrapers/aflac";
+import { scrapeAssurant }               from "./scrapers/assurant";
+import { scrapeTTCPortals }             from "./scrapers/ttcPortals";
+import { scrapeJibe }                   from "./scrapers/jibe";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -41,6 +47,7 @@ function looksLikeListingNoise(jds: ScrapedJD[]): boolean {
 // Key: regex to match the career page URL. Value: Greenhouse board slug.
 const CUSTOM_GREENHOUSE_BOARDS: Array<[RegExp, string]> = [
   [/stripe\.com\/jobs/i, "stripe"],
+  [/hioscar\.com/i,      "oscar"],
 ];
 
 function detectATS(url: string): { ats: string; boardSlug?: string } | null {
@@ -341,6 +348,50 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     }
     if (/careers\.axa\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeAxaUs();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/careers\.fiserv\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapePhenom({
+        host:   "careers.fiserv.com",
+        refNum: "FFFYJUS",
+      });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Marsh McLennan Agency — uses parent's Phenom tenant (refNum MAMCGLOBAL,
+    // 1,976 tenant-wide) but filtered to the MMA business unit (~458 jobs).
+    // Match the /mma-search path so we only apply this filter when the URL
+    // explicitly targets MMA, not the parent's whole careers site.
+    if (/careers\.marsh\.com.*mma-search/i.test(url)) {
+      const { jds, totalAvailable } = await scrapePhenom({
+        host:   "careers.marsh.com",
+        refNum: "MAMCGLOBAL",
+        lang:   "en_global",
+        locale: "global/en",
+        selectedFields: { business: ["Marsh McLennan Agency"] },
+      });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/careers\.amica\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeAmica();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/careers\.aflac\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeAflac();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/jobs\.assurant\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeAssurant();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/careers\.progressive\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeTTCPortals("https://careers.progressive.com/search/jobs/");
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    if (/careers\.fm\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeJibe({
+        base:       "https://careers.fm.com",
+        detailPath: "/careers-home/jobs/{slug}/job",
+      });
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
 

@@ -54,6 +54,10 @@ export interface PhenomConfig {
   locale?: string;
   /** API `lang` field. Defaults to "en_us". */
   lang?:   string;
+  /** Optional facet filter passed as selected_fields. E.g. for Marsh McLennan
+   *  Agency on careers.marsh.com: { business: ["Marsh McLennan Agency"] }.
+   *  Without this the API returns the whole tenant (parent-company-wide). */
+  selectedFields?: Record<string, string[]>;
 }
 
 function buildSearchPayload(cfg: PhenomConfig, from: number, size: number) {
@@ -74,12 +78,24 @@ function buildSearchPayload(cfg: PhenomConfig, from: number, size: number) {
     siteType:        "external",
     keywords:        "",
     global:          true,
-    selected_fields: {},
+    selected_fields: cfg.selectedFields ?? {},
     sort:            { order: "desc", field: "postedDate" },
     locationData:    {},
     refNum:          cfg.refNum,
     ddoKey:          "refineSearch",
   };
+}
+
+/** Reduce a job title to its role family for cross-listing dedup.
+ *  Mirrors the helper in ttcPortals/workday: large tenants post the same role
+ *  across many locations with city/branch suffixes after a dash. Strips the
+ *  first " - " or " -- " suffix, lowercases, collapses whitespace. */
+function roleFamilyKey(title: string): string {
+  return title
+    .toLowerCase()
+    .split(/\s+--?\s+/)[0]
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function jobDetailUrl(cfg: PhenomConfig, jobSeqNo: string): string {
@@ -160,23 +176,44 @@ async function mapWithConcurrency<T, R>(
 export async function scrapePhenom(
   cfg: PhenomConfig,
 ): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
-  // Single search call gives us totalHits + enough jobs for our scrape budget.
-  const initialSize = 25;
-  const searchRes   = await fetch(`https://${cfg.host}/widgets`, {
-    method:  "POST",
-    headers: HEADERS,
-    body:    JSON.stringify(buildSearchPayload(cfg, 0, initialSize)),
-    signal:  AbortSignal.timeout(30_000),
-  });
-  if (!searchRes.ok) return { jds: [], totalAvailable: 0 };
+  // Walk pages until we have enough unique role families (or hit end of list).
+  // Tenants with heavy city-fanout (MMA: 458 jobs but maybe ~80 unique roles)
+  // need >1 page to fill the LARGE_SCRAPE budget after dedup.
+  const PAGE_SIZE   = 50;
+  const MAX_PAGES   = 6;        // covers up to 300 listings
+  const seen: Set<string> = new Set();
+  const deduped: PhenomJob[] = [];
+  let totalAvailable = 0;
 
-  const data           = await searchRes.json() as RefineSearchResponse;
-  const totalAvailable = data.refineSearch?.totalHits ?? 0;
-  const jobs           = data.refineSearch?.data?.jobs ?? [];
-  if (jobs.length === 0) return { jds: [], totalAvailable };
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await fetch(`https://${cfg.host}/widgets`, {
+      method:  "POST",
+      headers: HEADERS,
+      body:    JSON.stringify(buildSearchPayload(cfg, page * PAGE_SIZE, PAGE_SIZE)),
+      signal:  AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) break;
+    const data = await res.json() as RefineSearchResponse;
+    if (page === 0) totalAvailable = data.refineSearch?.totalHits ?? 0;
+    const jobs = data.refineSearch?.data?.jobs ?? [];
+    if (jobs.length === 0) break;
+
+    for (const j of jobs) {
+      const key = roleFamilyKey(j.title || "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(j);
+    }
+
+    const target = targetScrapeCount(totalAvailable || deduped.length);
+    if (deduped.length >= target) break;
+    if (jobs.length < PAGE_SIZE) break;  // hit end of listings
+  }
+
+  if (deduped.length === 0) return { jds: [], totalAvailable };
 
   const keep    = targetScrapeCount(totalAvailable);
-  const toFetch = jobs.slice(0, keep);
+  const toFetch = deduped.slice(0, keep);
 
   const fetched = await mapWithConcurrency(toFetch, CONCURRENCY, j => fetchJobDescription(cfg, j));
   const jds     = fetched.filter((x): x is ScrapedJD => x !== null);
