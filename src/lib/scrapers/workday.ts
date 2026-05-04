@@ -222,18 +222,48 @@ interface WorkdayPosting {
   locationsText?: string;
 }
 
+/**
+ * Reduces a job title to a "role family" key for cross-listing dedup.
+ * Workday tenants (e.g. Progressive, large insurers) often post the same role
+ * many times with city/specialty appended after a dash:
+ *   "Claims Adjuster Senior - Litigation"  → "claims adjuster senior"
+ *   "Claims Adjuster Senior - Injury"      → "claims adjuster senior"
+ * Strips everything after the first " - " or " -- ", lowercases, and collapses
+ * whitespace. Conservative — distinct families ("Auto Damage Claims Adjuster"
+ * vs "Field Claims Adjuster") stay separate.
+ */
+function roleFamilyKey(title: string): string {
+  return title
+    .toLowerCase()
+    .split(/\s+--?\s+/)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** POST to Workday CxS jobs search API. Always requests LARGE_SCRAPE so we
  *  can learn the real tenant-wide `total` in one round-trip and decide whether
- *  to keep 15 (small) or 20 (large) postings based on it. */
+ *  to keep 15 (small) or 20 (large) postings based on it.
+ *
+ *  Some tenants (e.g. geico.wd1) reject this POST with 500 unless the request
+ *  includes browser-style Origin + Referer headers — Workday's CSRF check
+ *  treats requests without them as cross-site. The detail GET is unaffected. */
 async function fetchWorkdayJobs(
   host: string, tenant: string, jobSite: string
 ): Promise<{ postings: WorkdayPosting[]; total: number }> {
+  const siteUrl = `https://${host}/${jobSite}`;
   try {
     const res = await fetch(
       `https://${host}/wday/cxs/${tenant}/${jobSite}/jobs`,
       {
         method:  "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        headers: {
+          "Content-Type":    "application/json",
+          "Accept":          "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Origin":          `https://${host}`,
+          "Referer":         siteUrl,
+          "User-Agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
+        },
         body:    JSON.stringify({ appliedFacets: {}, limit: LARGE_SCRAPE, offset: 0, searchText: "" }),
         signal:  AbortSignal.timeout(12_000),
       }
@@ -249,8 +279,19 @@ async function fetchWorkdayJobs(
       typeof data.totalJobPostings === "number" ? data.totalJobPostings : 0,
       postings.length,
     );
+    // Dedup by role family before slicing — large tenants post the same role
+    // across many cities (e.g. "Claims Adjuster - NY" / "Claims Adjuster - TX").
+    // Without this, targetScrapeCount(total) returns 20 near-identical JDs.
+    const seen: Set<string> = new Set();
+    const deduped: WorkdayPosting[] = [];
+    for (const p of postings) {
+      const key = roleFamilyKey(p.title || "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(p);
+    }
     const keep = targetScrapeCount(total);
-    return { postings: postings.slice(0, keep), total };
+    return { postings: deduped.slice(0, keep), total };
   } catch { return { postings: [], total: 0 }; }
 }
 
