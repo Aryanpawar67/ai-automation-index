@@ -64,6 +64,16 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/admin/downloads",
+    exact: false,
+    label: "Downloads",
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+        <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
     href: "/admin",
     exact: true,
     label: "Quick Upload",

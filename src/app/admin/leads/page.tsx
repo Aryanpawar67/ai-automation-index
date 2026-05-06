@@ -31,7 +31,7 @@ export default async function LeadsPage() {
   return (
     <div>
       {/* ── Page header ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: "#220133", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
             Leads
@@ -39,6 +39,29 @@ export default async function LeadsPage() {
           <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
             {rows.length} lead{rows.length !== 1 ? "s" : ""} captured from report pages
           </p>
+        </div>
+      </div>
+
+      {/* ── Use-case context ── */}
+      <div style={{
+        background:   "linear-gradient(135deg, #F4EFF6, #FAF6FC)",
+        border:       "1px solid #E6DAEE",
+        borderRadius: 14,
+        padding:      "14px 18px",
+        marginBottom: 24,
+        display:      "flex",
+        gap:          12,
+        alignItems:   "flex-start",
+      }}>
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" style={{ marginTop: 2, flexShrink: 0 }}>
+          <rect x="2" y="4" width="20" height="16" rx="2" stroke="#220133" strokeWidth="1.6"/>
+          <path d="M2 8l10 7 10-7" stroke="#220133" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <div style={{ fontSize: 13, color: "#5C4D6E", lineHeight: 1.55 }}>
+          <strong style={{ color: "#220133" }}>What this tracks: </strong>
+          A visitor entered their email on a report page to <em>unlock the report</em> or express interest in iMocha.
+          These are <strong>top-of-funnel signals</strong> — the user has identified themselves but may not have engaged deeply yet.
+          See <a href="/admin/downloads" style={{ color: "#FD5A0F", fontWeight: 600 }}>Downloads</a> for users who exported the PDF after viewing.
         </div>
       </div>
 
