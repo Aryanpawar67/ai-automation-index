@@ -102,7 +102,7 @@ export default async function CompanyReportHub({
         />
       )}
 
-      <main style={{ maxWidth: 1152, margin: "0 auto", padding: "36px 28px 60px" }}>
+      <main className="company-main" style={{ maxWidth: 1152, margin: "0 auto", padding: "36px 28px 60px" }}>
         <CompanyReportList
           company={company.name}
           analyses={cleanAnalyses}
@@ -116,6 +116,9 @@ export default async function CompanyReportHub({
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50%       { opacity: 0.5; transform: scale(1.3); }
+        }
+        @media screen and (max-width: 768px) {
+          .company-main { padding: 24px 14px 60px !important; }
         }
       `}</style>
     </div>

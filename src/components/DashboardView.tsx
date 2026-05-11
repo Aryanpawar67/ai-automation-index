@@ -910,9 +910,53 @@ export default function DashboardView({
           </span>
         </div>
         <div style={{ flex: 1 }} />
+
+        {/* Mobile-only inline email gate inside the sticky bar */}
+        {!emailSubmitted && (
+          <form
+            className="dash-mobile-bar-gate"
+            onSubmit={handleEmailSubmit}
+            style={{ display: "none", flex: "1 1 auto", alignItems: "center", gap: 8 }}
+          >
+            <input
+              type="email"
+              value={headerEmail}
+              onChange={e => { setHeaderEmail(e.target.value); setEmailError(""); }}
+              placeholder="work email to download"
+              aria-label="Work email"
+              style={{
+                flex: "1 1 auto", height: 44, padding: "0 14px",
+                borderRadius: 10, fontSize: 14,
+                background: "#FAF8FC", color: "#220133",
+                border: `1.5px solid ${emailError ? "#fca5a5" : "#EAE4EF"}`,
+                outline: "none",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={emailValidating}
+              aria-label="Submit email and download"
+              style={{
+                width: 56, height: 44, borderRadius: 10, border: "none",
+                background: "#FD5A0F", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: emailValidating ? "wait" : "pointer", flexShrink: 0,
+              }}
+            >
+              {emailValidating ? (
+                <span style={{ fontSize: 16 }}>{"…"}</span>
+              ) : (
+                <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
+                  <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
+          </form>
+        )}
+
         <button
           onClick={handleDownloadClick}
-          className="dash-sticky-bar-btn"
+          className={`dash-sticky-bar-btn${!emailSubmitted ? " dash-sticky-bar-btn-pre" : ""}`}
           style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "8px 20px", borderRadius: 8, border: "none",
@@ -965,25 +1009,31 @@ export default function DashboardView({
           .dash-opps-grid { grid-template-columns: 1fr 1fr !important; }
         }
         @media screen and (max-width: 768px) {
-          .dash-main { padding: 20px 14px 88px !important; }
-          .dash-hero { top: 8px !important; border-radius: 16px !important; }
-          .dash-hero-row { gap: 8px !important; margin-bottom: 10px !important; }
+          .dash-main { padding: 16px 14px 88px !important; }
+          /* Non-sticky, compact hero. Clip decorative circles. */
+          .dash-hero { position: static !important; top: auto !important; max-width: none !important; margin: 0 14px 14px !important; border-radius: 14px !important; overflow: hidden !important; }
+          .dash-hero > div:last-child { padding: 12px 16px 14px !important; }
+          .dash-hero-row { gap: 8px !important; margin-bottom: 8px !important; }
+          /* Hide inline email form + inline download button — sticky bottom bar owns the gate */
+          .dash-email-form { display: none !important; }
+          .dash-download-btn { display: none !important; }
           .dash-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important; gap: 12px !important; }
           .dash-overview-grid { grid-template-columns: 1fr !important; }
           .dash-skills-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
           .dash-tasks-grid { grid-template-columns: 1fr !important; }
           .dash-opps-grid { grid-template-columns: 1fr !important; }
-          .dash-email-form { width: 100% !important; order: 10; }
-          .dash-email-input-wrap { flex: 1 1 auto; }
-          .dash-email-input { width: 100% !important; height: 40px !important; }
-          .dash-download-btn { min-height: 44px !important; padding: 9px 18px !important; font-size: 13px !important; flex: 1 1 auto; justify-content: center !important; }
-          .dash-sticky-bar { padding: 0 14px !important; gap: 10px !important; }
+          .dash-sticky-bar { padding: 0 14px !important; gap: 10px !important; height: 68px !important; }
           .dash-sticky-bar-text { display: none !important; }
-          .dash-sticky-bar-btn { flex: 1 1 auto; justify-content: center !important; min-height: 44px !important; }
+          .dash-sticky-bar-btn { flex: 1 1 auto; justify-content: center !important; min-height: 44px !important; font-size: 14px !important; }
+          /* When the user hasn't entered email yet, swap the bar's Download button
+             for the inline email gate. After submit, the regular button reappears. */
+          .dash-sticky-bar-btn-pre { display: none !important; }
+          .dash-mobile-bar-gate { display: flex !important; }
         }
         @media screen and (max-width: 480px) {
-          .dash-main { padding: 16px 10px 92px !important; }
-          .dash-hero { top: 6px !important; }
+          .dash-main { padding: 14px 10px 92px !important; }
+          .dash-hero { margin: 0 10px 12px !important; }
+          .dash-hero h1 { font-size: 18px !important; line-height: 1.25 !important; }
         }
         /* On non-hover (touch) devices, neutralize sticky :hover-driven JS by ensuring transitions are short.
            The inline onMouseEnter handlers still fire on tap; this just keeps state from feeling stuck. */

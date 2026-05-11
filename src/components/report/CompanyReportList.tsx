@@ -94,7 +94,7 @@ export default function CompanyReportList({
           </div>
 
           {/* Role cards grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 32 }}>
+          <div className="role-cards-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 32 }}>
             {sorted.map((a, i) => {
               const score    = a.overallScore ?? 0;
               const pot      = a.overallScore != null ? potential(score) : null;
@@ -125,6 +125,9 @@ export default function CompanyReportList({
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+        @media screen and (max-width: 768px) {
+          .role-cards-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
         }
       `}</style>
     </div>
