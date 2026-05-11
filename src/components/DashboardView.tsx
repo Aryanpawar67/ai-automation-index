@@ -318,7 +318,7 @@ export default function DashboardView({
       </div>
 
       {/* ── STICKY HERO HEADER (merged nav + hero) ── */}
-      <div className="no-print" style={{
+      <div className="no-print dash-hero" style={{
         position: "sticky", top: 12, zIndex: 50,
         maxWidth: 1200, margin: "0 auto",
         borderRadius: 20,
@@ -332,7 +332,7 @@ export default function DashboardView({
         <div style={{ padding: "14px 28px 18px", position: "relative" }}>
 
           {/* Top row: back | branding | company | download */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+          <div className="dash-hero-row" style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
             <button
               onClick={() => router.push(backHref)}
               style={{
@@ -387,14 +387,15 @@ export default function DashboardView({
                 </span>
               </div>
             ) : (
-              <form onSubmit={handleEmailSubmit} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
-                <div style={{ position: "relative" }}>
+              <form className="dash-email-form" onSubmit={handleEmailSubmit} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, position: "relative" }}>
+                <div className="dash-email-input-wrap" style={{ position: "relative" }}>
                   <input
                     ref={emailInputRef}
                     type="email"
                     value={headerEmail}
                     onChange={e => { setHeaderEmail(e.target.value); setEmailError(""); }}
                     placeholder="work email"
+                    className="dash-email-input"
                     style={{
                       width: 180, height: 32, padding: "0 12px",
                       borderRadius: 8, fontSize: 12,
@@ -463,6 +464,7 @@ export default function DashboardView({
             {/* Download PDF button — dulled until email submitted */}
             <button
               onClick={handleDownloadClick}
+              className="dash-download-btn"
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 fontSize: 12, padding: "7px 16px", borderRadius: 10,
@@ -515,7 +517,7 @@ export default function DashboardView({
         </div>
       </div>
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 28px 60px" }}>
+      <main className="dash-main" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 28px 60px" }}>
 
         {/* ── IMPACT SUMMARY (scrolls under sticky header) ── */}
         <div style={{
@@ -530,7 +532,7 @@ export default function DashboardView({
         </div>
 
         {/* ── KPI cards ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
+        <div className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
           {kpis.map((k, i) => (
             <div key={i} style={{ position: "relative" }}
               onMouseEnter={() => setHoveredKpi(i)}
@@ -639,7 +641,7 @@ export default function DashboardView({
 
         {/* ── OVERVIEW tab ── */}
         <div className="tab-panel" style={{ display: activeTab === "overview" ? "flex" : "none", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
+          <div className="dash-overview-grid" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
             <div style={{
               background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
               padding: "24px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
@@ -688,7 +690,7 @@ export default function DashboardView({
               <p style={{ fontSize: 14, fontWeight: 700, color: "#220133", margin: "0 0 3px" }}>Skills Analysis</p>
               <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>Classified by exposure to AI automation for this role</p>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+            <div className="dash-skills-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
               {[
                 { key: "futureProof" as const, title: "Future-Proof", items: analysis.skillsAnalysis.futureProof, color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: "✓" },
                 { key: "atRisk"      as const, title: "At Risk",       items: analysis.skillsAnalysis.atRisk,       color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "!" },
@@ -762,7 +764,7 @@ export default function DashboardView({
             </div>
             <TasksChart tasks={analysis.tasks} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          <div className="dash-tasks-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
             {[...analysis.tasks].sort((a, b) => b.automationScore - a.automationScore).map((task, i) => {
               const color = taskColor(task.automationScore);
               const impactCfg = IMPACT_CFG[task.automationPotential] ?? IMPACT_CFG.low;
@@ -810,7 +812,7 @@ export default function DashboardView({
 
         {/* ── OPPORTUNITIES tab ── */}
         <div className="tab-panel tab-opps" style={{ display: activeTab === "opportunities" ? "block" : "none", animation: "fadeIn 0.25s ease" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+          <div className="dash-opps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
             {analysis.aiOpportunities.map((opp, i) => {
               const impactCfg = IMPACT_CFG[opp.impact] ?? IMPACT_CFG.low;
               return (
@@ -890,7 +892,7 @@ export default function DashboardView({
       </footer>
 
       {/* ── STICKY BOTTOM DOWNLOAD BAR ── */}
-      <div className="no-print" style={{
+      <div className="no-print dash-sticky-bar" style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
         height: 64, zIndex: 55,
         background: "#fff", borderTop: "1px solid #EAE4EF",
@@ -901,7 +903,7 @@ export default function DashboardView({
         transition: "transform 0.35s ease",
         pointerEvents: stickyBarVisible ? "auto" : "none",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <div className="dash-sticky-bar-text" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <IMochaIcon size={18} color="#FD5A0F" />
           <span style={{ fontSize: 13, color: "#553366", fontWeight: 500 }}>
             Download your AI Automation Report
@@ -910,6 +912,7 @@ export default function DashboardView({
         <div style={{ flex: 1 }} />
         <button
           onClick={handleDownloadClick}
+          className="dash-sticky-bar-btn"
           style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "8px 20px", borderRadius: 8, border: "none",
@@ -954,6 +957,38 @@ export default function DashboardView({
           .tab-panel   { display: block !important; }
           .tab-tasks   { break-before: page; page-break-before: always; }
           .tab-opps    { break-before: page; page-break-before: always; }
+        }
+
+        /* ── Mobile-friendly responsive layout (screen only — print uses desktop dims) ── */
+        @media screen and (max-width: 1024px) {
+          .dash-main { padding: 24px 18px 84px !important; }
+          .dash-opps-grid { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media screen and (max-width: 768px) {
+          .dash-main { padding: 20px 14px 88px !important; }
+          .dash-hero { top: 8px !important; border-radius: 16px !important; }
+          .dash-hero-row { gap: 8px !important; margin-bottom: 10px !important; }
+          .dash-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important; gap: 12px !important; }
+          .dash-overview-grid { grid-template-columns: 1fr !important; }
+          .dash-skills-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+          .dash-tasks-grid { grid-template-columns: 1fr !important; }
+          .dash-opps-grid { grid-template-columns: 1fr !important; }
+          .dash-email-form { width: 100% !important; order: 10; }
+          .dash-email-input-wrap { flex: 1 1 auto; }
+          .dash-email-input { width: 100% !important; height: 40px !important; }
+          .dash-download-btn { min-height: 44px !important; padding: 9px 18px !important; font-size: 13px !important; flex: 1 1 auto; justify-content: center !important; }
+          .dash-sticky-bar { padding: 0 14px !important; gap: 10px !important; }
+          .dash-sticky-bar-text { display: none !important; }
+          .dash-sticky-bar-btn { flex: 1 1 auto; justify-content: center !important; min-height: 44px !important; }
+        }
+        @media screen and (max-width: 480px) {
+          .dash-main { padding: 16px 10px 92px !important; }
+          .dash-hero { top: 6px !important; }
+        }
+        /* On non-hover (touch) devices, neutralize sticky :hover-driven JS by ensuring transitions are short.
+           The inline onMouseEnter handlers still fire on tap; this just keeps state from feeling stuck. */
+        @media (hover: none) {
+          .dash-tasks-grid > div, .dash-opps-grid > div { transition: none !important; }
         }
       `}</style>
     </div>
