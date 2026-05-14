@@ -28,6 +28,37 @@ export function extractSmartRecruitersSlug(url: string): string | null {
   return m?.[1] ?? null;
 }
 
+/**
+ * Reduces a SmartRecruiters job title to a "role family" key for dedup.
+ * Large tenants (e.g. Etihad Airways, 77 postings) repeat the same role across
+ * many locations and seniority bands:
+ *   "Duty Supervisor - PVG"                 → "duty supervisor"
+ *   "Duty Supervisor - PKX"                 → "duty supervisor"
+ *   "Sales Representative - Philippines"    → "sales representative"
+ *   "Senior Cabin Crew"                     → "cabin crew"
+ *   "Cabin Crew II"                         → "cabin crew"
+ * Drops everything after the first dash, strips standalone seniority modifiers
+ * and trailing level markers (I/II/III/IV/V, 1–5), then lowercases + collapses
+ * whitespace. Conservative: distinct families ("Cargo Operations Officer" vs
+ * "Airport Operations Officer") still stay separate.
+ */
+export function roleFamilyKey(title: string): string {
+  const seniority = /^(senior|sr\.?|junior|jr\.?|lead|principal|staff|associate|head of|chief|deputy)\s+/i;
+  const trailingLevel = /\s+(senior|sr\.?|junior|jr\.?|lead|principal|staff|associate|i{1,3}v?|iv|v|[1-5])$/i;
+
+  let key = title
+    .toLowerCase()
+    .split(/\s*[-–—]+\s*/)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Strip seniority repeatedly — handles "Senior Lead Engineer" → "engineer".
+  while (seniority.test(key)) key = key.replace(seniority, "").trim();
+  while (trailingLevel.test(key)) key = key.replace(trailingLevel, "").trim();
+
+  return key;
+}
+
 export async function scrapeSmartRecruiters(
   url: string
 ): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
@@ -45,9 +76,21 @@ export async function scrapeSmartRecruiters(
   const totalAvailable = list.totalFound ?? all.length;
   const keep = targetScrapeCount(totalAvailable);
 
+  // Dedup by role family — drop near-duplicates that only differ by location
+  // or seniority band (common on large SR tenants like Etihad Airways).
+  const seen: Set<string> = new Set();
+  const deduped: SRPosting[] = [];
+  for (const p of all) {
+    const key = roleFamilyKey(p.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(p);
+    if (deduped.length >= keep) break;
+  }
+
   const jds: ScrapedJD[] = [];
 
-  for (const posting of all.slice(0, keep)) {
+  for (const posting of deduped) {
     try {
       const detailRes = await fetch(
         `https://api.smartrecruiters.com/v1/companies/${slug}/postings/${posting.id}`,
