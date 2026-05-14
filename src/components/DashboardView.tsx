@@ -158,6 +158,7 @@ export default function DashboardView({
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab]   = useState<"overview" | "tasks" | "opportunities">("overview");
+  const [autoRotating, setAutoRotating] = useState(true);
   const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
   const [skillsTooltip, setSkillsTooltip] = useState<string | null>(null);
   const [stickyBarVisible, setStickyBarVisible] = useState(false);
@@ -190,6 +191,42 @@ export default function DashboardView({
     const t = setTimeout(() => setEmailHighlight(false), 2000);
     return () => clearTimeout(t);
   }, [emailHighlight]);
+
+  // Auto-rotate report tabs once on first view (Overview → Tasks → Opportunities → back to Overview).
+  // Click on any tab, hover into the tab strip, or `prefers-reduced-motion` halts the sequence.
+  useEffect(() => {
+    if (!autoRotating) return;
+    if (typeof window !== "undefined"
+        && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setAutoRotating(false);
+      return;
+    }
+
+    const order = ["overview", "tasks", "opportunities", "overview"] as const;
+    let step = 0;
+    let timer: number;
+
+    const tick = () => {
+      step += 1;
+      if (step >= order.length) { setAutoRotating(false); return; }
+      setActiveTab(order[step]);
+      if (step < order.length - 1) timer = window.setTimeout(tick, 6000);
+      else timer = window.setTimeout(() => setAutoRotating(false), 6000);
+    };
+
+    timer = window.setTimeout(tick, 6000);
+
+    const onVisibility = () => {
+      if (document.hidden) window.clearTimeout(timer);
+      else timer = window.setTimeout(tick, 6000);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [autoRotating]);
 
   // Email hint auto-hide
   useEffect(() => {
@@ -595,25 +632,33 @@ export default function DashboardView({
         {/* ── Tab bar (full width, badge counts) ── */}
         <div className="no-print" style={{ marginBottom: 8 }}>
           <div style={{
-            display: "flex", gap: 4, padding: 5,
-            background: "#fff", borderRadius: 14, border: "1px solid #EAE4EF",
-            boxShadow: "0 2px 8px rgba(34,1,51,0.05)",
-            width: "100%",
-          }}>
+              display: "flex", gap: 4, padding: 5,
+              background: "#fff", borderRadius: 14, border: "1px solid #EAE4EF",
+              boxShadow: "0 2px 8px rgba(34,1,51,0.05)",
+              width: "100%",
+            }}>
             {(["overview", "tasks", "opportunities"] as const).map(tab => {
               const isActive = activeTab === tab;
+              const isFillingProgress = isActive && autoRotating;
               const badgeCount = tab === "tasks" ? analysis.tasks.length : tab === "opportunities" ? analysis.aiOpportunities.length : null;
               return (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => { setAutoRotating(false); setActiveTab(tab); }}
                   style={{
                     flex: 1,
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
                     padding: "9px 20px", borderRadius: 10, border: "none", cursor: "pointer",
                     fontSize: 13, fontWeight: 600, textTransform: "capitalize",
                     transition: "background 0.15s, color 0.15s, box-shadow 0.15s",
-                    background: isActive ? "#FD5A0F" : "transparent",
+                    background: isActive
+                      ? (isFillingProgress
+                          ? "linear-gradient(to right, #FD5A0F 0%, #FD5A0F 50%, #FFE0CC 50%, #FFE0CC 100%)"
+                          : "#FD5A0F")
+                      : "transparent",
+                    backgroundSize:     isFillingProgress ? "200% 100%" : undefined,
+                    backgroundPosition: isFillingProgress ? "100% 0"    : undefined,
+                    animation:          isFillingProgress ? "tabFill 6000ms linear forwards" : undefined,
                     color: isActive ? "#fff" : "#553366",
                     boxShadow: isActive ? "0 2px 10px rgba(253,90,15,0.3)" : "none",
                   }}
@@ -987,6 +1032,10 @@ export default function DashboardView({
         @keyframes fadeIn {
           from { opacity: 0; }
           to   { opacity: 1; }
+        }
+        @keyframes tabFill {
+          from { background-position: 100% 0; }
+          to   { background-position: 0% 0; }
         }
         input::placeholder { color: rgba(255,255,255,0.35); }
         @keyframes emailPulse {
