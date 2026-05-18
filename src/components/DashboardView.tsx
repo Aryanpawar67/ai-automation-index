@@ -159,6 +159,7 @@ export default function DashboardView({
   const router = useRouter();
   const [activeTab, setActiveTab]   = useState<"overview" | "tasks" | "opportunities">("overview");
   const [autoRotating, setAutoRotating] = useState(true);
+  const [printMode, setPrintMode] = useState(false);
   const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
   const [skillsTooltip, setSkillsTooltip] = useState<string | null>(null);
   const [stickyBarVisible, setStickyBarVisible] = useState(false);
@@ -184,6 +185,11 @@ export default function DashboardView({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [stickyBarDismissed]);
+
+  // Treat a syntactically valid email as "ready" so the Download CTA lights up
+  // before the server-side validation completes.
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(headerEmail.trim());
+  const downloadReady   = emailSubmitted || emailLooksValid;
 
   // Email highlight pulse auto-reset
   useEffect(() => {
@@ -235,6 +241,20 @@ export default function DashboardView({
     return () => clearTimeout(t);
   }, [emailHint]);
 
+  // Reveal all tab panels during print so charts re-mount with real dimensions.
+  // Why: tab panels use display:none for inactive tabs; Recharts' ResponsiveContainer
+  // measures 0×0 inside hidden parents and renders blank in the printed PDF.
+  useEffect(() => {
+    const onBefore = () => setPrintMode(true);
+    const onAfter  = () => setPrintMode(false);
+    window.addEventListener("beforeprint", onBefore);
+    window.addEventListener("afterprint",  onAfter);
+    return () => {
+      window.removeEventListener("beforeprint", onBefore);
+      window.removeEventListener("afterprint",  onAfter);
+    };
+  }, []);
+
   const triggerDownload = () => {
     // Fire-and-forget analytics
     fetch("/api/preview/track-download", {
@@ -249,14 +269,28 @@ export default function DashboardView({
 
     const prevTitle = document.title;
     document.title = `${analysis.jobTitle} – ${company} | AI Automation Report by iMocha`;
+
+    // Reveal all tab panels NOW so Recharts (ResponsiveContainer + ResizeObserver)
+    // has time to measure the newly-visible parents and paint before the print
+    // engine snapshots the page. Without this delay, the radar and bar charts
+    // print as blank white boxes.
+    setPrintMode(true);
     setTimeout(() => {
       window.print();
-      setTimeout(() => { document.title = prevTitle; }, 500);
-    }, 300);
+      setTimeout(() => {
+        document.title = prevTitle;
+        setPrintMode(false);
+      }, 500);
+    }, 700);
   };
 
   const handleDownloadClick = () => {
     if (emailSubmitted) { triggerDownload(); return; }
+    // If user typed an email but hasn't submitted, treat Download click as submit.
+    if (headerEmail.trim()) {
+      void handleEmailSubmit({ preventDefault: () => {} } as React.FormEvent);
+      return;
+    }
     setEmailHint(true);
     emailInputRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     emailInputRef.current?.focus();
@@ -474,27 +508,6 @@ export default function DashboardView({
                     </div>
                   )}
                 </div>
-                <button
-                  type="submit"
-                  disabled={emailValidating}
-                  style={{
-                    width: 32, height: 32, borderRadius: 8, border: "none",
-                    background: "rgba(253,90,15,0.30)", color: "#FDBB96",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: emailValidating ? "wait" : "pointer",
-                    transition: "background 0.15s", flexShrink: 0,
-                  }}
-                  onMouseEnter={e => { if (!emailValidating) (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.50)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.30)"; }}
-                >
-                  {emailValidating ? (
-                    <span style={{ fontSize: 12 }}>{"\u2026"}</span>
-                  ) : (
-                    <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-                      <path d="M3 8h10M8 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </button>
               </form>
             )}
 
@@ -506,10 +519,10 @@ export default function DashboardView({
                 display: "flex", alignItems: "center", gap: 6,
                 fontSize: 12, padding: "7px 16px", borderRadius: 10,
                 fontWeight: 700,
-                color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
-                background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
+                color: downloadReady ? "#fff" : "rgba(255,255,255,0.85)",
+                background: downloadReady ? "#FD5A0F" : "rgba(253,90,15,0.55)",
                 border: "none", cursor: "pointer",
-                boxShadow: emailSubmitted ? "0 2px 10px rgba(253,90,15,0.30)" : "none",
+                boxShadow: downloadReady ? "0 2px 10px rgba(253,90,15,0.30)" : "none",
                 transition: "background 0.3s, box-shadow 0.3s",
                 flexShrink: 0,
               }}
@@ -685,7 +698,7 @@ export default function DashboardView({
         </div>
 
         {/* ── OVERVIEW tab ── */}
-        <div className="tab-panel" style={{ display: activeTab === "overview" ? "flex" : "none", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
+        <div key={`overview-${printMode ? "p" : "s"}`} className="tab-panel tab-overview" style={{ display: printMode || activeTab === "overview" ? "flex" : "none", flexDirection: "column", gap: 16, animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
           <div className="dash-overview-grid" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
             <div style={{
               background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
@@ -781,7 +794,7 @@ export default function DashboardView({
         </div>
 
         {/* ── TASKS tab ── */}
-        <div className="tab-panel tab-tasks" style={{ display: activeTab === "tasks" ? "flex" : "none", flexDirection: "column", gap: 16, animation: "fadeIn 0.25s ease" }}>
+        <div key={`tasks-${printMode ? "p" : "s"}`} className="tab-panel tab-tasks" style={{ display: printMode || activeTab === "tasks" ? "flex" : "none", flexDirection: "column", gap: 16, animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
           <div style={{
             background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
             padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
@@ -856,7 +869,7 @@ export default function DashboardView({
         </div>
 
         {/* ── OPPORTUNITIES tab ── */}
-        <div className="tab-panel tab-opps" style={{ display: activeTab === "opportunities" ? "block" : "none", animation: "fadeIn 0.25s ease" }}>
+        <div key={`opps-${printMode ? "p" : "s"}`} className="tab-panel tab-opps" style={{ display: printMode || activeTab === "opportunities" ? "block" : "none", animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
           <div className="dash-opps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
             {analysis.aiOpportunities.map((opp, i) => {
               const impactCfg = IMPACT_CFG[opp.impact] ?? IMPACT_CFG.low;
@@ -1005,8 +1018,8 @@ export default function DashboardView({
           style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "8px 20px", borderRadius: 8, border: "none",
-            background: emailSubmitted ? "#FD5A0F" : "rgba(253,90,15,0.55)",
-            color: emailSubmitted ? "#fff" : "rgba(255,255,255,0.85)",
+            background: downloadReady ? "#FD5A0F" : "rgba(253,90,15,0.55)",
+            color: downloadReady ? "#fff" : "rgba(255,255,255,0.85)",
             fontSize: 13, fontWeight: 700, cursor: "pointer",
             transition: "background 0.3s", whiteSpace: "nowrap",
           }}
@@ -1045,11 +1058,12 @@ export default function DashboardView({
         @media print {
           @page { margin: 0; size: A4; }
           body  { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print    { display: none !important; }
-          .print-only  { display: block !important; }
-          .tab-panel   { display: block !important; }
-          .tab-tasks   { break-before: page; page-break-before: always; }
-          .tab-opps    { break-before: page; page-break-before: always; }
+          .no-print     { display: none !important; }
+          .print-only   { display: block !important; }
+          .tab-panel    { animation: none !important; opacity: 1 !important; }
+          .tab-overview { display: flex !important; flex-direction: column; }
+          .tab-tasks    { display: flex !important; flex-direction: column; break-before: page; page-break-before: always; }
+          .tab-opps     { display: block !important; break-before: page; page-break-before: always; }
         }
 
         /* ── Mobile-friendly responsive layout (screen only — print uses desktop dims) ── */
