@@ -23,6 +23,7 @@
     "jszip": "^3.10.1",
     "langsmith": "^0.5.7",
     "next": "16.1.6",
+    "posthog-js": "^1.374.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",

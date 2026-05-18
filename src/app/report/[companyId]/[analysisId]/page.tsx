@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import DashboardView, { type Analysis } from "@/components/DashboardView";
+import ReportTelemetry                  from "@/components/report/ReportTelemetry";
 import { db }                           from "@/lib/db/client";
 import { analyses, jobDescriptions, companies } from "@/lib/db/schema";
 import { eq, and }                      from "drizzle-orm";
@@ -44,10 +45,21 @@ export default async function AnalysisReportPage({
   const backHref = `/report/${publicIdentifier}?token=${encodeURIComponent(token)}`;
 
   return (
-    <DashboardView
-      analysis={analysis}
-      company={row.companyName}
-      backHref={backHref}
-    />
+    <>
+      <ReportTelemetry
+        token={token}
+        companySlug={publicIdentifier}
+        companyName={row.companyName}
+        reportType="analysis"
+        jobTitle={analysis.jobTitle}
+      />
+      <DashboardView
+        analysis={analysis}
+        company={row.companyName}
+        backHref={backHref}
+        token={token}
+        companySlug={publicIdentifier}
+      />
+    </>
   );
 }

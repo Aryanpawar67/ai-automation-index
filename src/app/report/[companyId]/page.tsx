@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
-import CompanyReportList     from "@/components/report/CompanyReportList";
-import FullAnalysisHeroStrip from "@/components/report/FullAnalysisHeroStrip";
+import CompanyReportList         from "@/components/report/CompanyReportList";
+import FullAnalysisHeroStrip     from "@/components/report/FullAnalysisHeroStrip";
+import CompleteCoverageHeroStrip from "@/components/report/CompleteCoverageHeroStrip";
+import ReportTelemetry           from "@/components/report/ReportTelemetry";
 import { db }                from "@/lib/db/client";
 import { analyses, jobDescriptions, companies } from "@/lib/db/schema";
 import { isValidTitle }      from "@/lib/validation";
@@ -67,6 +69,12 @@ export default async function CompanyReportHub({
 
   return (
     <div style={{ minHeight: "100vh", background: "#F4EFF6" }}>
+      <ReportTelemetry
+        token={token}
+        companySlug={publicIdentifier}
+        companyName={company.name}
+        reportType="hub"
+      />
 
       {/* Nav */}
       <nav style={{
@@ -93,13 +101,20 @@ export default async function CompanyReportHub({
       </nav>
 
       {cleanAnalyses.length > 0 && (
-        <FullAnalysisHeroStrip
-          company={company.name}
-          companyId={companyId}
-          totalAvailable={company.totalJobsAvailable ?? cleanAnalyses.length}
-          analysedCount={cleanAnalyses.length}
-          token={token}
-        />
+        company.totalJobsAvailable != null && cleanAnalyses.length >= company.totalJobsAvailable
+          ? <CompleteCoverageHeroStrip
+              company={company.name}
+              companyId={companyId}
+              analysedCount={cleanAnalyses.length}
+              token={token}
+            />
+          : <FullAnalysisHeroStrip
+              company={company.name}
+              companyId={companyId}
+              totalAvailable={company.totalJobsAvailable ?? cleanAnalyses.length}
+              analysedCount={cleanAnalyses.length}
+              token={token}
+            />
       )}
 
       <main className="company-main" style={{ maxWidth: 1152, margin: "0 auto", padding: "36px 28px 60px" }}>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import ScoreRing from "@/components/ScoreRing";
+import { track } from "@/lib/reportTrack";
 
 const TasksChart    = dynamic(() => import("@/components/TasksChart"),    { ssr: false });
 const CategoryRadar = dynamic(() => import("@/components/CategoryRadar"), { ssr: false });
@@ -150,11 +151,15 @@ export default function DashboardView({
   company,
   backHref,
   showNewAnalysis = false,
+  token,
+  companySlug,
 }: {
   analysis: Analysis;
   company: string;
   backHref: string;
   showNewAnalysis?: boolean;
+  token?: string;
+  companySlug?: string;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab]   = useState<"overview" | "tasks" | "opportunities">("overview");
@@ -241,6 +246,48 @@ export default function DashboardView({
     return () => clearTimeout(t);
   }, [emailHint]);
 
+  // Scroll-depth milestones (25/50/75/100%) — one event per threshold per session.
+  const scrollDepthsRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!token || !companySlug || typeof window === "undefined") return;
+    const ctx = { token, companySlug, reportType: "analysis" as const, jobTitle: analysis.jobTitle };
+    const milestones = [25, 50, 75, 100];
+    const onScroll = () => {
+      const pageH = document.body.scrollHeight - window.innerHeight;
+      if (pageH <= 0) return;
+      const pct = (window.scrollY / pageH) * 100;
+      for (const m of milestones) {
+        if (pct >= m && !scrollDepthsRef.current.has(m)) {
+          scrollDepthsRef.current.add(m);
+          track("report_scrolled_depth", ctx, { depth_pct: m });
+        }
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [token, companySlug, analysis.jobTitle]);
+
+  // Section visibility via IntersectionObserver. Re-bind on tab switch so
+  // newly-mounted panels (display:none → flex) get observed. The seen-set
+  // persists across re-binds so we never double-fire for the same section.
+  const seenSectionsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!token || !companySlug || typeof window === "undefined") return;
+    const ctx = { token, companySlug, reportType: "analysis" as const, jobTitle: analysis.jobTitle };
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        const name = (e.target as HTMLElement).dataset.phSection;
+        if (!name || seenSectionsRef.current.has(name)) continue;
+        if (e.isIntersecting && e.intersectionRatio >= 0.4) {
+          seenSectionsRef.current.add(name);
+          track("report_section_viewed", ctx, { section: name });
+        }
+      }
+    }, { threshold: [0.4] });
+    document.querySelectorAll<HTMLElement>("[data-ph-section]").forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, [token, companySlug, analysis.jobTitle, activeTab, printMode]);
+
   // Reveal all tab panels during print so charts re-mount with real dimensions.
   // Why: tab panels use display:none for inactive tabs; Recharts' ResponsiveContainer
   // measures 0×0 inside hidden parents and renders blank in the printed PDF.
@@ -256,6 +303,11 @@ export default function DashboardView({
   }, []);
 
   const triggerDownload = () => {
+    track("report_downloaded",
+      { token, companySlug, reportType: "analysis", jobTitle: analysis.jobTitle },
+      { email: headerEmail.trim().toLowerCase() || undefined },
+    );
+
     // Fire-and-forget analytics
     fetch("/api/preview/track-download", {
       method: "POST",
@@ -570,7 +622,7 @@ export default function DashboardView({
       <main className="dash-main" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 28px 60px" }}>
 
         {/* ── IMPACT SUMMARY (scrolls under sticky header) ── */}
-        <div style={{
+        <div data-ph-section="impact_summary" style={{
           background: "linear-gradient(135deg, #1A0028 0%, #2D0050 100%)",
           borderRadius: 16, padding: "18px 22px", marginBottom: 28,
           border: "1px solid rgba(255,255,255,0.07)",
@@ -582,7 +634,7 @@ export default function DashboardView({
         </div>
 
         {/* ── KPI cards ── */}
-        <div className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
+        <div data-ph-section="kpis" className="dash-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
           {kpis.map((k, i) => (
             <div key={i} style={{ position: "relative" }}
               onMouseEnter={() => setHoveredKpi(i)}
@@ -700,7 +752,7 @@ export default function DashboardView({
         {/* ── OVERVIEW tab ── */}
         <div key={`overview-${printMode ? "p" : "s"}`} className="tab-panel tab-overview" style={{ display: printMode || activeTab === "overview" ? "flex" : "none", flexDirection: "column", gap: 16, animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
           <div className="dash-overview-grid" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
-            <div style={{
+            <div data-ph-section="score_breakdown" style={{
               background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
               padding: "24px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
               display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
@@ -726,7 +778,7 @@ export default function DashboardView({
                 ))}
               </div>
             </div>
-            <div style={{
+            <div data-ph-section="category_radar" style={{
               background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
               padding: "24px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
               breakInside: "avoid", pageBreakInside: "avoid",
@@ -739,7 +791,7 @@ export default function DashboardView({
           </div>
 
           {/* Skills analysis with tooltips */}
-          <div style={{
+          <div data-ph-section="skills_analysis" style={{
             background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
             padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
             breakInside: "avoid", pageBreakInside: "avoid",
@@ -794,7 +846,7 @@ export default function DashboardView({
         </div>
 
         {/* ── TASKS tab ── */}
-        <div key={`tasks-${printMode ? "p" : "s"}`} className="tab-panel tab-tasks" style={{ display: printMode || activeTab === "tasks" ? "flex" : "none", flexDirection: "column", gap: 16, animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
+        <div key={`tasks-${printMode ? "p" : "s"}`} data-ph-section="tasks" className="tab-panel tab-tasks" style={{ display: printMode || activeTab === "tasks" ? "flex" : "none", flexDirection: "column", gap: 16, animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
           <div style={{
             background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
             padding: "24px 28px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)",
@@ -869,7 +921,7 @@ export default function DashboardView({
         </div>
 
         {/* ── OPPORTUNITIES tab ── */}
-        <div key={`opps-${printMode ? "p" : "s"}`} className="tab-panel tab-opps" style={{ display: printMode || activeTab === "opportunities" ? "block" : "none", animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
+        <div key={`opps-${printMode ? "p" : "s"}`} data-ph-section="opportunities" className="tab-panel tab-opps" style={{ display: printMode || activeTab === "opportunities" ? "block" : "none", animation: printMode ? "none" : "fadeIn 0.25s ease" }}>
           <div className="dash-opps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
             {analysis.aiOpportunities.map((opp, i) => {
               const impactCfg = IMPACT_CFG[opp.impact] ?? IMPACT_CFG.low;

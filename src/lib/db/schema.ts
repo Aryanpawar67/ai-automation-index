@@ -7,6 +7,7 @@ import {
   jsonb,
   timestamp,
   boolean,
+  index,
 } from "drizzle-orm/pg-core";
 
 export interface HrStackVendor {
@@ -149,3 +150,22 @@ export const analyses = pgTable("analyses", {
   hoursSaved:       numeric("hours_saved"),
   createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const reportEvents = pgTable("report_events", {
+  id:         uuid("id").primaryKey().defaultRandom(),
+  companyId:  uuid("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  token:      text("token").notNull(),
+  sessionId:  uuid("session_id").notNull(),
+  event:      text("event").notNull(),
+  reportType: text("report_type").notNull(),
+  jobTitle:   text("job_title"),
+  props:      jsonb("props"),
+  userAgent:  text("user_agent"),
+  ipHash:     text("ip_hash"),
+  referrer:   text("referrer"),
+  createdAt:  timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  byCompany: index("report_events_company_idx").on(t.companyId, t.createdAt),
+  byToken:   index("report_events_token_idx").on(t.token, t.createdAt),
+  bySession: index("report_events_session_idx").on(t.sessionId),
+}));
