@@ -42,28 +42,6 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/admin/enrichment",
-    exact: false,
-    label: "Enrichment",
-    icon: (
-      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6"/>
-        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
-  {
-    href: "/admin/leads",
-    exact: false,
-    label: "Leads",
-    icon: (
-      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.6"/>
-        <path d="M2 8l10 7 10-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    ),
-  },
-  {
     href: "/admin/downloads",
     exact: false,
     label: "Downloads",
@@ -80,17 +58,6 @@ const NAV_ITEMS = [
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
         <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    ),
-  },
-  {
-    href: "/admin",
-    exact: true,
-    label: "Quick Upload",
-    icon: (
-      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-        <path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M4 20h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
       </svg>
     ),
   },
