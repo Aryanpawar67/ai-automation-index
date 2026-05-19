@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { db } from "@/lib/db/client";
 import { sql } from "drizzle-orm";
 import AnalyticsCompanyTable, { type AnalyticsRow } from "@/components/admin/AnalyticsCompanyTable";
+import { formatLocation } from "@/lib/formatLocation";
 
 export default async function AnalyticsIndexPage() {
   // Per-company aggregation. The top_location subquery picks the city+country
@@ -17,15 +18,18 @@ export default async function AnalyticsIndexPage() {
       COUNT(*) FILTER (WHERE e.event = 'report_downloaded') AS "downloads",
       MAX(e.created_at)                                     AS "lastSeenAt",
       (
-        SELECT
-          COALESCE(NULLIF(city, ''), '?')
-            || CASE WHEN country IS NOT NULL AND country <> '' THEN ', ' || country ELSE '' END
+        SELECT json_build_object(
+          'city',        city,
+          'region',      region,
+          'country',     country,
+          'accuracy_km', MIN(accuracy_km)
+        )
         FROM report_events
         WHERE company_id = c.id AND country IS NOT NULL
-        GROUP BY city, country
+        GROUP BY city, region, country
         ORDER BY COUNT(*) DESC
         LIMIT 1
-      )                                                     AS "topLocation"
+      )                                                     AS "topGeo"
     FROM companies c
     LEFT JOIN report_events e ON e.company_id = c.id
     WHERE c.report_token IS NOT NULL
@@ -33,16 +37,19 @@ export default async function AnalyticsIndexPage() {
     ORDER BY MAX(e.created_at) DESC NULLS LAST, c.name ASC
   `);
 
-  const rows: AnalyticsRow[] = (result.rows as unknown as Array<Record<string, unknown>>).map(r => ({
-    companyId:   r.companyId  as string,
-    name:        r.name       as string,
-    slug:        (r.slug as string | null) ?? null,
-    opens:       Number(r.opens ?? 0),
-    sessions:    Number(r.sessions ?? 0),
-    downloads:   Number(r.downloads ?? 0),
-    topLocation: (r.topLocation as string | null) ?? null,
-    lastSeenAt:  r.lastSeenAt ? new Date(r.lastSeenAt as string).toISOString() : null,
-  }));
+  const rows: AnalyticsRow[] = (result.rows as unknown as Array<Record<string, unknown>>).map(r => {
+    const g = (r.topGeo as { city?: string | null; region?: string | null; country?: string | null; accuracy_km?: number | null } | null) ?? null;
+    return {
+      companyId:   r.companyId  as string,
+      name:        r.name       as string,
+      slug:        (r.slug as string | null) ?? null,
+      opens:       Number(r.opens ?? 0),
+      sessions:    Number(r.sessions ?? 0),
+      downloads:   Number(r.downloads ?? 0),
+      topLocation: g ? formatLocation(g.city ?? null, g.region ?? null, g.country ?? null, g.accuracy_km ?? null) : null,
+      lastSeenAt:  r.lastSeenAt ? new Date(r.lastSeenAt as string).toISOString() : null,
+    };
+  });
 
   const totalSessions  = rows.reduce((sum, r) => sum + r.sessions,  0);
   const totalDownloads = rows.reduce((sum, r) => sum + r.downloads, 0);

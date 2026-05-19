@@ -6,6 +6,7 @@ import { db } from "@/lib/db/client";
 import { companies, reportEvents } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { formatLocation, LOCATION_TOOLTIP } from "@/lib/formatLocation";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -65,7 +66,8 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
   };
   const sessionMap = new Map<string, SessionRow>();
   for (const e of events) {
-    const loc = [e.city, e.country].filter(Boolean).join(", ") || null;
+    const locStr = formatLocation(e.city, e.region, e.country, e.accuracyKm);
+    const loc = locStr === "—" ? null : locStr;
     const s = sessionMap.get(e.sessionId) ?? {
       sessionId:    e.sessionId,
       startedAt:    e.createdAt,
@@ -132,21 +134,34 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
   const maxSection = Math.max(1, ...sectionCounts.map(s => s.n));
   const maxFunnel  = Math.max(1, ...funnel.map(f => f.n));
 
-  // Region breakdown — one row per distinct location, counted by sessions
+  // Region breakdown — group by raw (city, region, country) but render with
+  // accuracy-aware labels. We collapse the result by display label afterwards
+  // so e.g. low-confidence "Bengaluru" and high-confidence "Bengaluru" rows
+  // that both render as "Bengaluru, India" don't appear twice.
   const geoAgg = await db.execute(sql`
     SELECT
-      COALESCE(NULLIF(city, ''),    '?') AS city,
-      COALESCE(NULLIF(region, ''),  '?') AS region,
-      COALESCE(NULLIF(country, ''), '?') AS country,
-      COUNT(DISTINCT session_id)         AS n
+      city,
+      region,
+      country,
+      MIN(accuracy_km)            AS "accuracyKm",
+      COUNT(DISTINCT session_id)  AS n
     FROM report_events
     WHERE company_id = ${company.id} AND country IS NOT NULL
-    GROUP BY 1, 2, 3
+    GROUP BY city, region, country
     ORDER BY n DESC
-    LIMIT 8
+    LIMIT 24
   `);
-  const geoRows = (geoAgg.rows as unknown as Array<{ city: string; region: string; country: string; n: number }>)
-    .map(r => ({ city: r.city, region: r.region, country: r.country, n: Number(r.n) }));
+  const rawGeo = (geoAgg.rows as unknown as Array<{ city: string | null; region: string | null; country: string | null; accuracyKm: number | null; n: number }>);
+  const geoByLabel = new Map<string, number>();
+  for (const r of rawGeo) {
+    const label = formatLocation(r.city, r.region, r.country, r.accuracyKm);
+    if (label === "—") continue;
+    geoByLabel.set(label, (geoByLabel.get(label) ?? 0) + Number(r.n));
+  }
+  const geoRows = Array.from(geoByLabel.entries())
+    .map(([label, n]) => ({ label, n }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 8);
   const maxGeo = Math.max(1, ...geoRows.map(g => g.n));
 
   const TOKEN_PREVIEW = company.reportToken ? `${company.reportToken.slice(0, 10)}…` : "—";
@@ -261,18 +276,20 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
 
       {/* Regions */}
       <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)", marginBottom: 24 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Top regions</h3>
-        <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Distinct sessions by geolocation (server-side IP lookup via MaxMind)</p>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px", display: "flex", alignItems: "center", gap: 6 }}>
+          Top regions
+          <span title={LOCATION_TOOLTIP} style={{ fontSize: 11, color: "#C4B5D0", cursor: "help" }}>ⓘ</span>
+        </h3>
+        <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Distinct sessions by geolocation. City shown only when MaxMind reports &lt;50km accuracy; otherwise we fall back to region or country.</p>
         {geoRows.length === 0 ? (
           <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>No geolocated sessions yet. Drop the GeoLite2-City.mmdb file into <code style={{ background: "#F4EFF6", padding: "1px 5px", borderRadius: 4 }}>data/</code> to enable geo enrichment.</p>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
             {geoRows.map((g, i) => {
-              const label = [g.city, g.region, g.country].filter(s => s && s !== "?").join(", ") || g.country;
               return (
                 <div key={i}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: "#553366", fontWeight: 600 }}>{label}</span>
+                    <span style={{ color: "#553366", fontWeight: 600 }}>{g.label}</span>
                     <span style={{ color: "#9988AA" }}>{g.n}</span>
                   </div>
                   <div style={{ height: 6, background: "#F4EFF6", borderRadius: 4, overflow: "hidden" }}>
@@ -301,11 +318,25 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#FAF8FC" }}>
-                {["Started", "Type", "Role", "Location", "Device", "Duration", "Max scroll", "Sections", "DL"].map(h => (
-                  <th key={h} style={{
+                {[
+                  { label: "Started" },
+                  { label: "Type" },
+                  { label: "Role" },
+                  { label: "Location", hint: LOCATION_TOOLTIP },
+                  { label: "Device" },
+                  { label: "Duration" },
+                  { label: "Max scroll" },
+                  { label: "Sections" },
+                  { label: "DL" },
+                ].map(h => (
+                  <th key={h.label} title={h.hint} style={{
                     padding: "12px 18px", textAlign: "left", fontSize: 10, fontWeight: 700,
                     letterSpacing: "0.07em", textTransform: "uppercase", color: "#9988AA",
-                  }}>{h}</th>
+                    cursor: h.hint ? "help" : "default",
+                  }}>
+                    {h.label}
+                    {h.hint && <span style={{ marginLeft: 3, fontSize: 9, color: "#C4B5D0" }}>ⓘ</span>}
+                  </th>
                 ))}
               </tr>
             </thead>

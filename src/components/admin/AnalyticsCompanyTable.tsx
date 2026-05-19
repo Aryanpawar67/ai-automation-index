@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { LOCATION_TOOLTIP } from "@/lib/formatLocation";
 
 export interface AnalyticsRow {
   companyId:    string;
@@ -85,12 +86,25 @@ export default function AnalyticsCompanyTable({ rows }: { rows: AnalyticsRow[] }
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EAE4EF", background: "#FAF8FC" }}>
-                {["Company", "Top location", "Opens", "Sessions", "Downloads", "Last activity"].map(h => (
-                  <th key={h} style={{
+                {[
+                  { label: "Company" },
+                  { label: "Top location", hint: LOCATION_TOOLTIP },
+                  { label: "Opens" },
+                  { label: "Sessions" },
+                  { label: "Downloads" },
+                  { label: "Last activity" },
+                ].map(h => (
+                  <th key={h.label} title={h.hint} style={{
                     padding: "14px 24px", textAlign: "left",
                     fontSize: 11, fontWeight: 700, letterSpacing: "0.07em",
                     textTransform: "uppercase", color: "#9988AA",
-                  }}>{h}</th>
+                    cursor: h.hint ? "help" : "default",
+                  }}>
+                    {h.label}
+                    {h.hint && (
+                      <span style={{ marginLeft: 4, fontSize: 10, color: "#C4B5D0" }}>ⓘ</span>
+                    )}
+                  </th>
                 ))}
               </tr>
             </thead>

@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
           ?? "";
   const salt = process.env.REPORT_EVENTS_IP_SALT ?? "";
   const ipHash = ip ? createHash("sha256").update(ip + salt).digest("hex") : null;
-  const geo = ip ? lookupGeo(ip) : { country: null, region: null, city: null };
+  const geo = ip ? lookupGeo(ip) : { country: null, region: null, city: null, accuracyKm: null };
 
   try {
     await db.insert(reportEvents).values({
@@ -53,9 +53,10 @@ export async function POST(req: NextRequest) {
       userAgent,
       ipHash,
       referrer,
-      country: geo.country,
-      region:  geo.region,
-      city:    geo.city,
+      country:    geo.country,
+      region:     geo.region,
+      city:       geo.city,
+      accuracyKm: geo.accuracyKm,
     });
   } catch {
     // swallow — analytics must never break the report

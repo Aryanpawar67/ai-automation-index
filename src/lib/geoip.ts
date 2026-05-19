@@ -21,23 +21,27 @@ function getReader(): ReaderModel | null {
 }
 
 export interface GeoLookup {
-  country: string | null;
-  region:  string | null;
-  city:    string | null;
+  country:    string | null;
+  region:     string | null;
+  city:       string | null;
+  accuracyKm: number | null;  // radius in km; lower = more precise. ISP NAT exits usually report >100km.
 }
 
+const EMPTY: GeoLookup = { country: null, region: null, city: null, accuracyKm: null };
+
 export function lookupGeo(ip: string): GeoLookup {
-  if (!ip) return { country: null, region: null, city: null };
+  if (!ip) return EMPTY;
   const r = getReader();
-  if (!r) return { country: null, region: null, city: null };
+  if (!r) return EMPTY;
   try {
     const res = r.city(ip);
     return {
-      country: res.country?.names.en ?? null,
-      region:  res.subdivisions?.[0]?.names.en ?? null,
-      city:    res.city?.names.en ?? null,
+      country:    res.country?.names.en ?? null,
+      region:     res.subdivisions?.[0]?.names.en ?? null,
+      city:       res.city?.names.en ?? null,
+      accuracyKm: res.location?.accuracyRadius ?? null,
     };
   } catch {
-    return { country: null, region: null, city: null };
+    return EMPTY;
   }
 }

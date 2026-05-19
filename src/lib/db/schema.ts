@@ -166,6 +166,7 @@ export const reportEvents = pgTable("report_events", {
   country:    text("country"),
   region:     text("region"),
   city:       text("city"),
+  accuracyKm: integer("accuracy_km"),
   createdAt:  timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   byCompany: index("report_events_company_idx").on(t.companyId, t.createdAt),
