@@ -61,9 +61,11 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
     downloaded: boolean;
     jobTitle:   string | null;
     reportType: string;
+    location:   string | null;
   };
   const sessionMap = new Map<string, SessionRow>();
   for (const e of events) {
+    const loc = [e.city, e.country].filter(Boolean).join(", ") || null;
     const s = sessionMap.get(e.sessionId) ?? {
       sessionId:    e.sessionId,
       startedAt:    e.createdAt,
@@ -76,7 +78,9 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
       downloaded:   false,
       jobTitle:     e.jobTitle,
       reportType:   e.reportType,
+      location:     loc,
     };
+    if (!s.location && loc) s.location = loc;
     if (e.createdAt < s.startedAt) s.startedAt = e.createdAt;
     if (e.createdAt > s.endedAt)   s.endedAt   = e.createdAt;
     const props = (e.props ?? {}) as Record<string, unknown>;
@@ -127,6 +131,23 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
   const sectionCounts = (sectionAgg.rows as unknown as Array<{ section: string; n: number }>).map(r => ({ section: r.section, n: Number(r.n) }));
   const maxSection = Math.max(1, ...sectionCounts.map(s => s.n));
   const maxFunnel  = Math.max(1, ...funnel.map(f => f.n));
+
+  // Region breakdown — one row per distinct location, counted by sessions
+  const geoAgg = await db.execute(sql`
+    SELECT
+      COALESCE(NULLIF(city, ''),    '?') AS city,
+      COALESCE(NULLIF(region, ''),  '?') AS region,
+      COALESCE(NULLIF(country, ''), '?') AS country,
+      COUNT(DISTINCT session_id)         AS n
+    FROM report_events
+    WHERE company_id = ${company.id} AND country IS NOT NULL
+    GROUP BY 1, 2, 3
+    ORDER BY n DESC
+    LIMIT 8
+  `);
+  const geoRows = (geoAgg.rows as unknown as Array<{ city: string; region: string; country: string; n: number }>)
+    .map(r => ({ city: r.city, region: r.region, country: r.country, n: Number(r.n) }));
+  const maxGeo = Math.max(1, ...geoRows.map(g => g.n));
 
   const TOKEN_PREVIEW = company.reportToken ? `${company.reportToken.slice(0, 10)}…` : "—";
   const forwardedFlag = uniqueDevices > 1;
@@ -238,6 +259,36 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
         </div>
       </div>
 
+      {/* Regions */}
+      <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)", marginBottom: 24 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Top regions</h3>
+        <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Distinct sessions by geolocation (server-side IP lookup via MaxMind)</p>
+        {geoRows.length === 0 ? (
+          <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>No geolocated sessions yet. Drop the GeoLite2-City.mmdb file into <code style={{ background: "#F4EFF6", padding: "1px 5px", borderRadius: 4 }}>data/</code> to enable geo enrichment.</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+            {geoRows.map((g, i) => {
+              const label = [g.city, g.region, g.country].filter(s => s && s !== "?").join(", ") || g.country;
+              return (
+                <div key={i}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: "#553366", fontWeight: 600 }}>{label}</span>
+                    <span style={{ color: "#9988AA" }}>{g.n}</span>
+                  </div>
+                  <div style={{ height: 6, background: "#F4EFF6", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%",
+                      width: `${(g.n / maxGeo) * 100}%`,
+                      background: "linear-gradient(90deg, #220133, #553366)",
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Sessions */}
       <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, boxShadow: "0 2px 12px rgba(34,1,51,0.06)", overflow: "hidden", marginBottom: 24 }}>
         <div style={{ padding: "16px 22px", borderBottom: "1px solid #EAE4EF" }}>
@@ -250,7 +301,7 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#FAF8FC" }}>
-                {["Started", "Type", "Role", "Device", "Duration", "Max scroll", "Sections", "DL"].map(h => (
+                {["Started", "Type", "Role", "Location", "Device", "Duration", "Max scroll", "Sections", "DL"].map(h => (
                   <th key={h} style={{
                     padding: "12px 18px", textAlign: "left", fontSize: 10, fontWeight: 700,
                     letterSpacing: "0.07em", textTransform: "uppercase", color: "#9988AA",
@@ -277,6 +328,9 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
                   </td>
                   <td style={{ padding: "12px 18px", fontSize: 12, color: "#553366" }}>
                     {s.jobTitle ?? "—"}
+                  </td>
+                  <td style={{ padding: "12px 18px", fontSize: 12, color: "#553366", whiteSpace: "nowrap" }}>
+                    {s.location ?? "—"}
                   </td>
                   <td style={{ padding: "12px 18px", fontSize: 12, color: "#9988AA" }} title={s.userAgent ?? ""}>
                     {shortUA(s.userAgent)}

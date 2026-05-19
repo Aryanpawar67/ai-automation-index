@@ -163,6 +163,9 @@ export const reportEvents = pgTable("report_events", {
   userAgent:  text("user_agent"),
   ipHash:     text("ip_hash"),
   referrer:   text("referrer"),
+  country:    text("country"),
+  region:     text("region"),
+  city:       text("city"),
   createdAt:  timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   byCompany: index("report_events_company_idx").on(t.companyId, t.createdAt),

@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { db } from "@/lib/db/client";
 import { companies, reportEvents } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { lookupGeo } from "@/lib/geoip";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
           ?? "";
   const salt = process.env.REPORT_EVENTS_IP_SALT ?? "";
   const ipHash = ip ? createHash("sha256").update(ip + salt).digest("hex") : null;
+  const geo = ip ? lookupGeo(ip) : { country: null, region: null, city: null };
 
   try {
     await db.insert(reportEvents).values({
@@ -51,6 +53,9 @@ export async function POST(req: NextRequest) {
       userAgent,
       ipHash,
       referrer,
+      country: geo.country,
+      region:  geo.region,
+      city:    geo.city,
     });
   } catch {
     // swallow — analytics must never break the report
