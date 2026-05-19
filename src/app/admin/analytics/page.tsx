@@ -1,34 +1,31 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { db } from "@/lib/db/client";
 import { sql } from "drizzle-orm";
-
-interface Row {
-  companyId:   string;
-  name:        string;
-  slug:        string | null;
-  opens:       number;
-  sessions:    number;
-  downloads:   number;
-  lastSeenAt:  Date | null;
-}
-
-function formatDate(d: Date | null): string {
-  if (!d) return "—";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
+import AnalyticsCompanyTable, { type AnalyticsRow } from "@/components/admin/AnalyticsCompanyTable";
 
 export default async function AnalyticsIndexPage() {
+  // Per-company aggregation. The top_location subquery picks the city+country
+  // pair with the most events for that company (NULL when no geo data exists).
   const result = await db.execute(sql`
     SELECT
-      c.id                                                AS "companyId",
-      c.name                                              AS "name",
-      c.slug                                              AS "slug",
-      COUNT(*) FILTER (WHERE e.event = 'report_opened')   AS "opens",
-      COUNT(DISTINCT e.session_id)                        AS "sessions",
+      c.id                                                  AS "companyId",
+      c.name                                                AS "name",
+      c.slug                                                AS "slug",
+      COUNT(*) FILTER (WHERE e.event = 'report_opened')     AS "opens",
+      COUNT(DISTINCT e.session_id)                          AS "sessions",
       COUNT(*) FILTER (WHERE e.event = 'report_downloaded') AS "downloads",
-      MAX(e.created_at)                                   AS "lastSeenAt"
+      MAX(e.created_at)                                     AS "lastSeenAt",
+      (
+        SELECT
+          COALESCE(NULLIF(city, ''), '?')
+            || CASE WHEN country IS NOT NULL AND country <> '' THEN ', ' || country ELSE '' END
+        FROM report_events
+        WHERE company_id = c.id AND country IS NOT NULL
+        GROUP BY city, country
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+      )                                                     AS "topLocation"
     FROM companies c
     LEFT JOIN report_events e ON e.company_id = c.id
     WHERE c.report_token IS NOT NULL
@@ -36,19 +33,20 @@ export default async function AnalyticsIndexPage() {
     ORDER BY MAX(e.created_at) DESC NULLS LAST, c.name ASC
   `);
 
-  const rows = (result.rows as unknown as Array<Record<string, unknown>>).map(r => ({
-    companyId:  r.companyId  as string,
-    name:       r.name       as string,
-    slug:       (r.slug as string | null) ?? null,
-    opens:      Number(r.opens ?? 0),
-    sessions:   Number(r.sessions ?? 0),
-    downloads:  Number(r.downloads ?? 0),
-    lastSeenAt: r.lastSeenAt ? new Date(r.lastSeenAt as string) : null,
-  })) as Row[];
+  const rows: AnalyticsRow[] = (result.rows as unknown as Array<Record<string, unknown>>).map(r => ({
+    companyId:   r.companyId  as string,
+    name:        r.name       as string,
+    slug:        (r.slug as string | null) ?? null,
+    opens:       Number(r.opens ?? 0),
+    sessions:    Number(r.sessions ?? 0),
+    downloads:   Number(r.downloads ?? 0),
+    topLocation: (r.topLocation as string | null) ?? null,
+    lastSeenAt:  r.lastSeenAt ? new Date(r.lastSeenAt as string).toISOString() : null,
+  }));
 
-  const totalSessions = rows.reduce((sum, r) => sum + r.sessions, 0);
+  const totalSessions  = rows.reduce((sum, r) => sum + r.sessions,  0);
   const totalDownloads = rows.reduce((sum, r) => sum + r.downloads, 0);
-  const engaged = rows.filter(r => r.sessions > 0).length;
+  const engaged        = rows.filter(r => r.sessions > 0).length;
 
   return (
     <div>
@@ -91,64 +89,8 @@ export default async function AnalyticsIndexPage() {
           <p style={{ fontSize: 14, color: "#9988AA" }}>Generate a report token on a company first.</p>
         </div>
       ) : (
-        <div style={{
-          background: "#fff", border: "1px solid #EAE4EF", borderRadius: 20,
-          boxShadow: "0 2px 12px rgba(34,1,51,0.06)", overflow: "hidden",
-        }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #EAE4EF", background: "#FAF8FC" }}>
-                {["Company", "Opens", "Sessions", "Downloads", "Last activity"].map(h => (
-                  <th key={h} style={{
-                    padding: "14px 24px", textAlign: "left",
-                    fontSize: 11, fontWeight: 700, letterSpacing: "0.07em",
-                    textTransform: "uppercase", color: "#9988AA",
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => {
-                const identifier = row.slug ?? row.companyId;
-                return (
-                  <tr key={row.companyId} className="an-row" style={{
-                    borderBottom: i < rows.length - 1 ? "1px solid #EAE4EF" : "none",
-                  }}>
-                    <td style={{ padding: "16px 24px" }}>
-                      <Link href={`/admin/analytics/${identifier}`} style={{
-                        fontSize: 14, color: "#220133", fontWeight: 600, textDecoration: "none",
-                      }}>
-                        {row.name}
-                      </Link>
-                      {row.slug && (
-                        <span style={{ marginLeft: 8, fontSize: 12, color: "#9988AA", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                          {row.slug}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: "16px 24px", fontSize: 14, color: "#220133", fontWeight: 600 }}>
-                      {row.opens}
-                    </td>
-                    <td style={{ padding: "16px 24px", fontSize: 14, color: "#220133", fontWeight: 600 }}>
-                      {row.sessions}
-                    </td>
-                    <td style={{ padding: "16px 24px", fontSize: 14, color: row.downloads > 0 ? "#059669" : "#9988AA", fontWeight: 700 }}>
-                      {row.downloads}
-                    </td>
-                    <td style={{ padding: "16px 24px", fontSize: 13, color: "#9988AA", whiteSpace: "nowrap" }}>
-                      {formatDate(row.lastSeenAt)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <AnalyticsCompanyTable rows={rows} />
       )}
-
-      <style>{`
-        .an-row:hover { background: #FAF8FC; cursor: pointer; }
-      `}</style>
     </div>
   );
 }
