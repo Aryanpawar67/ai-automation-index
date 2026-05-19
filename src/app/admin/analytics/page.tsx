@@ -37,6 +37,18 @@ export default async function AnalyticsIndexPage() {
     ORDER BY MAX(e.created_at) DESC NULLS LAST, c.name ASC
   `);
 
+  // Format the timestamp on the server with an explicit timezone so the SSR
+  // output is identical to what the client would render — otherwise React
+  // throws hydration error #418 when the server is UTC and the browser is IST.
+  const fmtLastSeen = (iso: string | null): string => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("en-GB", {
+      day: "numeric", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+      timeZone: "Asia/Kolkata",
+    });
+  };
+
   const rows: AnalyticsRow[] = (result.rows as unknown as Array<Record<string, unknown>>).map(r => {
     const g = (r.topGeo as { city?: string | null; region?: string | null; country?: string | null; accuracy_km?: number | null } | null) ?? null;
     return {
@@ -47,7 +59,7 @@ export default async function AnalyticsIndexPage() {
       sessions:    Number(r.sessions ?? 0),
       downloads:   Number(r.downloads ?? 0),
       topLocation: g ? formatLocation(g.city ?? null, g.region ?? null, g.country ?? null, g.accuracy_km ?? null) : null,
-      lastSeenAt:  r.lastSeenAt ? new Date(r.lastSeenAt as string).toISOString() : null,
+      lastSeen:    fmtLastSeen(r.lastSeenAt ? (r.lastSeenAt as string) : null),
     };
   });
 

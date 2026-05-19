@@ -12,13 +12,9 @@ export interface AnalyticsRow {
   sessions:     number;
   downloads:    number;
   topLocation:  string | null;
-  lastSeenAt:   string | null;   // ISO string — serialised by parent
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  lastSeen:     string;           // already formatted on the server; passing
+                                  // ISO + formatting client-side would cause
+                                  // SSR/CSR timezone hydration mismatches.
 }
 
 export default function AnalyticsCompanyTable({ rows }: { rows: AnalyticsRow[] }) {
@@ -140,7 +136,7 @@ export default function AnalyticsCompanyTable({ rows }: { rows: AnalyticsRow[] }
                       {row.downloads}
                     </td>
                     <td style={{ padding: "16px 24px", fontSize: 13, color: "#9988AA", whiteSpace: "nowrap" }}>
-                      {formatDate(row.lastSeenAt)}
+                      {row.lastSeen}
                     </td>
                   </tr>
                 );
