@@ -15,6 +15,7 @@
     "@maxmind/geoip2-node": "^6.3.4",
     "@mendable/firecrawl-js": "^4.16.0",
     "@neondatabase/serverless": "^1.0.2",
+    "@react-pdf/renderer": "^4.5.1",
     "@types/cheerio": "^0.22.35",
     "@types/jszip": "^3.4.0",
     "cheerio": "^1.2.0",
