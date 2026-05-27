@@ -141,7 +141,7 @@ export default function CompleteCoverageHeroStrip({
 
         {/* Fine print */}
         {state !== "done" && (
-          <p style={{ fontSize: 11, color: "#553366", marginTop: 12 }}>
+          <p style={{ fontSize: 11, color: "#fff", marginTop: 12 }}>
             No spam. An iMocha expert will contact you within 1 business day.
           </p>
         )}

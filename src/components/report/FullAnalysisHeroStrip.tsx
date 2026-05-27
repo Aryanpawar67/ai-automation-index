@@ -64,20 +64,18 @@ export default function FullAnalysisHeroStrip({
           Full analysis available
         </p>
 
-        {/* Headline row */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-          <span style={{ fontSize: 52, fontWeight: 900, lineHeight: 1, color: "#FD5A0F", letterSpacing: "-2px" }}>
+        {/* Headline row — number inline with sentence so they sit on one line */}
+        <p style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.25, marginBottom: 10, maxWidth: 620 }}>
+          <span style={{ fontSize: 32, fontWeight: 900, color: "#FD5A0F", letterSpacing: "-2px", lineHeight: 1, verticalAlign: "baseline" }}>
             {totalAvailable}
           </span>
-          <span style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.2, maxWidth: 520 }}>
-            open roles at <span style={{ color: "#FDBB96" }}>{company}</span> are ready for AI automation analysis.
-          </span>
-        </div>
+          {" "}open roles at <span style={{ color: "#FDBB96" }}>{company}</span> are ready for AI automation analysis.
+        </p>
 
         {/* Sub-copy */}
         <p style={{ fontSize: 14, color: "#C4B5D0", lineHeight: 1.65, marginBottom: 28, maxWidth: 560 }}>
           {analysedCount > 0
-            ? `You're viewing a sample of ${analysedCount} role${analysedCount !== 1 ? "s" : ""}. ${remaining > 0 ? `${remaining} more role${remaining !== 1 ? "s" : ""} haven't been touched yet.` : ""} Want the complete picture — every role, every score, every automation opportunity?`
+            ? `You're viewing ${analysedCount} of the highest-impact roles.${remaining > 0 ? ` Unlock ${remaining} more to reveal the full automation potential hiding across your open positions.` : ""}`
             : `Want to see the complete automation picture across every single one of them?`
           }
         </p>
@@ -143,7 +141,7 @@ export default function FullAnalysisHeroStrip({
 
         {/* Fine print */}
         {state !== "done" && (
-          <p style={{ fontSize: 11, color: "#553366", marginTop: 12 }}>
+          <p style={{ fontSize: 11, color: "#fff", marginTop: 12 }}>
             No spam. An iMocha expert will contact you within 1 business day.
           </p>
         )}

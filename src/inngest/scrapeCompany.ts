@@ -29,13 +29,18 @@ export const scrapeCompanyFn = inngest.createFunction(
 
       const result = await scrapeCareerPage(company.careerPageUrl, company.atsType ?? undefined);
 
-      // Persist the resolved ATS URL + total available jobs count
+      // Persist the resolved ATS URL + total available jobs count.
+      // Floor on jds.length so a scraper that under-reports total (e.g. a
+      // Workday tenant returning total:0 while serving postings) never leaves
+      // the DB column null when we actually have roles in hand.
       if (result.success) {
         const updates: Record<string, unknown> = {};
         if (result.resolvedUrl && result.resolvedUrl !== company.careerPageUrl)
           updates.careerPageUrl = result.resolvedUrl;
-        if (result.totalAvailable)
-          updates.totalJobsAvailable = result.totalAvailable;
+        const reported  = typeof result.totalAvailable === "number" ? result.totalAvailable : 0;
+        const existing  = company.totalJobsAvailable ?? 0;
+        const total     = Math.max(existing, reported, result.jds.length);
+        if (total > 0) updates.totalJobsAvailable = total;
         if (Object.keys(updates).length > 0)
           await db.update(companies).set(updates).where(eq(companies.id, companyId));
       }
