@@ -12,6 +12,8 @@ export interface AnalyticsRow {
   opens:        number;
   sessions:     number;
   downloads:    number;
+  downloadCard: number;
+  downloadPage: number;
   devices:      number;
   topLocation:  string | null;
   lastSeen:     string;           // already formatted on the server; passing
@@ -235,8 +237,13 @@ export default function AnalyticsCompanyTable({
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: "16px 24px", fontSize: 14, color: row.downloads > 0 ? "#059669" : "#9988AA", fontWeight: 700 }}>
-                      {row.downloads}
+                    <td style={{ padding: "16px 24px", fontSize: 14, color: row.downloads > 0 ? "#059669" : "#9988AA", fontWeight: 700, whiteSpace: "nowrap" }}>
+                      {row.downloads === 0
+                        ? "0"
+                        : (row.downloadCard > 0 && row.downloadPage > 0)
+                          ? <>{row.downloads} <span style={{ fontSize: 11, fontWeight: 500, color: "#9988AA" }}>({row.downloadCard} card + {row.downloadPage} page)</span></>
+                          : row.downloads
+                      }
                     </td>
                     <td style={{ padding: "16px 24px", fontSize: 13, color: "#9988AA", whiteSpace: "nowrap" }}>
                       {row.lastSeen}
