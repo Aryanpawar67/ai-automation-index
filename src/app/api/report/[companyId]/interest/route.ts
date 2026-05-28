@@ -35,12 +35,6 @@ export async function POST(
     return NextResponse.json({ error: "Valid email required." }, { status: 400 });
   }
 
-  const domain = email.split("@")[1];
-  const mxOk   = await hasMxRecord(domain);
-  if (!mxOk) {
-    return NextResponse.json({ error: "Email domain does not appear to be valid. Please use a real work email." }, { status: 400 });
-  }
-
   await db.insert(reportLeads).values({ companyId, email });
 
   return NextResponse.json({ ok: true });
