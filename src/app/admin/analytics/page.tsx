@@ -42,7 +42,8 @@ export default async function AnalyticsIndexPage({
       c.slug                                                AS "slug",
       COUNT(*) FILTER (WHERE e.event = 'report_opened')     AS "opens",
       COUNT(DISTINCT e.session_id)                          AS "sessions",
-      COUNT(*) FILTER (WHERE e.event = 'report_downloaded') AS "downloads",
+      COUNT(*) FILTER (WHERE e.event = 'report_downloaded' AND e.props->>'source' = 'role_card') AS "downloadCard",
+      COUNT(*) FILTER (WHERE e.event = 'report_downloaded' AND (e.props->>'source' IS NULL OR e.props->>'source' != 'role_card')) AS "downloadPage",
       COUNT(DISTINCT (
         COALESCE(e.ip_hash, '') || '|' || COALESCE(e.user_agent, '')
       )) FILTER (WHERE e.ip_hash IS NOT NULL OR e.user_agent IS NOT NULL)
@@ -92,7 +93,9 @@ export default async function AnalyticsIndexPage({
       slug:        (r.slug as string | null) ?? null,
       opens:       Number(r.opens ?? 0),
       sessions:    Number(r.sessions ?? 0),
-      downloads:   Number(r.downloads ?? 0),
+      downloads:    Number(r.downloadCard ?? 0) + Number(r.downloadPage ?? 0),
+      downloadCard: Number(r.downloadCard ?? 0),
+      downloadPage: Number(r.downloadPage ?? 0),
       devices:     Number(r.devices ?? 0),
       topLocation: g ? formatLocation(g.city ?? null, g.region ?? null, g.country ?? null, g.accuracy_km ?? null) : null,
       lastSeen:    fmtLastSeen(r.lastSeenAt ? (r.lastSeenAt as string) : null),
