@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import dynamic from "next/dynamic";
+
+const DownloadRolePdfButton = dynamic(() => import("./DownloadRolePdfButton"), { ssr: false });
 
 interface AnalysisRow {
   analysisId:   string;
@@ -114,6 +117,9 @@ export default function CompanyReportList({
                   potCfg={potCfg}
                   href={`/report/${identifier}/${a.analysisId}?token=${encodeURIComponent(token)}`}
                   delay={i * 0.05}
+                  companyId={companyId}
+                  analysisId={a.analysisId}
+                  token={token}
                 />
               );
             })}
@@ -153,7 +159,7 @@ function StatChip({ label, value, color, bg, border }: {
   );
 }
 
-function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, href, delay }: {
+function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, href, delay, companyId, analysisId, token }: {
   rank:       number;
   title:      string;
   department: string | null;
@@ -163,6 +169,9 @@ function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, h
   potCfg:     { label: string; text: string; bg: string; border: string } | null;
   href:       string;
   delay:      number;
+  companyId:  string;
+  analysisId: string;
+  token:      string;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -242,24 +251,32 @@ function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, h
         ) : (
           <div />
         )}
-        <Link
-          href={href}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 5,
-            padding: "7px 16px", borderRadius: 10,
-            fontSize: 12, fontWeight: 700,
-            background: hovered ? "#FD5A0F" : "#FFF0EA",
-            color: hovered ? "#fff" : "#FD5A0F",
-            border: "1px solid #FDBB96",
-            textDecoration: "none",
-            flexShrink: 0,
-          }}
-        >
-          View report
-          <svg width="10" height="10" fill="none" viewBox="0 0 16 16">
-            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <DownloadRolePdfButton
+            companyId={companyId}
+            analysisId={analysisId}
+            token={token}
+            title={title}
+          />
+          <Link
+            href={href}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "7px 16px", borderRadius: 10,
+              fontSize: 12, fontWeight: 700,
+              background: hovered ? "#FD5A0F" : "#FFF0EA",
+              color: hovered ? "#fff" : "#FD5A0F",
+              border: "1px solid #FDBB96",
+              textDecoration: "none",
+              flexShrink: 0,
+            }}
+          >
+            View report
+            <svg width="10" height="10" fill="none" viewBox="0 0 16 16">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </Link>
+        </div>
       </div>
     </div>
   );
