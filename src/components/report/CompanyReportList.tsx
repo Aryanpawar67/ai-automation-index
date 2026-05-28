@@ -120,6 +120,7 @@ export default function CompanyReportList({
                   companyId={companyId}
                   analysisId={a.analysisId}
                   token={token}
+                  companySlug={identifier}
                 />
               );
             })}
@@ -159,19 +160,20 @@ function StatChip({ label, value, color, bg, border }: {
   );
 }
 
-function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, href, delay, companyId, analysisId, token }: {
-  rank:       number;
-  title:      string;
-  department: string | null;
-  score:      number | null;
-  scoreColor: string;
-  hours:      number | null;
-  potCfg:     { label: string; text: string; bg: string; border: string } | null;
-  href:       string;
-  delay:      number;
-  companyId:  string;
-  analysisId: string;
-  token:      string;
+function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, href, delay, companyId, analysisId, token, companySlug }: {
+  rank:        number;
+  title:       string;
+  department:  string | null;
+  score:       number | null;
+  scoreColor:  string;
+  hours:       number | null;
+  potCfg:      { label: string; text: string; bg: string; border: string } | null;
+  href:        string;
+  delay:       number;
+  companyId:   string;
+  analysisId:  string;
+  token:       string;
+  companySlug: string;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -257,6 +259,7 @@ function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, h
             analysisId={analysisId}
             token={token}
             title={title}
+            companySlug={companySlug}
           />
           <Link
             href={href}

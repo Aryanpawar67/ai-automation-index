@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@/lib/reportTrack";
 
 export default function DownloadRolePdfButton({
   companyId,
   analysisId,
   token,
   title,
+  companySlug,
 }: {
-  companyId:  string;
-  analysisId: string;
-  token:      string;
-  title:      string;
+  companyId:   string;
+  analysisId:  string;
+  token:       string;
+  title:       string;
+  companySlug: string;
 }) {
   const [state,   setState]   = useState<"idle" | "loading" | "done">("idle");
   const [hovered, setHovered] = useState(false);
@@ -35,6 +38,11 @@ export default function DownloadRolePdfButton({
       a.download = `${title.replace(/[^a-zA-Z0-9]/g, "_")}_AI_Report.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+
+      track("report_downloaded",
+        { token, companySlug, reportType: "hub", jobTitle: title },
+        { source: "role_card" },
+      );
 
       setState("done");
       setTimeout(() => setState("idle"), 3000);
