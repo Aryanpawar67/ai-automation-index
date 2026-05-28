@@ -14,24 +14,41 @@ function getBaseUrl(req: NextRequest): string {
   return `${proto}://${host}`;
 }
 
+const CONTAINER_CHROME_PATHS = [
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+];
+
 const DEV_CHROME_PATHS = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  "/usr/bin/google-chrome",
-  "/usr/bin/chromium-browser",
+  ...CONTAINER_CHROME_PATHS,
 ];
 
+// --no-sandbox is required when running as root or inside a container (Railway, Docker).
+const CONTAINER_ARGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"];
+
 async function getLaunchOptions() {
+  const fs = await import("fs");
+
   if (process.env.NODE_ENV === "production") {
+    // Prefer a system Chromium (Railway/Docker) over the Lambda-specific sparticuz binary.
+    const systemPath = CONTAINER_CHROME_PATHS.find(p => fs.existsSync(p));
+    if (systemPath) {
+      return { executablePath: systemPath, args: CONTAINER_ARGS, headless: true as const };
+    }
+    // Fallback: Lambda / Vercel serverless via @sparticuz/chromium
     const chromium = (await import("@sparticuz/chromium")).default;
     return {
       executablePath: await chromium.executablePath(),
-      args:           chromium.args,
+      args:           [...chromium.args, ...CONTAINER_ARGS],
       headless:       true as const,
     };
   }
+
   // Dev: find a local Chrome/Chromium install
-  const fs = await import("fs");
   const executablePath = DEV_CHROME_PATHS.find(p => fs.existsSync(p));
   if (!executablePath) throw new Error("No local Chrome found for PDF generation in dev");
   return {
