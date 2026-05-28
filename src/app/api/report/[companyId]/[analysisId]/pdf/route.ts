@@ -7,6 +7,7 @@ import { chromium as playwrightChrome } from "playwright-core";
 export const maxDuration = 60;
 
 function getBaseUrl(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL)  return process.env.NEXT_PUBLIC_APP_URL;
   if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
   const host  = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3000";
