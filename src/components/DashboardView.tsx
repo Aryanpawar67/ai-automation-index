@@ -305,7 +305,7 @@ export default function DashboardView({
   const triggerDownload = () => {
     track("report_downloaded",
       { token, companySlug, reportType: "analysis", jobTitle: analysis.jobTitle },
-      { email: headerEmail.trim().toLowerCase() || undefined },
+      { source: "report_page", email: headerEmail.trim().toLowerCase() || undefined },
     );
 
     // Fire-and-forget analytics
