@@ -64,7 +64,7 @@ export default function DownloadRolePdfButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       disabled={isLoading}
-      title="Download PDF report"
+      title="Get Report"
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
         padding: "7px 16px", borderRadius: 10, border,
@@ -93,7 +93,7 @@ export default function DownloadRolePdfButton({
           <path d="M12 2v10m0 0l-3-3m3 3l3-3M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       )}
-      {isLoading ? "…" : isDone ? "Saved" : "PDF"}
+      {isLoading ? "…" : isDone ? "Saved" : "Get Report"}
     </button>
   );
 }
