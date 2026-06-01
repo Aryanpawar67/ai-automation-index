@@ -6,6 +6,9 @@
 // Also used by the static /report/daman-health page.
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
+
+const HubSpotModal = dynamic(() => import("./HubSpotModal"), { ssr: false });
 
 export default function CompleteCoverageHeroStrip({
   company,
@@ -18,134 +21,119 @@ export default function CompleteCoverageHeroStrip({
   analysedCount:  number;
   token:          string;
 }) {
-  const [email,   setEmail]   = useState("");
-  const [state,   setState]   = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [errMsg,  setErrMsg]  = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [done,      setDone]      = useState(false);
+  const [hovered,   setHovered]   = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setState("loading");
-    setErrMsg("");
-    try {
-      const res = await fetch(
+  const handleSubmitted = (email?: string) => {
+    setShowModal(false);
+    setDone(true);
+    if (email) {
+      fetch(
         `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
         {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({ email }),
         }
-      );
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        setErrMsg(d.error ?? "Something went wrong. Please try again.");
-        setState("error");
-      } else {
-        setState("done");
-      }
-    } catch {
-      setErrMsg("Network error. Please try again.");
-      setState("error");
+      ).catch(() => {});
     }
   };
 
   return (
-    <div style={{
-      background:    "linear-gradient(135deg, #1A0028 0%, #2D0050 45%, #1A0028 100%)",
-      borderRadius:  0,
-      padding:       "40px 0",
-      marginBottom:  0,
-    }}>
-      <div style={{ maxWidth: 1152, margin: "0 auto", padding: "0 24px" }}>
+    <>
+      <div style={{
+        background:   "linear-gradient(135deg, #1A0028 0%, #2D0050 45%, #1A0028 100%)",
+        borderRadius: 0,
+        padding:      "40px 0",
+        marginBottom: 0,
+      }}>
+        <div style={{ maxWidth: 1152, margin: "0 auto", padding: "0 24px" }}>
 
-        {/* Top label */}
-        <p style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
-          textTransform: "uppercase", color: "#6EE7B7", marginBottom: 12,
-        }}>
-          Complete coverage
-        </p>
-
-        {/* Headline row */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
-          <span style={{ fontSize: 52, fontWeight: 900, lineHeight: 1, color: "#FD5A0F", letterSpacing: "-2px" }}>
-            100%
-          </span>
-          <span style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.25, maxWidth: 620 }}>
-            career-site coverage at <span style={{ color: "#FDBB96" }}>{company}</span> — all {analysedCount} open roles fully analysed for AI automation readiness.
-          </span>
-        </div>
-
-        {/* Sub-copy — CTA-first, no "want the complete picture" since we already have it */}
-        <p style={{ fontSize: 14, color: "#C4B5D0", lineHeight: 1.65, marginBottom: 28, maxWidth: 620 }}>
-          Every role at {company} has been scored, ranked, and mapped to AI-powered skill assessments. Want iMocha&apos;s concierge walk-through to plan the rollout — priority roles, time-to-hire impact, and where to start first?
-        </p>
-
-        {/* CTA area */}
-        {state === "done" ? (
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 12,
-            background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)",
-            borderRadius: 14, padding: "16px 24px",
+          <p style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+            textTransform: "uppercase", color: "#6EE7B7", marginBottom: 12,
           }}>
-            <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-              <path d="M5 13l4 4L19 7" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <div>
-              <p style={{ fontSize: 15, fontWeight: 700, color: "#6EE7B7", marginBottom: 2 }}>
-                We&apos;ve got your request.
-              </p>
-              <p style={{ fontSize: 13, color: "#A7F3D0" }}>
-                iMocha will reach out within 1 business day to schedule your walk-through.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 280px", maxWidth: 380 }}>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={e => { setEmail(e.target.value); if (state === "error") setState("idle"); }}
-                placeholder="Enter your work email"
-                style={{
-                  width: "100%", padding: "12px 16px",
-                  borderRadius: 10, border: state === "error" ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.15)",
-                  background: "rgba(255,255,255,0.07)", color: "#fff",
-                  fontSize: 14, outline: "none",
-                  boxSizing: "border-box",
-                }}
-                onFocus={e  => { e.currentTarget.style.border = "1px solid rgba(253,90,15,0.6)"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-                onBlur={e   => { e.currentTarget.style.border = state === "error" ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.15)"; e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
-              />
-              {state === "error" && errMsg && (
-                <p style={{ fontSize: 12, color: "#f87171", margin: 0 }}>{errMsg}</p>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={state === "loading"}
-              style={{
-                padding: "12px 24px", borderRadius: 10, border: "none",
-                background: state === "loading" ? "rgba(253,90,15,0.5)" : "#FD5A0F",
-                color: "#fff", fontWeight: 700, fontSize: 14,
-                cursor: state === "loading" ? "not-allowed" : "pointer",
-                whiteSpace: "nowrap", flexShrink: 0,
-                transition: "background 0.15s",
-              }}
-            >
-              {state === "loading" ? "Sending…" : "Book my walk-through →"}
-            </button>
-          </form>
-        )}
-
-        {/* Fine print */}
-        {state !== "done" && (
-          <p style={{ fontSize: 11, color: "#fff", marginTop: 12 }}>
-            No spam. An iMocha expert will contact you within 1 business day.
+            Complete coverage
           </p>
-        )}
+
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <span style={{ fontSize: 52, fontWeight: 900, lineHeight: 1, color: "#FD5A0F", letterSpacing: "-2px" }}>
+              100%
+            </span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.25, maxWidth: 620 }}>
+              career-site coverage at <span style={{ color: "#FDBB96" }}>{company}</span> — all {analysedCount} open roles fully analysed for AI automation readiness.
+            </span>
+          </div>
+
+          <p style={{ fontSize: 14, color: "#C4B5D0", lineHeight: 1.65, marginBottom: 28, maxWidth: 620 }}>
+            Every role at {company} has been scored, ranked, and mapped to AI-powered skill assessments. Want iMocha&apos;s concierge walk-through to plan the rollout — priority roles, time-to-hire impact, and where to start first?
+          </p>
+
+          {done ? (
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 12,
+              background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)",
+              borderRadius: 14, padding: "16px 24px",
+            }}>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+                <path d="M5 13l4 4L19 7" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: "#6EE7B7", marginBottom: 2 }}>
+                  We&apos;ve got your request.
+                </p>
+                <p style={{ fontSize: 13, color: "#A7F3D0" }}>
+                  iMocha will reach out within 1 business day to schedule your walk-through.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                onClick={() => setShowModal(true)}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+                style={{
+                  display:       "inline-flex",
+                  alignItems:    "center",
+                  gap:           8,
+                  padding:       "13px 28px",
+                  borderRadius:  12,
+                  border:        "none",
+                  background:    hovered ? "#e84e0a" : "#FD5A0F",
+                  color:         "#fff",
+                  fontWeight:    700,
+                  fontSize:      15,
+                  cursor:        "pointer",
+                  whiteSpace:    "nowrap",
+                  alignSelf:     "flex-start",
+                  boxShadow:     hovered ? "0 8px 28px rgba(253,90,15,0.5)" : "0 4px 16px rgba(253,90,15,0.3)",
+                  transition:    "background 0.15s, box-shadow 0.15s",
+                  letterSpacing: "-0.2px",
+                }}
+              >
+                Reach out to me
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                  <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", margin: 0 }}>
+                No spam. An iMocha expert will contact you within 1 business day.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {showModal && (
+        <HubSpotModal
+          onClose={() => setShowModal(false)}
+          onSubmitted={handleSubmitted}
+          headline="Book your walk-through"
+          subline={`Get iMocha's concierge rollout plan for all ${analysedCount} roles at ${company}.`}
+        />
+      )}
+    </>
   );
 }
