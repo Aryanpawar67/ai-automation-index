@@ -16,33 +16,11 @@ interface HubSpotModalProps {
 
 const IFRAME_CSS = `
   body, form { background: transparent !important; }
-  label, .hs-form-field > label, .field > label {
-    color: #fff !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-  }
-  input[type="text"], input[type="email"], input[type="tel"],
-  textarea, select {
-    background: rgba(255,255,255,0.1) !important;
-    border: 1px solid rgba(255,255,255,0.2) !important;
-    border-radius: 10px !important;
-    color: #fff !important;
-    padding: 11px 14px !important;
-    font-size: 14px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-  input::placeholder { color: rgba(255,255,255,0.4) !important; }
-  input:focus {
-    border-color: rgba(253,90,15,0.7) !important;
-    background: rgba(255,255,255,0.14) !important;
-    outline: none !important;
-  }
   .hs-button, input[type="submit"] {
     background: #FD5A0F !important;
     color: #fff !important;
     border: none !important;
-    border-radius: 10px !important;
+    border-radius: 8px !important;
     padding: 12px 28px !important;
     font-weight: 700 !important;
     font-size: 14px !important;
@@ -53,21 +31,10 @@ const IFRAME_CSS = `
   .hs-button:hover, input[type="submit"]:hover {
     background: #e84e0a !important;
   }
-  .hs-error-msgs li, .hs-error-msg {
-    color: #f87171 !important;
-    font-size: 12px !important;
-  }
-  .legal-consent-container, .hs-richtext {
-    color: rgba(255,255,255,0.45) !important;
-    font-size: 11px !important;
-  }
-  /* Success state */
-  .submitted-message, .hs-main-font-element {
-    color: #fff !important;
-  }
-  .submitted-message p, .submitted-message h3,
-  .submitted-message span {
-    color: #fff !important;
+  input[type="text"]:focus, input[type="email"]:focus, input[type="tel"]:focus {
+    border-color: #FD5A0F !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(253,90,15,0.15) !important;
   }
 `;
 
@@ -189,111 +156,114 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
           pointerEvents: "auto",
           width:         "100%",
           maxWidth:      480,
-          background:    "linear-gradient(150deg, #1E0035 0%, #2D0050 55%, #1A0028 100%)",
-          border:        "1px solid rgba(253, 90, 15, 0.25)",
+          background:    "#fff",
           borderRadius:  24,
-          boxShadow:     "0 32px 96px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset",
-          padding:       "36px 36px 32px",
+          boxShadow:     "0 32px 96px rgba(0,0,0,0.6)",
+          overflow:      "hidden",
           animation:     "hsModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
-          position:      "relative",
         }}>
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              position:       "absolute",
-              top:            16,
-              right:          16,
-              width:          32,
-              height:         32,
-              borderRadius:   8,
-              border:         "1px solid rgba(255,255,255,0.1)",
-              background:     "rgba(255,255,255,0.06)",
-              color:          "rgba(255,255,255,0.5)",
-              cursor:         "pointer",
-              display:        "flex",
-              alignItems:     "center",
-              justifyContent: "center",
-              transition:     "background 0.15s, color 0.15s",
-              flexShrink:     0,
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.2)";
-              (e.currentTarget as HTMLButtonElement).style.color      = "#FD5A0F";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)";
-              (e.currentTarget as HTMLButtonElement).style.color      = "rgba(255,255,255,0.5)";
-            }}
-          >
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
-              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-
-          {submitted ? (
-            /* Our own success state — fully white, styled to match the modal */
-            <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
-              <div style={{
-                width:          56,
-                height:         56,
-                borderRadius:   "50%",
-                background:     "rgba(16,185,129,0.15)",
-                border:         "1px solid rgba(16,185,129,0.35)",
+          {/* Dark purple header */}
+          <div style={{
+            background: "linear-gradient(150deg, #1E0035 0%, #2D0050 100%)",
+            padding:    "28px 32px 24px",
+            position:   "relative",
+          }}>
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                position:       "absolute",
+                top:            14,
+                right:          14,
+                width:          30,
+                height:         30,
+                borderRadius:   8,
+                border:         "1px solid rgba(255,255,255,0.15)",
+                background:     "rgba(255,255,255,0.1)",
+                color:          "rgba(255,255,255,0.6)",
+                cursor:         "pointer",
                 display:        "flex",
                 alignItems:     "center",
                 justifyContent: "center",
-                margin:         "0 auto 20px",
-              }}>
-                <svg width="26" height="26" fill="none" viewBox="0 0 24 24">
-                  <path d="M5 13l4 4L19 7" stroke="#6EE7B7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                transition:     "background 0.15s, color 0.15s",
+                flexShrink:     0,
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,90,15,0.25)";
+                (e.currentTarget as HTMLButtonElement).style.color      = "#FD5A0F";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.1)";
+                (e.currentTarget as HTMLButtonElement).style.color      = "rgba(255,255,255,0.6)";
+              }}
+            >
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+
+            <h2 style={{
+              fontSize:      22,
+              fontWeight:    800,
+              color:         "#fff",
+              marginBottom:  7,
+              letterSpacing: "-0.4px",
+              lineHeight:    1.25,
+            }}>
+              {headline ?? "Get your full AI analysis"}
+            </h2>
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.6)", lineHeight: 1.55 }}>
+              {subline ?? "An iMocha expert will reach out within 1 business day."}
+            </p>
+          </div>
+
+          {/* Orange accent stripe */}
+          <div style={{ height: 3, background: "linear-gradient(90deg, #FD5A0F 0%, #FF8C42 100%)" }} />
+
+          {/* White form body */}
+          <div style={{ padding: "24px 32px 28px" }}>
+            {submitted ? (
+              <div style={{ textAlign: "center", padding: "20px 0 12px" }}>
+                <div style={{
+                  width:          52,
+                  height:         52,
+                  borderRadius:   "50%",
+                  background:     "rgba(16,185,129,0.1)",
+                  border:         "1px solid rgba(16,185,129,0.3)",
+                  display:        "flex",
+                  alignItems:     "center",
+                  justifyContent: "center",
+                  margin:         "0 auto 18px",
+                }}>
+                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path d="M5 13l4 4L19 7" stroke="#34D399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h3 style={{ fontSize: 19, fontWeight: 800, color: "#1E0035", marginBottom: 8, letterSpacing: "-0.3px" }}>
+                  You&apos;re all set! 🎉
+                </h3>
+                <p style={{ fontSize: 14, color: "#6B7280", lineHeight: 1.6 }}>
+                  An iMocha expert will contact you soon.
+                </p>
               </div>
-              <h3 style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 10, letterSpacing: "-0.3px" }}>
-                You&apos;re all set! 🎉
-              </h3>
-              <p style={{ fontSize: 14, color: "#fff", lineHeight: 1.6, opacity: 0.85 }}>
-                An iMocha expert will contact you soon.
-              </p>
-            </div>
-          ) : (
-            <>
-              <h2 style={{
-                fontSize:      22,
-                fontWeight:    800,
-                color:         "#fff",
-                marginBottom:  8,
-                letterSpacing: "-0.4px",
-                lineHeight:    1.25,
-              }}>
-                {headline ?? "Get your full AI analysis"}
-              </h2>
-
-              <p style={{
-                fontSize:     14,
-                color:        "#C4B5D0",
-                lineHeight:   1.6,
-                marginBottom: 24,
-              }}>
-                {subline ?? "An iMocha expert will reach out within 1 business day."}
-              </p>
-
-              {/* HubSpot form frame */}
-              <div
-                ref={frameRef}
-                className="hs-form-frame"
-                data-region="na1"
-                data-form-id="5a2ff39f-bcf8-435a-be40-c6f0afdba087"
-                data-portal-id="820873"
-              />
-
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 16, textAlign: "center" }}>
-                No spam. Your data is handled per iMocha&apos;s privacy policy.
-              </p>
-            </>
-          )}
+            ) : (
+              <>
+                {/* HubSpot form frame */}
+                <div
+                  ref={frameRef}
+                  className="hs-form-frame"
+                  data-region="na1"
+                  data-form-id="5a2ff39f-bcf8-435a-be40-c6f0afdba087"
+                  data-portal-id="820873"
+                />
+                <p style={{ fontSize: 11, color: "#9B8AAB", marginTop: 14, textAlign: "center" }}>
+                  No spam. Your data is handled per iMocha&apos;s privacy policy.
+                </p>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -309,27 +279,19 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
         /* Fallback overrides for when form renders directly in DOM (non-iframe) */
         .hs-form-frame form,
         .hs-form-frame .hs-form { background: transparent !important; }
-        .hs-form-frame label,
-        .hs-form-frame .hs-form-field > label {
-          color: #fff !important;
-          font-size: 13px !important;
-          font-weight: 600 !important;
-        }
-        .hs-form-frame input[type="text"],
-        .hs-form-frame input[type="email"],
-        .hs-form-frame input[type="tel"] {
-          background: rgba(255,255,255,0.1) !important;
-          border: 1px solid rgba(255,255,255,0.2) !important;
-          border-radius: 10px !important;
-          color: #fff !important;
-          padding: 11px 14px !important;
+        .hs-form-frame input[type="text"]:focus,
+        .hs-form-frame input[type="email"]:focus,
+        .hs-form-frame input[type="tel"]:focus {
+          border-color: #FD5A0F !important;
+          box-shadow: 0 0 0 2px rgba(253,90,15,0.15) !important;
+          outline: none !important;
         }
         .hs-form-frame .hs-button,
         .hs-form-frame input[type="submit"] {
           background: #FD5A0F !important;
           color: #fff !important;
           border: none !important;
-          border-radius: 10px !important;
+          border-radius: 8px !important;
           width: 100% !important;
           padding: 12px 28px !important;
           font-weight: 700 !important;
