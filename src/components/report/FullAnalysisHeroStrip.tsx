@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function FullAnalysisHeroStrip({
   company,
@@ -15,48 +15,55 @@ export default function FullAnalysisHeroStrip({
   analysedCount:  number;
   token:          string;
 }) {
-  const [email,   setEmail]   = useState("");
-  const [state,   setState]   = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [errMsg,  setErrMsg]  = useState("");
-
+  const [state, setState] = useState<"idle" | "done">("idle");
+  const scriptLoaded = useRef(false);
   const remaining = totalAvailable - analysedCount;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setState("loading");
-    setErrMsg("");
-    try {
-      const res = await fetch(
-        `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
-        {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ email }),
-        }
-      );
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        setErrMsg(d.error ?? "Something went wrong. Please try again.");
-        setState("error");
-      } else {
+  useEffect(() => {
+    if (scriptLoaded.current) return;
+    scriptLoaded.current = true;
+
+    const script = document.createElement("script");
+    script.src   = "https://js.hsforms.net/forms/embed/820873.js";
+    script.defer = true;
+    document.head.appendChild(script);
+
+    const handleMessage = (e: MessageEvent) => {
+      if (
+        e.data?.type === "hsFormCallback" &&
+        e.data?.eventName === "onFormSubmitted" &&
+        e.data?.id === "5a2ff39f-bcf8-435a-be40-c6f0afdba087"
+      ) {
+        const email = e.data?.data?.submissionValues?.email;
         setState("done");
+
+        // Mirror submission to our own report_leads table
+        if (email) {
+          fetch(
+            `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
+            {
+              method:  "POST",
+              headers: { "Content-Type": "application/json" },
+              body:    JSON.stringify({ email }),
+            }
+          ).catch(() => {});
+        }
       }
-    } catch {
-      setErrMsg("Network error. Please try again.");
-      setState("error");
-    }
-  };
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [companyId, token]);
 
   return (
     <div style={{
-      background:    "linear-gradient(135deg, #1A0028 0%, #2D0050 45%, #1A0028 100%)",
-      borderRadius:  0,
-      padding:       "40px 0",
-      marginBottom:  0,
+      background:   "linear-gradient(135deg, #1A0028 0%, #2D0050 45%, #1A0028 100%)",
+      borderRadius: 0,
+      padding:      "40px 0",
+      marginBottom: 0,
     }}>
       <div style={{ maxWidth: 1152, margin: "0 auto", padding: "0 24px" }}>
 
-        {/* Top label */}
         <p style={{
           fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
           textTransform: "uppercase", color: "#FDBB96", marginBottom: 12,
@@ -64,7 +71,6 @@ export default function FullAnalysisHeroStrip({
           Full analysis available
         </p>
 
-        {/* Headline row — number inline with sentence so they sit on one line */}
         <p style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.25, marginBottom: 10, maxWidth: 620 }}>
           <span style={{ fontSize: 32, fontWeight: 900, color: "#FD5A0F", letterSpacing: "-2px", lineHeight: 1, verticalAlign: "baseline" }}>
             {totalAvailable}
@@ -72,7 +78,6 @@ export default function FullAnalysisHeroStrip({
           {" "}open roles at <span style={{ color: "#FDBB96" }}>{company}</span> are ready for AI automation analysis.
         </p>
 
-        {/* Sub-copy */}
         <p style={{ fontSize: 14, color: "#C4B5D0", lineHeight: 1.65, marginBottom: 28, maxWidth: 560 }}>
           {analysedCount > 0
             ? `You're viewing ${analysedCount} of the highest-impact roles.${remaining > 0 ? ` Unlock ${remaining} more to reveal the full automation potential hiding across your open positions.` : ""}`
@@ -80,7 +85,6 @@ export default function FullAnalysisHeroStrip({
           }
         </p>
 
-        {/* CTA area */}
         {state === "done" ? (
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 12,
@@ -100,50 +104,17 @@ export default function FullAnalysisHeroStrip({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 280px", maxWidth: 380 }}>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={e => { setEmail(e.target.value); if (state === "error") setState("idle"); }}
-                placeholder="Enter your work email"
-                style={{
-                  width: "100%", padding: "12px 16px",
-                  borderRadius: 10, border: state === "error" ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.15)",
-                  background: "rgba(255,255,255,0.07)", color: "#fff",
-                  fontSize: 14, outline: "none",
-                  boxSizing: "border-box",
-                }}
-                onFocus={e  => { e.currentTarget.style.border = "1px solid rgba(253,90,15,0.6)"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-                onBlur={e   => { e.currentTarget.style.border = state === "error" ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.15)"; e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
-              />
-              {state === "error" && errMsg && (
-                <p style={{ fontSize: 12, color: "#f87171", margin: 0 }}>{errMsg}</p>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={state === "loading"}
-              style={{
-                padding: "12px 24px", borderRadius: 10, border: "none",
-                background: state === "loading" ? "rgba(253,90,15,0.5)" : "#FD5A0F",
-                color: "#fff", fontWeight: 700, fontSize: 14,
-                cursor: state === "loading" ? "not-allowed" : "pointer",
-                whiteSpace: "nowrap", flexShrink: 0,
-                transition: "background 0.15s",
-              }}
-            >
-              {state === "loading" ? "Sending…" : "Reach out to me →"}
-            </button>
-          </form>
-        )}
-
-        {/* Fine print */}
-        {state !== "done" && (
-          <p style={{ fontSize: 11, color: "#fff", marginTop: 12 }}>
-            No spam. An iMocha expert will contact you within 1 business day.
-          </p>
+          <div>
+            <div
+              className="hs-form-frame"
+              data-region="na1"
+              data-form-id="5a2ff39f-bcf8-435a-be40-c6f0afdba087"
+              data-portal-id="820873"
+            />
+            <p style={{ fontSize: 11, color: "#fff", marginTop: 12 }}>
+              No spam. An iMocha expert will contact you within 1 business day.
+            </p>
+          </div>
         )}
       </div>
     </div>
