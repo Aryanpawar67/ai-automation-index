@@ -5,7 +5,7 @@
 // totalAvailable, i.e. the report covers every open role at the company.
 // Also used by the static /report/daman-health page.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
 const HubSpotModal = dynamic(() => import("./HubSpotModal"), { ssr: false });
@@ -24,6 +24,15 @@ export default function CompleteCoverageHeroStrip({
   const [showModal, setShowModal] = useState(false);
   const [done,      setDone]      = useState(false);
   const [hovered,   setHovered]   = useState(false);
+
+  useEffect(() => {
+    if (window.__hsScriptLoaded) return;
+    window.__hsScriptLoaded = true;
+    const s = document.createElement("script");
+    s.src   = "https://js.hsforms.net/forms/embed/820873.js";
+    s.async = true;
+    document.head.appendChild(s);
+  }, []);
 
   const handleSubmitted = (email?: string) => {
     setShowModal(false);

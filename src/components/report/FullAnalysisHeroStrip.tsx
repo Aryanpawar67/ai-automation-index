@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
 const HubSpotModal = dynamic(() => import("./HubSpotModal"), { ssr: false });
@@ -21,6 +21,16 @@ export default function FullAnalysisHeroStrip({
   const [showModal, setShowModal] = useState(false);
   const [done,      setDone]      = useState(false);
   const [hovered,   setHovered]   = useState(false);
+
+  // Preload HubSpot script on mount so the form renders instantly on modal open
+  useEffect(() => {
+    if (window.__hsScriptLoaded) return;
+    window.__hsScriptLoaded = true;
+    const s = document.createElement("script");
+    s.src   = "https://js.hsforms.net/forms/embed/820873.js";
+    s.async = true;
+    document.head.appendChild(s);
+  }, []);
   const remaining = totalAvailable - analysedCount;
 
   const handleSubmitted = (email?: string) => {

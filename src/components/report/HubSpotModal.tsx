@@ -65,14 +65,6 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
 
   // Load HubSpot script once, then watch for iframe insertion to inject styles
   useEffect(() => {
-    if (!window.__hsScriptLoaded) {
-      window.__hsScriptLoaded = true;
-      const script = document.createElement("script");
-      script.src   = "https://js.hsforms.net/forms/embed/820873.js";
-      script.async = true;
-      document.head.appendChild(script);
-    }
-
     // Watch the hs-form-frame container for an iframe being added by HubSpot
     const observer = new MutationObserver(() => {
       const iframe = frameRef.current?.querySelector("iframe") as HTMLIFrameElement | null;
