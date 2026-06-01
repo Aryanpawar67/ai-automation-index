@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 declare global {
@@ -14,8 +14,80 @@ interface HubSpotModalProps {
   subline?:    string;
 }
 
+const IFRAME_CSS = `
+  body, form { background: transparent !important; }
+  label, .hs-form-field > label, .field > label {
+    color: #fff !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+  }
+  input[type="text"], input[type="email"], input[type="tel"],
+  textarea, select {
+    background: rgba(255,255,255,0.1) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    padding: 11px 14px !important;
+    font-size: 14px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  input::placeholder { color: rgba(255,255,255,0.4) !important; }
+  input:focus {
+    border-color: rgba(253,90,15,0.7) !important;
+    background: rgba(255,255,255,0.14) !important;
+    outline: none !important;
+  }
+  .hs-button, input[type="submit"] {
+    background: #FD5A0F !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px 28px !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    width: 100% !important;
+    cursor: pointer !important;
+    margin-top: 8px !important;
+  }
+  .hs-button:hover, input[type="submit"]:hover {
+    background: #e84e0a !important;
+  }
+  .hs-error-msgs li, .hs-error-msg {
+    color: #f87171 !important;
+    font-size: 12px !important;
+  }
+  .legal-consent-container, .hs-richtext {
+    color: rgba(255,255,255,0.45) !important;
+    font-size: 11px !important;
+  }
+  /* Success state */
+  .submitted-message, .hs-main-font-element {
+    color: #fff !important;
+  }
+  .submitted-message p, .submitted-message h3,
+  .submitted-message span {
+    color: #fff !important;
+  }
+`;
+
+function injectIframeStyles(iframe: HTMLIFrameElement) {
+  try {
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    const style = doc.createElement("style");
+    style.textContent = IFRAME_CSS;
+    doc.head.appendChild(style);
+  } catch {
+    // cross-origin guard — silently skip if blocked
+  }
+}
+
 export default function HubSpotModal({ onClose, onSubmitted, headline, subline }: HubSpotModalProps) {
-  const listenerAdded = useRef(false);
+  const [submitted, setSubmitted] = useState(false);
+  const listenerAdded  = useRef(false);
+  const frameRef       = useRef<HTMLDivElement>(null);
+  const submittedEmail = useRef<string | undefined>(undefined);
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -24,18 +96,34 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  // Load HubSpot script once, then watch for iframe insertion to inject styles
   useEffect(() => {
-    // Load script only once across all modal opens — HubSpot uses MutationObserver
-    // to discover newly added .hs-form-frame divs, so no re-add needed.
     if (!window.__hsScriptLoaded) {
       window.__hsScriptLoaded = true;
-      const script   = document.createElement("script");
-      script.src     = "https://js.hsforms.net/forms/embed/820873.js";
-      script.async   = true;
+      const script = document.createElement("script");
+      script.src   = "https://js.hsforms.net/forms/embed/820873.js";
+      script.async = true;
       document.head.appendChild(script);
     }
 
-    if (listenerAdded.current) return;
+    // Watch the hs-form-frame container for an iframe being added by HubSpot
+    const observer = new MutationObserver(() => {
+      const iframe = frameRef.current?.querySelector("iframe") as HTMLIFrameElement | null;
+      if (!iframe) return;
+      observer.disconnect();
+      // Inject immediately if already loaded, else wait for load event
+      if (iframe.contentDocument?.readyState === "complete") {
+        injectIframeStyles(iframe);
+      } else {
+        iframe.addEventListener("load", () => injectIframeStyles(iframe), { once: true });
+      }
+    });
+
+    if (frameRef.current) {
+      observer.observe(frameRef.current, { childList: true, subtree: true });
+    }
+
+    if (listenerAdded.current) return () => observer.disconnect();
     listenerAdded.current = true;
 
     const handleMessage = (e: MessageEvent) => {
@@ -44,13 +132,18 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
         e.data?.eventName === "onFormSubmitted" &&
         e.data?.id        === "5a2ff39f-bcf8-435a-be40-c6f0afdba087"
       ) {
-        const email = e.data?.data?.submissionValues?.email as string | undefined;
-        onSubmitted(email);
+        submittedEmail.current = e.data?.data?.submissionValues?.email as string | undefined;
+        setSubmitted(true);
+        // Close modal and notify parent after brief success display
+        setTimeout(() => onSubmitted(submittedEmail.current), 2000);
       }
     };
 
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("message", handleMessage);
+    };
   }, [onSubmitted]);
 
   // Close on Escape
@@ -140,37 +233,67 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
             </svg>
           </button>
 
-          <h2 style={{
-            fontSize:      22,
-            fontWeight:    800,
-            color:         "#fff",
-            marginBottom:  8,
-            letterSpacing: "-0.4px",
-            lineHeight:    1.25,
-          }}>
-            {headline ?? "Get your full AI analysis"}
-          </h2>
+          {submitted ? (
+            /* Our own success state — fully white, styled to match the modal */
+            <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
+              <div style={{
+                width:          56,
+                height:         56,
+                borderRadius:   "50%",
+                background:     "rgba(16,185,129,0.15)",
+                border:         "1px solid rgba(16,185,129,0.35)",
+                display:        "flex",
+                alignItems:     "center",
+                justifyContent: "center",
+                margin:         "0 auto 20px",
+              }}>
+                <svg width="26" height="26" fill="none" viewBox="0 0 24 24">
+                  <path d="M5 13l4 4L19 7" stroke="#6EE7B7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <h3 style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 10, letterSpacing: "-0.3px" }}>
+                You&apos;re all set! 🎉
+              </h3>
+              <p style={{ fontSize: 14, color: "#fff", lineHeight: 1.6, opacity: 0.85 }}>
+                An iMocha expert will contact you soon.
+              </p>
+            </div>
+          ) : (
+            <>
+              <h2 style={{
+                fontSize:      22,
+                fontWeight:    800,
+                color:         "#fff",
+                marginBottom:  8,
+                letterSpacing: "-0.4px",
+                lineHeight:    1.25,
+              }}>
+                {headline ?? "Get your full AI analysis"}
+              </h2>
 
-          <p style={{
-            fontSize:     14,
-            color:        "#C4B5D0",
-            lineHeight:   1.6,
-            marginBottom: 24,
-          }}>
-            {subline ?? "An iMocha expert will reach out within 1 business day."}
-          </p>
+              <p style={{
+                fontSize:     14,
+                color:        "#C4B5D0",
+                lineHeight:   1.6,
+                marginBottom: 24,
+              }}>
+                {subline ?? "An iMocha expert will reach out within 1 business day."}
+              </p>
 
-          {/* HubSpot form frame */}
-          <div
-            className="hs-form-frame"
-            data-region="na1"
-            data-form-id="5a2ff39f-bcf8-435a-be40-c6f0afdba087"
-            data-portal-id="820873"
-          />
+              {/* HubSpot form frame */}
+              <div
+                ref={frameRef}
+                className="hs-form-frame"
+                data-region="na1"
+                data-form-id="5a2ff39f-bcf8-435a-be40-c6f0afdba087"
+                data-portal-id="820873"
+              />
 
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 16, textAlign: "center" }}>
-            No spam. Your data is handled per iMocha&apos;s privacy policy.
-          </p>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 16, textAlign: "center" }}>
+                No spam. Your data is handled per iMocha&apos;s privacy policy.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -183,50 +306,23 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
           from { opacity: 0; transform: translateY(16px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-
-        /* ── HubSpot form overrides for dark modal ── */
+        /* Fallback overrides for when form renders directly in DOM (non-iframe) */
         .hs-form-frame form,
-        .hs-form-frame .hs-form {
-          background: transparent !important;
-        }
-        .hs-form-frame .hs-form-field > label,
-        .hs-form-frame label {
-          color: rgba(255,255,255,0.75) !important;
+        .hs-form-frame .hs-form { background: transparent !important; }
+        .hs-form-frame label,
+        .hs-form-frame .hs-form-field > label {
+          color: #fff !important;
           font-size: 13px !important;
           font-weight: 600 !important;
-          margin-bottom: 6px !important;
         }
         .hs-form-frame input[type="text"],
         .hs-form-frame input[type="email"],
-        .hs-form-frame input[type="tel"],
-        .hs-form-frame textarea,
-        .hs-form-frame select {
-          background: rgba(255,255,255,0.08) !important;
-          border: 1px solid rgba(255,255,255,0.15) !important;
+        .hs-form-frame input[type="tel"] {
+          background: rgba(255,255,255,0.1) !important;
+          border: 1px solid rgba(255,255,255,0.2) !important;
           border-radius: 10px !important;
           color: #fff !important;
           padding: 11px 14px !important;
-          font-size: 14px !important;
-          width: 100% !important;
-          box-sizing: border-box !important;
-          transition: border 0.15s, background 0.15s !important;
-        }
-        .hs-form-frame input[type="text"]::placeholder,
-        .hs-form-frame input[type="email"]::placeholder,
-        .hs-form-frame input[type="tel"]::placeholder {
-          color: rgba(255,255,255,0.35) !important;
-        }
-        .hs-form-frame input[type="text"]:focus,
-        .hs-form-frame input[type="email"]:focus,
-        .hs-form-frame input[type="tel"]:focus {
-          border-color: rgba(253,90,15,0.6) !important;
-          background: rgba(255,255,255,0.12) !important;
-          outline: none !important;
-        }
-        .hs-form-frame .hs-error-msgs,
-        .hs-form-frame .hs-error-msg {
-          color: #f87171 !important;
-          font-size: 12px !important;
         }
         .hs-form-frame .hs-button,
         .hs-form-frame input[type="submit"] {
@@ -234,28 +330,10 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
           color: #fff !important;
           border: none !important;
           border-radius: 10px !important;
+          width: 100% !important;
           padding: 12px 28px !important;
           font-weight: 700 !important;
-          font-size: 14px !important;
-          width: 100% !important;
           cursor: pointer !important;
-          transition: background 0.15s !important;
-          margin-top: 8px !important;
-        }
-        .hs-form-frame .hs-button:hover,
-        .hs-form-frame input[type="submit"]:hover {
-          background: #e84e0a !important;
-        }
-        .hs-form-frame .hs-recaptcha {
-          margin-top: 12px !important;
-        }
-        .hs-form-frame .legal-consent-container,
-        .hs-form-frame .hs-richtext {
-          color: rgba(255,255,255,0.45) !important;
-          font-size: 11px !important;
-        }
-        .hs-form-frame .hs-form-iframe {
-          border-radius: 12px !important;
         }
       `}</style>
     </>
