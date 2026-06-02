@@ -43,7 +43,7 @@ export default function DownloadRolePdfButton({
     if (inputOpen) setTimeout(() => inputRef.current?.focus(), 60);
   }, [inputOpen]);
 
-  const triggerDownload = async () => {
+  const triggerDownload = async (email?: string) => {
     setState("loading");
     try {
       const res = await fetch(
@@ -61,7 +61,7 @@ export default function DownloadRolePdfButton({
 
       track("report_downloaded",
         { token, companySlug, reportType: "hub", jobTitle: title },
-        { source: "role_card" },
+        { source: "role_card", ...(email ? { email } : {}) },
       );
 
       setState("done");
@@ -86,15 +86,14 @@ export default function DownloadRolePdfButton({
       setEmailError("Valid email required");
       return;
     }
-    // Save lead fire-and-forget — full verification (Reoon) to be added next session
     fetch(
       `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: trimmed }) }
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: trimmed, source: "download" }) }
     ).catch(() => {});
 
     setGated(true);
     setInputOpen(false);
-    triggerDownload();
+    triggerDownload(trimmed);
   };
 
   const isDone    = state === "done";

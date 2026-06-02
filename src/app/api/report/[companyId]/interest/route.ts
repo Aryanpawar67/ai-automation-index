@@ -28,14 +28,15 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const body = await req.json().catch(() => ({})) as { email?: string };
-  const email = (body.email ?? "").trim().toLowerCase();
+  const body   = await req.json().catch(() => ({})) as { email?: string; source?: string };
+  const email  = (body.email ?? "").trim().toLowerCase();
+  const source = body.source === "download" ? "download" : "cta";
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Valid email required." }, { status: 400 });
   }
 
-  await db.insert(reportLeads).values({ companyId, email });
+  await db.insert(reportLeads).values({ companyId, email, source });
 
   return NextResponse.json({ ok: true });
 }

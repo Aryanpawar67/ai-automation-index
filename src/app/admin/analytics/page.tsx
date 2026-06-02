@@ -35,6 +35,38 @@ export default async function AnalyticsIndexPage({
 
   // Per-company aggregation. The top_location subquery picks the city+country
   // pair with the most events for that company (NULL when no geo data exists).
+  // Individual download events with email — shown in the Download Events section.
+  // email lives in props->>'email' for both role_card (after our change) and report_page.
+  const dlDateFilter = days
+    ? sql`AND e.created_at >= NOW() - (${days} || ' days')::interval`
+    : sql``;
+
+  const dlEvents = await db.execute(sql`
+    SELECT
+      e.id                        AS "id",
+      c.name                      AS "company",
+      e.job_title                 AS "jobTitle",
+      e.props->>'source'          AS "source",
+      e.props->>'email'           AS "email",
+      e.created_at                AS "createdAt"
+    FROM report_events e
+    JOIN companies c ON c.id = e.company_id
+    WHERE e.event = 'report_downloaded'
+      ${dlDateFilter}
+    ORDER BY e.created_at DESC
+    LIMIT 200
+  `);
+
+  type DlEvent = { id: string; company: string; jobTitle: string | null; source: string | null; email: string | null; createdAt: string };
+  const downloadEvents = dlEvents.rows as unknown as DlEvent[];
+
+  const fmtDlDate = (iso: string): string =>
+    new Date(iso).toLocaleString("en-GB", {
+      day: "numeric", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+      timeZone: "Asia/Kolkata",
+    });
+
   const result = await db.execute(sql`
     SELECT
       c.id                                                  AS "companyId",
@@ -156,6 +188,77 @@ export default async function AnalyticsIndexPage({
       ) : (
         <AnalyticsCompanyTable rows={rows} range={range} />
       )}
+
+      {/* ── Download Events ──────────────────────────────────────── */}
+      <div style={{ marginTop: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#220133", margin: 0 }}>
+            Download Events
+          </h2>
+          <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 20, background: "#EEF2FF", color: "#4F46E5" }}>
+            {downloadEvents.length}
+          </span>
+          <span style={{ fontSize: 12, color: "#9988AA", marginLeft: 4 }}>
+            — every PDF download with the email that unlocked it
+          </span>
+        </div>
+
+        {downloadEvents.length === 0 ? (
+          <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "32px 24px", textAlign: "center", fontSize: 13, color: "#9988AA" }}>
+            No download events yet in this range.
+          </div>
+        ) : (
+          <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, boxShadow: "0 2px 12px rgba(34,1,51,0.05)", overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #EAE4EF", background: "#FAF8FC" }}>
+                  {["Type", "Email", "Company", "Role / Report", "Date"].map(h => (
+                    <th key={h} style={{ padding: "12px 24px", textAlign: "left", fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#9988AA" }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {downloadEvents.map((ev, i) => (
+                  <tr key={ev.id} style={{ borderBottom: i < downloadEvents.length - 1 ? "1px solid #EAE4EF" : "none" }} className="dl-ev-row">
+                    <td style={{ padding: "14px 24px" }}>
+                      {ev.source === "role_card" ? (
+                        <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: "#EEF2FF", color: "#4F46E5" }}>Card</span>
+                      ) : (
+                        <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: "#F0FDF4", color: "#059669" }}>Page</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "14px 24px" }}>
+                      {ev.email ? (
+                        <a href={`mailto:${ev.email}`} style={{ fontSize: 14, color: "#FD5A0F", fontWeight: 500, textDecoration: "none" }} className="dl-ev-email">
+                          {ev.email}
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: 13, color: "#C4B5D0" }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "14px 24px", fontSize: 14, color: "#220133", fontWeight: 600 }}>
+                      {ev.company}
+                    </td>
+                    <td style={{ padding: "14px 24px", fontSize: 13, color: "#5C4D6E" }}>
+                      {ev.jobTitle ?? "—"}
+                    </td>
+                    <td style={{ padding: "14px 24px", fontSize: 13, color: "#9988AA", whiteSpace: "nowrap" }}>
+                      {fmtDlDate(ev.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        .dl-ev-row:hover { background: #FAF8FC; }
+        .dl-ev-email:hover { text-decoration: underline !important; }
+      `}</style>
     </div>
   );
 }

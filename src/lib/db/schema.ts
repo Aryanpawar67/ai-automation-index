@@ -127,6 +127,7 @@ export const reportLeads = pgTable("report_leads", {
   id:        uuid("id").primaryKey().defaultRandom(),
   companyId: uuid("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   email:     text("email").notNull(),
+  source:    text("source").notNull().default("cta"),  // "cta" = hero CTA, "download" = role-card PDF gate
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
