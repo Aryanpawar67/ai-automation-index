@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 declare global {
-  interface Window { __hsScriptLoaded?: boolean; }
+  interface Window {
+    __hsScriptLoaded?: boolean;
+    hbspt?: { forms: { create: (opts: Record<string, unknown>) => void } };
+  }
 }
 
 interface HubSpotModalProps {
@@ -63,14 +66,32 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  // Load HubSpot script once, then watch for iframe insertion to inject styles
+  // Explicitly call hbspt.forms.create() as a backup for HubSpot's built-in
+  // hs-form-frame auto-detection (which works but can race with dynamic mounting).
   useEffect(() => {
-    // Watch the hs-form-frame container for an iframe being added by HubSpot
+    const tryCreate = () => {
+      if (!window.hbspt || !frameRef.current) return false;
+      if (frameRef.current.hasChildNodes()) return true; // auto-detect already fired
+      window.hbspt.forms.create({
+        portalId: "820873",
+        formId:   "5a2ff39f-bcf8-435a-be40-c6f0afdba087",
+        target:   "#hs-form-target",
+      });
+      return true;
+    };
+
+    if (!tryCreate()) {
+      const poll = setInterval(() => { if (tryCreate()) clearInterval(poll); }, 100);
+      return () => clearInterval(poll);
+    }
+  }, []);
+
+  // Watch for iframe insertion to inject brand styles, and listen for form submission.
+  useEffect(() => {
     const observer = new MutationObserver(() => {
       const iframe = frameRef.current?.querySelector("iframe") as HTMLIFrameElement | null;
       if (!iframe) return;
       observer.disconnect();
-      // Inject immediately if already loaded, else wait for load event
       if (iframe.contentDocument?.readyState === "complete") {
         injectIframeStyles(iframe);
       } else {
@@ -86,6 +107,11 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
     listenerAdded.current = true;
 
     const handleMessage = (e: MessageEvent) => {
+      // Debug: log all HubSpot callbacks so we can verify the email extraction path
+      if (e.data?.type === "hsFormCallback") {
+        console.log("[HubSpot postMessage]", JSON.stringify(e.data));
+      }
+
       if (
         e.data?.type      === "hsFormCallback" &&
         e.data?.eventName === "onFormSubmitted" &&
@@ -93,7 +119,6 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
       ) {
         submittedEmail.current = e.data?.data?.submissionValues?.email as string | undefined;
         setSubmitted(true);
-        // Close modal and notify parent after brief success display
         setTimeout(() => onSubmitted(submittedEmail.current), 2000);
       }
     };
@@ -242,9 +267,10 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
               </div>
             ) : (
               <>
-                {/* HubSpot form frame */}
+                {/* HubSpot form target — populated by hbspt.forms.create() in useEffect */}
                 <div
                   ref={frameRef}
+                  id="hs-form-target"
                   className="hs-form-frame"
                   data-region="na1"
                   data-form-id="5a2ff39f-bcf8-435a-be40-c6f0afdba087"

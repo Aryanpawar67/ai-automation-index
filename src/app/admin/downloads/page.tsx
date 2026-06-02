@@ -32,39 +32,14 @@ export default async function DownloadsPage() {
       .orderBy(desc(reportLeads.createdAt)),
   ]);
 
-  // Merge into a single sorted array for the client toggle component
-  const rows: DownloadRow[] = [
-    ...cardRows.map(r => ({
-      id:          r.id,
-      type:        "card" as const,
-      email:       r.email,
-      companyName: r.companyName ?? null,
-      reportSlug:  null,
-      referrer:    null,
-      date:        fmt(new Date(r.createdAt)),
-      deletableId: null,
-    })),
-    ...pageRows.map(r => ({
-      id:          r.id,
-      type:        "page" as const,
-      email:       r.email,
-      companyName: r.companyName ?? null,
-      reportSlug:  r.reportSlug ?? null,
-      referrer:    r.referrer ?? null,
-      date:        fmt(new Date(r.downloadedAt)),
-      deletableId: r.id,
-    })),
-    ...ctaRows.map(r => ({
-      id:          r.id,
-      type:        "cta" as const,
-      email:       r.email,
-      companyName: r.companyName ?? null,
-      reportSlug:  null,
-      referrer:    null,
-      date:        fmt(new Date(r.createdAt)),
-      deletableId: null,
-    })),
-  ].sort((a, b) => b.date.localeCompare(a.date));
+  // Merge into a single array, sort by raw timestamp, then format dates for display
+  const merged = [
+    ...cardRows.map(r => ({ id: r.id, type: "card" as const, email: r.email, companyName: r.companyName ?? null, reportSlug: null as string | null, referrer: null as string | null, deletableId: null as string | null, ts: new Date(r.createdAt).getTime() })),
+    ...pageRows.map(r => ({ id: r.id, type: "page" as const, email: r.email, companyName: r.companyName ?? null, reportSlug: r.reportSlug ?? null, referrer: r.referrer ?? null, deletableId: r.id,           ts: new Date(r.downloadedAt).getTime() })),
+    ...ctaRows.map(r => ({  id: r.id, type: "cta"  as const, email: r.email, companyName: r.companyName ?? null, reportSlug: null as string | null, referrer: null as string | null, deletableId: null as string | null, ts: new Date(r.createdAt).getTime() })),
+  ].sort((a, b) => b.ts - a.ts);
+
+  const rows: DownloadRow[] = merged.map(({ ts: _ts, ...r }) => ({ ...r, date: fmt(new Date(_ts)) }));
 
   const total = rows.length;
 

@@ -22,14 +22,31 @@ export default function FullAnalysisHeroStrip({
   const [done,      setDone]      = useState(false);
   const [hovered,   setHovered]   = useState(false);
 
-  // Preload HubSpot script on mount so the form renders instantly on modal open
+  // Load HubSpot script + pre-render form in a hidden div so modal opens instantly
   useEffect(() => {
-    if (window.__hsScriptLoaded) return;
-    window.__hsScriptLoaded = true;
-    const s = document.createElement("script");
-    s.src   = "https://js.hsforms.net/forms/embed/820873.js";
-    s.async = true;
-    document.head.appendChild(s);
+    const tryPreload = () => {
+      if (!window.hbspt) return false;
+      const container = document.getElementById("hs-preload-form");
+      if (!container || container.hasChildNodes()) return true;
+      window.hbspt.forms.create({
+        portalId: "820873",
+        formId:   "5a2ff39f-bcf8-435a-be40-c6f0afdba087",
+        target:   "#hs-preload-form",
+      });
+      return true;
+    };
+
+    if (!window.__hsScriptLoaded) {
+      window.__hsScriptLoaded = true;
+      const s = document.createElement("script");
+      s.src     = "https://js.hsforms.net/forms/embed/820873.js";
+      s.async   = true;
+      s.onload  = () => { tryPreload(); };
+      document.head.appendChild(s);
+    } else if (!tryPreload()) {
+      const poll = setInterval(() => { if (tryPreload()) clearInterval(poll); }, 100);
+      return () => clearInterval(poll);
+    }
   }, []);
   const remaining = totalAvailable - analysedCount;
 
@@ -134,6 +151,9 @@ export default function FullAnalysisHeroStrip({
           )}
         </div>
       </div>
+
+      {/* Off-screen pre-render target — form initialises here before modal opens */}
+      <div id="hs-preload-form" style={{ position: "fixed", left: -9999, top: -9999, visibility: "hidden", pointerEvents: "none" }} aria-hidden />
 
       {showModal && (
         <HubSpotModal

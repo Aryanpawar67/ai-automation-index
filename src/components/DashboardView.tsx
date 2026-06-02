@@ -173,7 +173,7 @@ export default function DashboardView({
   // Email gate state
   const [headerEmail, setHeaderEmail]       = useState("");
   const [emailSubmitted, setEmailSubmitted] = useState(false);
-  const [emailValidating, setEmailValidating] = useState(false);
+  const [emailValidating] = useState(false);
   const [emailError, setEmailError]         = useState("");
   const [emailHighlight, setEmailHighlight] = useState(false);
   const [emailHint, setEmailHint]           = useState(false);
@@ -349,34 +349,16 @@ export default function DashboardView({
     setEmailHighlight(true);
   };
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const email = headerEmail.trim().toLowerCase();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setEmailError("Enter a valid email");
       return;
     }
-    setEmailValidating(true);
     setEmailError("");
-    try {
-      const res = await fetch("/api/preview/validate-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json() as { ok?: boolean; error?: string };
-      if (!res.ok) {
-        setEmailError(data.error ?? "Invalid email");
-        setEmailValidating(false);
-        return;
-      }
-      setEmailSubmitted(true);
-      setEmailValidating(false);
-      setTimeout(() => triggerDownload(), 600);
-    } catch {
-      setEmailError("Something went wrong. Try again.");
-      setEmailValidating(false);
-    }
+    setEmailSubmitted(true);
+    setTimeout(() => triggerDownload(), 600);
   };
 
   const tasksHigh   = analysis.tasks.filter(t => t.automationPotential === "high").length;
