@@ -20,7 +20,6 @@ export default function DownloadRolePdfButton({
   const [hovered,    setHovered]    = useState(false);
   const [gated,      setGated]      = useState(false);
   const [inputOpen,  setInputOpen]  = useState(false);
-  const [validating, setValidating] = useState(false);
   const [emailError, setEmailError] = useState("");
 
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -87,30 +86,15 @@ export default function DownloadRolePdfButton({
       setEmailError("Valid email required");
       return;
     }
-    setValidating(true);
-    setEmailError("");
-    try {
-      const vRes  = await fetch("/api/preview/validate-email", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email: trimmed }),
-      });
-      const vData = await vRes.json();
-      if (!vRes.ok) { setEmailError(vData.error ?? "Invalid email"); return; }
+    // Save lead fire-and-forget — full verification (Reoon) to be added next session
+    fetch(
+      `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: trimmed }) }
+    ).catch(() => {});
 
-      fetch(
-        `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: trimmed }) }
-      ).catch(() => {});
-
-      setGated(true);
-      setInputOpen(false);
-      triggerDownload();
-    } catch {
-      setEmailError("Try again.");
-    } finally {
-      setValidating(false);
-    }
+    setGated(true);
+    setInputOpen(false);
+    triggerDownload();
   };
 
   const isDone    = state === "done";
@@ -138,7 +122,6 @@ export default function DownloadRolePdfButton({
             defaultValue=""
             placeholder="work email"
             autoComplete="email"
-            disabled={validating}
             style={{
               height:       30,
               padding:      "0 10px",
@@ -158,34 +141,26 @@ export default function DownloadRolePdfButton({
           />
           <button
             type="submit"
-            disabled={validating}
             style={{
               height:        30,
               padding:       "0 10px",
               borderRadius:  "0 8px 8px 0",
               border:        `1.5px solid ${emailError ? "#f87171" : "#FD5A0F"}`,
               borderLeft:    "none",
-              background:    validating ? "rgba(253,90,15,0.5)" : "#FD5A0F",
+              background:    "#FD5A0F",
               color:         "#fff",
               fontSize:      11,
               fontWeight:    700,
-              cursor:        validating ? "not-allowed" : "pointer",
+              cursor:        "pointer",
               display:       "flex",
               alignItems:    "center",
               justifyContent:"center",
               flexShrink:    0,
             }}
           >
-            {validating ? (
-              <svg style={{ animation: "rolePdfSpin 0.8s linear infinite" }} width="11" height="11" fill="none" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.4"/>
-                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-            ) : (
-              <svg width="11" height="11" fill="none" viewBox="0 0 24 24">
-                <path d="M12 2v10m0 0l-3-3m3 3l3-3M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
+            <svg width="11" height="11" fill="none" viewBox="0 0 24 24">
+              <path d="M12 2v10m0 0l-3-3m3 3l3-3M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
         </form>
 
