@@ -80,7 +80,7 @@ export default function DownloadRolePdfButton({
     setShowPopover(v => !v);
   };
 
-  const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEmailSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const val     = inputRef.current?.value ?? "";
     const trimmed = val.trim().toLowerCase();
