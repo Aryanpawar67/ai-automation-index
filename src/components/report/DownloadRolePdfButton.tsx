@@ -16,18 +16,17 @@ export default function DownloadRolePdfButton({
   title:       string;
   companySlug: string;
 }) {
-  const [state,      setState]      = useState<"idle" | "loading" | "done">("idle");
-  const [hovered,    setHovered]    = useState(false);
-  const [gated,      setGated]      = useState(false);
-  const [showPopover,setShowPopover]= useState(false);
-  const [email,      setEmail]      = useState("");
-  const [validating, setValidating] = useState(false);
-  const [emailError, setEmailError] = useState("");
+  const [state,       setState]       = useState<"idle" | "loading" | "done">("idle");
+  const [hovered,     setHovered]     = useState(false);
+  const [gated,       setGated]       = useState(false);
+  const [showPopover, setShowPopover] = useState(false);
+  const [validating,  setValidating]  = useState(false);
+  const [emailError,  setEmailError]  = useState("");
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
 
-  // Close popover on outside click
+  // Close on outside click
   useEffect(() => {
     if (!showPopover) return;
     const handler = (e: MouseEvent) => {
@@ -40,9 +39,9 @@ export default function DownloadRolePdfButton({
     return () => document.removeEventListener("mousedown", handler);
   }, [showPopover]);
 
-  // Focus input when popover opens
+  // Auto-focus input when popover opens
   useEffect(() => {
-    if (showPopover) setTimeout(() => inputRef.current?.focus(), 50);
+    if (showPopover) setTimeout(() => inputRef.current?.focus(), 60);
   }, [showPopover]);
 
   const triggerDownload = async () => {
@@ -77,16 +76,14 @@ export default function DownloadRolePdfButton({
     e.preventDefault();
     e.stopPropagation();
     if (state !== "idle") return;
-    if (gated) {
-      triggerDownload();
-    } else {
-      setShowPopover(v => !v);
-    }
+    if (gated) { triggerDownload(); return; }
+    setShowPopover(v => !v);
   };
 
   const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const val     = inputRef.current?.value ?? "";
+    const trimmed = val.trim().toLowerCase();
     if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       setEmailError("Enter a valid email");
       return;
@@ -94,16 +91,16 @@ export default function DownloadRolePdfButton({
     setValidating(true);
     setEmailError("");
     try {
-      const vRes = await fetch("/api/preview/validate-email", {
+      const vRes  = await fetch("/api/preview/validate-email", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email: trimmed }),
       });
       const vData = await vRes.json();
-      if (!vRes.ok) { setEmailError(vData.error ?? "Invalid email"); setValidating(false); return; }
+      if (!vRes.ok) { setEmailError(vData.error ?? "Invalid email"); return; }
 
-      // Save lead
-      await fetch(
+      // Save lead fire-and-forget
+      fetch(
         `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: trimmed }) }
       ).catch(() => {});
@@ -120,10 +117,9 @@ export default function DownloadRolePdfButton({
 
   const isDone    = state === "done";
   const isLoading = state === "loading";
-
-  const bg    = isDone ? "#ecfdf5" : hovered && !isLoading ? "#FD5A0F" : "#FFF0EA";
-  const color = isDone ? "#059669" : hovered && !isLoading ? "#fff"    : "#FD5A0F";
-  const border = isDone ? "1px solid #a7f3d0" : "1px solid #FDBB96";
+  const bg        = isDone ? "#ecfdf5" : hovered && !isLoading ? "#FD5A0F" : "#FFF0EA";
+  const color     = isDone ? "#059669" : hovered && !isLoading ? "#fff"    : "#FD5A0F";
+  const border    = isDone ? "1px solid #a7f3d0" : "1px solid #FDBB96";
 
   return (
     <div ref={wrapperRef} style={{ position: "relative" }}>
@@ -146,11 +142,10 @@ export default function DownloadRolePdfButton({
       >
         {isLoading ? (
           <>
-            <svg style={{ animation: "spin 0.8s linear infinite" }} width="12" height="12" fill="none" viewBox="0 0 24 24">
+            <svg style={{ animation: "rolePdfSpin 0.8s linear infinite" }} width="12" height="12" fill="none" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.25"/>
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
-            <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
           </>
         ) : isDone ? (
           <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
@@ -166,43 +161,65 @@ export default function DownloadRolePdfButton({
 
       {showPopover && (
         <div
+          onMouseDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
           style={{
-            position:    "absolute",
-            top:         "calc(100% + 8px)",
-            right:       0,
-            zIndex:      100,
-            width:       272,
-            background:  "#fff",
-            border:      "1px solid #FDBB96",
+            position:     "absolute",
+            top:          "50%",
+            right:        "calc(100% + 10px)",
+            transform:    "translateY(-50%)",
+            zIndex:       200,
+            width:        264,
+            background:   "#fff",
+            border:       "1px solid #FDBB96",
             borderRadius: 12,
-            boxShadow:   "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(253,90,15,0.08)",
-            padding:     "14px 14px 12px",
-            animation:   "popoverIn 0.15s cubic-bezier(0.16,1,0.3,1) both",
+            boxShadow:    "0 8px 32px rgba(0,0,0,0.13), 0 2px 8px rgba(253,90,15,0.08)",
+            padding:      "14px 14px 12px",
+            animation:    "rolePdfPopoverIn 0.18s cubic-bezier(0.16,1,0.3,1) both",
           }}
         >
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#1E0035", marginBottom: 4 }}>
-            Enter your work email to download
+          {/* Arrow pointing right toward button */}
+          <div style={{
+            position:    "absolute",
+            top:         "50%",
+            right:       -6,
+            transform:   "translateY(-50%) rotate(45deg)",
+            width:       10,
+            height:      10,
+            background:  "#fff",
+            border:      "1px solid #FDBB96",
+            borderLeft:  "none",
+            borderBottom: "none",
+          }} />
+
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#1E0035", marginBottom: 3 }}>
+            Enter your work email
           </p>
           <p style={{ fontSize: 11, color: "#9B8AAB", marginBottom: 10, lineHeight: 1.45 }}>
             Free. An iMocha expert may follow up.
           </p>
+
           <form onSubmit={handleEmailSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <input
               ref={inputRef}
               type="email"
-              value={email}
-              onChange={e => { setEmail(e.target.value); setEmailError(""); }}
+              defaultValue=""
               placeholder="you@company.com"
+              autoComplete="email"
               style={{
-                width: "100%", padding: "8px 10px", fontSize: 13,
-                border: `1.5px solid ${emailError ? "#f87171" : "#DDD0E8"}`,
-                borderRadius: 8, color: "#1E0035", outline: "none",
-                background: "#F8F4FC", boxSizing: "border-box",
-                transition: "border-color 0.15s",
+                width:       "100%",
+                padding:     "8px 10px",
+                fontSize:    13,
+                border:      `1.5px solid ${emailError ? "#f87171" : "#DDD0E8"}`,
+                borderRadius: 8,
+                color:       "#1E0035",
+                outline:     "none",
+                background:  "#F8F4FC",
+                boxSizing:   "border-box",
               }}
-              onFocus={e  => (e.target.style.borderColor = emailError ? "#f87171" : "#FD5A0F")}
-              onBlur={e   => (e.target.style.borderColor = emailError ? "#f87171" : "#DDD0E8")}
+              onFocus={e  => { e.currentTarget.style.borderColor = emailError ? "#f87171" : "#FD5A0F"; }}
+              onBlur={e   => { e.currentTarget.style.borderColor = emailError ? "#f87171" : "#DDD0E8"; }}
+              onChange={() => { if (emailError) setEmailError(""); }}
             />
             {emailError && (
               <p style={{ fontSize: 11, color: "#f87171", margin: "-4px 0 0" }}>{emailError}</p>
@@ -211,24 +228,33 @@ export default function DownloadRolePdfButton({
               type="submit"
               disabled={validating}
               style={{
-                width: "100%", padding: "8px 0", borderRadius: 8, border: "none",
-                background: validating ? "rgba(253,90,15,0.5)" : "#FD5A0F",
-                color: "#fff", fontSize: 13, fontWeight: 700,
-                cursor: validating ? "not-allowed" : "pointer",
-                transition: "background 0.15s",
+                width:        "100%",
+                padding:      "8px 0",
+                borderRadius: 8,
+                border:       "none",
+                background:   validating ? "rgba(253,90,15,0.5)" : "#FD5A0F",
+                color:        "#fff",
+                fontSize:     13,
+                fontWeight:   700,
+                cursor:       validating ? "not-allowed" : "pointer",
               }}
             >
               {validating ? "Checking…" : "Download PDF →"}
             </button>
           </form>
-          <style>{`
-            @keyframes popoverIn {
-              from { opacity: 0; transform: translateY(-6px) scale(0.97); }
-              to   { opacity: 1; transform: translateY(0) scale(1); }
-            }
-          `}</style>
         </div>
       )}
+
+      <style>{`
+        @keyframes rolePdfSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes rolePdfPopoverIn {
+          from { opacity: 0; transform: translateY(-50%) translateX(8px); }
+          to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+        }
+      `}</style>
     </div>
   );
 }
