@@ -86,7 +86,15 @@ export default function DownloadRolePdfButton({
       setEmailError("Valid email required");
       return;
     }
-    // Save lead fire-and-forget — full verification (Reoon) to be added next session
+    // TODO(reoon): call Reoon SMTP verification before saving lead
+    // GET https://emailvalidation.reoon.com/api/v1/verify?email=<trimmed>&key=<REOON_API_KEY>&mode=power
+    // - if status === "valid"   → proceed
+    // - if status === "invalid" → setEmailError("Email doesn't exist. Try another."); return;
+    // - if status === "disposable" → setEmailError("Please use a work email."); return;
+    // - on network error         → proceed anyway (don't block the user)
+    // Store key in Railway env as REOON_API_KEY (free tier: 100/day)
+    // Move the fetch call to a server-side route (/api/report/verify-email) to keep the key secret
+
     fetch(
       `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: trimmed }) }
