@@ -16,33 +16,33 @@ export default function DownloadRolePdfButton({
   title:       string;
   companySlug: string;
 }) {
-  const [state,       setState]       = useState<"idle" | "loading" | "done">("idle");
-  const [hovered,     setHovered]     = useState(false);
-  const [gated,       setGated]       = useState(false);
-  const [showPopover, setShowPopover] = useState(false);
-  const [validating,  setValidating]  = useState(false);
-  const [emailError,  setEmailError]  = useState("");
+  const [state,      setState]      = useState<"idle" | "loading" | "done">("idle");
+  const [hovered,    setHovered]    = useState(false);
+  const [gated,      setGated]      = useState(false);
+  const [inputOpen,  setInputOpen]  = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
 
-  // Close on outside click
+  // Close input on outside click
   useEffect(() => {
-    if (!showPopover) return;
+    if (!inputOpen) return;
     const handler = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setShowPopover(false);
+        setInputOpen(false);
         setEmailError("");
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [showPopover]);
+  }, [inputOpen]);
 
-  // Auto-focus input when popover opens
+  // Auto-focus when input expands
   useEffect(() => {
-    if (showPopover) setTimeout(() => inputRef.current?.focus(), 60);
-  }, [showPopover]);
+    if (inputOpen) setTimeout(() => inputRef.current?.focus(), 60);
+  }, [inputOpen]);
 
   const triggerDownload = async () => {
     setState("loading");
@@ -77,15 +77,14 @@ export default function DownloadRolePdfButton({
     e.stopPropagation();
     if (state !== "idle") return;
     if (gated) { triggerDownload(); return; }
-    setShowPopover(v => !v);
+    setInputOpen(true);
   };
 
   const handleEmailSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const val     = inputRef.current?.value ?? "";
-    const trimmed = val.trim().toLowerCase();
+    const trimmed = (inputRef.current?.value ?? "").trim().toLowerCase();
     if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setEmailError("Enter a valid email");
+      setEmailError("Valid email required");
       return;
     }
     setValidating(true);
@@ -99,17 +98,16 @@ export default function DownloadRolePdfButton({
       const vData = await vRes.json();
       if (!vRes.ok) { setEmailError(vData.error ?? "Invalid email"); return; }
 
-      // Save lead fire-and-forget
       fetch(
         `/api/report/${companyId}/interest?token=${encodeURIComponent(token)}`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: trimmed }) }
       ).catch(() => {});
 
       setGated(true);
-      setShowPopover(false);
+      setInputOpen(false);
       triggerDownload();
     } catch {
-      setEmailError("Something went wrong. Try again.");
+      setEmailError("Try again.");
     } finally {
       setValidating(false);
     }
@@ -121,8 +119,108 @@ export default function DownloadRolePdfButton({
   const color     = isDone ? "#059669" : hovered && !isLoading ? "#fff"    : "#FD5A0F";
   const border    = isDone ? "1px solid #a7f3d0" : "1px solid #FDBB96";
 
+  // Inline email input — expands in place, same height as button
+  if (inputOpen) {
+    return (
+      <div
+        ref={wrapperRef}
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+        style={{ display: "flex", alignItems: "center", gap: 4, animation: "roleInputIn 0.18s cubic-bezier(0.16,1,0.3,1) both" }}
+      >
+        <form
+          onSubmit={handleEmailSubmit}
+          style={{ display: "flex", alignItems: "center", gap: 0 }}
+        >
+          <input
+            ref={inputRef}
+            type="email"
+            defaultValue=""
+            placeholder="work email"
+            autoComplete="email"
+            disabled={validating}
+            style={{
+              height:       30,
+              padding:      "0 10px",
+              fontSize:     12,
+              border:       `1.5px solid ${emailError ? "#f87171" : "#FDBB96"}`,
+              borderRight:  "none",
+              borderRadius: "8px 0 0 8px",
+              color:        "#1E0035",
+              outline:      "none",
+              background:   emailError ? "#fff5f5" : "#FFF0EA",
+              width:        148,
+            }}
+            onFocus={e  => { e.currentTarget.style.borderColor = emailError ? "#f87171" : "#FD5A0F"; }}
+            onBlur={e   => { e.currentTarget.style.borderColor = emailError ? "#f87171" : "#FDBB96"; }}
+            onChange={() => { if (emailError) setEmailError(""); }}
+            title={emailError || undefined}
+          />
+          <button
+            type="submit"
+            disabled={validating}
+            style={{
+              height:        30,
+              padding:       "0 10px",
+              borderRadius:  "0 8px 8px 0",
+              border:        `1.5px solid ${emailError ? "#f87171" : "#FD5A0F"}`,
+              borderLeft:    "none",
+              background:    validating ? "rgba(253,90,15,0.5)" : "#FD5A0F",
+              color:         "#fff",
+              fontSize:      11,
+              fontWeight:    700,
+              cursor:        validating ? "not-allowed" : "pointer",
+              display:       "flex",
+              alignItems:    "center",
+              justifyContent:"center",
+              flexShrink:    0,
+            }}
+          >
+            {validating ? (
+              <svg style={{ animation: "rolePdfSpin 0.8s linear infinite" }} width="11" height="11" fill="none" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.4"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg width="11" height="11" fill="none" viewBox="0 0 24 24">
+                <path d="M12 2v10m0 0l-3-3m3 3l3-3M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </button>
+        </form>
+
+        {/* Cancel — collapse back to button */}
+        <button
+          onClick={e => { e.stopPropagation(); setInputOpen(false); setEmailError(""); }}
+          style={{
+            width: 22, height: 22, borderRadius: 6,
+            border: "1px solid #EAE4EF", background: "#F4EFF6",
+            color: "#9988AA", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0, padding: 0,
+          }}
+        >
+          <svg width="9" height="9" fill="none" viewBox="0 0 24 24">
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+          </svg>
+        </button>
+
+        <style>{`
+          @keyframes rolePdfSpin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+          }
+          @keyframes roleInputIn {
+            from { opacity: 0; transform: translateX(6px); }
+            to   { opacity: 1; transform: translateX(0); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
-    <div ref={wrapperRef} style={{ position: "relative" }}>
+    <div ref={wrapperRef}>
       <button
         onClick={handleButtonClick}
         onMouseEnter={() => setHovered(true)}
@@ -158,101 +256,10 @@ export default function DownloadRolePdfButton({
         )}
         {isLoading ? "…" : isDone ? "Saved" : "Get Report"}
       </button>
-
-      {showPopover && (
-        <div
-          onMouseDown={e => e.stopPropagation()}
-          onClick={e => e.stopPropagation()}
-          style={{
-            position:     "absolute",
-            top:          "50%",
-            right:        "calc(100% + 10px)",
-            transform:    "translateY(-50%)",
-            zIndex:       200,
-            width:        264,
-            background:   "#fff",
-            border:       "1px solid #FDBB96",
-            borderRadius: 12,
-            boxShadow:    "0 8px 32px rgba(0,0,0,0.13), 0 2px 8px rgba(253,90,15,0.08)",
-            padding:      "14px 14px 12px",
-            animation:    "rolePdfPopoverIn 0.18s cubic-bezier(0.16,1,0.3,1) both",
-          }}
-        >
-          {/* Arrow pointing right toward button */}
-          <div style={{
-            position:    "absolute",
-            top:         "50%",
-            right:       -6,
-            transform:   "translateY(-50%) rotate(45deg)",
-            width:       10,
-            height:      10,
-            background:  "#fff",
-            border:      "1px solid #FDBB96",
-            borderLeft:  "none",
-            borderBottom: "none",
-          }} />
-
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#1E0035", marginBottom: 3 }}>
-            Enter your work email
-          </p>
-          <p style={{ fontSize: 11, color: "#9B8AAB", marginBottom: 10, lineHeight: 1.45 }}>
-            Free. An iMocha expert may follow up.
-          </p>
-
-          <form onSubmit={handleEmailSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <input
-              ref={inputRef}
-              type="email"
-              defaultValue=""
-              placeholder="you@company.com"
-              autoComplete="email"
-              style={{
-                width:       "100%",
-                padding:     "8px 10px",
-                fontSize:    13,
-                border:      `1.5px solid ${emailError ? "#f87171" : "#DDD0E8"}`,
-                borderRadius: 8,
-                color:       "#1E0035",
-                outline:     "none",
-                background:  "#F8F4FC",
-                boxSizing:   "border-box",
-              }}
-              onFocus={e  => { e.currentTarget.style.borderColor = emailError ? "#f87171" : "#FD5A0F"; }}
-              onBlur={e   => { e.currentTarget.style.borderColor = emailError ? "#f87171" : "#DDD0E8"; }}
-              onChange={() => { if (emailError) setEmailError(""); }}
-            />
-            {emailError && (
-              <p style={{ fontSize: 11, color: "#f87171", margin: "-4px 0 0" }}>{emailError}</p>
-            )}
-            <button
-              type="submit"
-              disabled={validating}
-              style={{
-                width:        "100%",
-                padding:      "8px 0",
-                borderRadius: 8,
-                border:       "none",
-                background:   validating ? "rgba(253,90,15,0.5)" : "#FD5A0F",
-                color:        "#fff",
-                fontSize:     13,
-                fontWeight:   700,
-                cursor:       validating ? "not-allowed" : "pointer",
-              }}
-            >
-              {validating ? "Checking…" : "Download PDF →"}
-            </button>
-          </form>
-        </div>
-      )}
-
       <style>{`
         @keyframes rolePdfSpin {
           from { transform: rotate(0deg); }
           to   { transform: rotate(360deg); }
-        }
-        @keyframes rolePdfPopoverIn {
-          from { opacity: 0; transform: translateY(-50%) translateX(8px); }
-          to   { opacity: 1; transform: translateY(-50%) translateX(0); }
         }
       `}</style>
     </div>
