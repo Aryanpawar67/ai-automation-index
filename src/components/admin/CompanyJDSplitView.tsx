@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import JDActionButtons from "@/components/admin/JDActionButtons";
 import CompanyAnalyseButton from "@/components/admin/CompanyAnalyseButton";
+import CompanyStopButton from "@/components/admin/CompanyStopButton";
 
 export interface JDWithAnalysis {
   id:         string;
@@ -290,6 +291,7 @@ export default function CompanyJDSplitView({ batchId, batch, company, companies,
   const keyPoints = selected ? extractKeyPoints(selected.rawText) : [];
 
   const scrapedCount = jds.filter(j => j.status === "scraped").length;
+  const activeCount  = jds.filter(j => j.status === "scraped" || j.status === "pending").length;
   const validCount   = jds.filter(j => j.status !== "invalid" && j.status !== "cancelled").length;
   const invalidCount = jds.filter(j => j.status === "invalid" || j.status === "cancelled").length;
   const doneCount    = jds.filter(j => j.status === "complete").length;
@@ -417,7 +419,10 @@ export default function CompanyJDSplitView({ batchId, batch, company, companies,
             </div>
           )}
           {!isMulti && (
-            <CompanyAnalyseButton batchId={batchId} companyId={company.id} scrapedCount={scrapedCount} />
+            <>
+              <CompanyStopButton batchId={batchId} companyId={company.id} activeCount={activeCount} />
+              <CompanyAnalyseButton batchId={batchId} companyId={company.id} scrapedCount={scrapedCount} />
+            </>
           )}
         </div>
       </div>

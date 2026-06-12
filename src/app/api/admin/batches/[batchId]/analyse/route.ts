@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db }                        from "@/lib/db/client";
-import { jobDescriptions, batches }  from "@/lib/db/schema";
-import { inngest }                   from "@/inngest/client";
-import { eq, and, asc, sql }         from "drizzle-orm";
-
-// Maximum JDs to analyse per company per batch — extras stay as 'scraped' reserve
-// so analyzeJD can pull replacements when a JD is rejected during analysis.
-const TARGET_JDS_PER_COMPANY = 10;
+import { NextRequest, NextResponse }    from "next/server";
+import { db }                           from "@/lib/db/client";
+import { jobDescriptions, batches, companies } from "@/lib/db/schema";
+import { inngest }                      from "@/inngest/client";
+import { eq, and, asc, sql }            from "drizzle-orm";
+import { targetAnalyseCount }           from "@/lib/jdLimits";
 
 export async function POST(
   req: NextRequest,
@@ -20,10 +17,17 @@ export async function POST(
     ? and(eq(jobDescriptions.batchId, batchId), eq(jobDescriptions.companyId, companyId), eq(jobDescriptions.status, "scraped"))
     : and(eq(jobDescriptions.batchId, batchId), eq(jobDescriptions.status, "scraped"));
 
-  // Ordered so oldest-scraped are queued first (deterministic)
+  // Ordered so oldest-scraped are queued first (deterministic). Join companies
+  // so each row carries the per-company totalJobsAvailable that drives the
+  // dynamic cap (15 if large, 10 otherwise).
   const allScraped = await db
-    .select({ id: jobDescriptions.id, companyId: jobDescriptions.companyId })
+    .select({
+      id:             jobDescriptions.id,
+      companyId:      jobDescriptions.companyId,
+      totalAvailable: companies.totalJobsAvailable,
+    })
     .from(jobDescriptions)
+    .leftJoin(companies, eq(jobDescriptions.companyId, companies.id))
     .where(conditions)
     .orderBy(asc(jobDescriptions.createdAt));
 
@@ -31,11 +35,15 @@ export async function POST(
     return NextResponse.json({ queued: 0, message: "No scraped JDs to analyse" });
   }
 
-  // Cap at TARGET_JDS_PER_COMPANY per company — extras stay 'scraped' as reserve
+  // Per-company dynamic cap — extras stay 'scraped' as the replacement reserve
+  // for analyzeJD.
   const countPerCompany: Record<string, number> = {};
+  const capPerCompany:   Record<string, number> = {};
   const toQueue = allScraped.filter(jd => {
+    const cap = capPerCompany[jd.companyId] ??
+      (capPerCompany[jd.companyId] = targetAnalyseCount(jd.totalAvailable));
     const n = countPerCompany[jd.companyId] ?? 0;
-    if (n < TARGET_JDS_PER_COMPANY) {
+    if (n < cap) {
       countPerCompany[jd.companyId] = n + 1;
       return true;
     }

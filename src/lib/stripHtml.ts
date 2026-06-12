@@ -4,6 +4,12 @@
  */
 export function stripHtml(html: string): string {
   return html
+    // Decode HTML entities first so tag-stripping regexes can see the actual tags
+    // (Greenhouse and some other APIs double-encode their content)
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
     // Remove <style> and <script> blocks entirely (including content)
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")

@@ -162,6 +162,7 @@ interface OracleListJob {
   Id:              string;
   Title:           string;
   PrimaryLocation: string;
+  PostedDate?:     string;  // ISO date "YYYY-MM-DD" — used to surface newest postings first
 }
 
 interface OracleListResult {
@@ -245,11 +246,24 @@ export async function scrapeOracleHCM(url: string): Promise<{ jds: ScrapedJD[]; 
   const { jobs, total } = await fetchJobList(ctx);
   if (jobs.length === 0) return { jds: [], totalAvailable: 0 };
 
+  // Surface the newest postings first so reports reflect what the company is
+  // hiring for *now*. Oracle's default response order is by relevancy, which
+  // pushes older legacy reqs ahead of fresh ones for some tenants.
+  // Stable: undated jobs keep their original API order at the tail.
+  const sorted = [...jobs].sort((a, b) => {
+    const da = a.PostedDate ?? "";
+    const db = b.PostedDate ?? "";
+    if (da === db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return db.localeCompare(da);  // descending — "2026-05-14" > "2026-05-13"
+  });
+
   const keep = targetScrapeCount(total);
 
   // Fetch individual JD detail for each job up to keep
   const jds: ScrapedJD[] = [];
-  for (const job of jobs.slice(0, keep)) {
+  for (const job of sorted.slice(0, keep)) {
     const rawText = await fetchJobDetail(ctx.base, job.Id);
     if (!rawText || rawText.length < 100) continue;
     jds.push({

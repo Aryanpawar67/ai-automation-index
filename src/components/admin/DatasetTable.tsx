@@ -116,7 +116,13 @@ const MANUAL_COLS: readonly ManualField[] = [
 function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [mode,  setMode]  = useState<"file" | "manual">("file");
   const [stage, setStage] = useState<"pick" | "preview" | "uploading" | "done">("pick");
-  const [stats, setStats] = useState<{ total: number; newRows: number; duplicates: number; existingInDb: number } | null>(null);
+  const [stats, setStats] = useState<{
+    total: number; newRows: number; duplicates: number; existingInDb: number;
+    existingDetails?: { companyName: string; domain: string; careerPageUrl: string; atsType: string | null }[];
+    newDetails?:      { companyName: string; domain: string; careerPageUrl: string; atsType: string | null }[];
+  } | null>(null);
+  const [overwrite,      setOverwrite]      = useState(false);
+  const [insertedDetails, setInsertedDetails] = useState<{ companyName: string; domain: string }[]>([]);
   const [file,  setFile]  = useState<File | null>(null);
   const [error, setError] = useState("");
   const [drag,  setDrag]  = useState(false);
@@ -245,15 +251,17 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   const handleManualConfirm = async () => {
     setStage("uploading");
-    const res = await fetch("/api/admin/dataset/manual", {
+    const url = overwrite ? "/api/admin/dataset/manual?overwrite=true" : "/api/admin/dataset/manual";
+    const res = await fetch(url, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ rows: stripErrors(manualRows) }),
     });
     const d = await res.json();
     if (!res.ok) { setError(d.error ?? "Save failed."); setStage("preview"); return; }
+    setInsertedDetails(d.insertedDetails ?? []);
     setStage("done");
-    setTimeout(() => { onDone(); onClose(); }, 1200);
+    setTimeout(() => { onDone(); onClose(); }, 3000);
   };
 
   const inPick          = stage === "pick";
@@ -471,14 +479,63 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 </div>
               ))}
             </div>
+
+            {/* New companies being added */}
+            {stats.newDetails && stats.newDetails.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#059669", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                  New companies ({stats.newDetails.length})
+                </div>
+                <div style={{ border: "1px solid #d1fae5", borderRadius: 10, overflow: "hidden" }}>
+                  {stats.newDetails.map((c, i) => (
+                    <div key={c.domain} style={{ padding: "8px 12px", background: i % 2 === 0 ? "#f0fdf4" : "#fff", borderBottom: i < stats.newDetails!.length - 1 ? "1px solid #d1fae5" : "none" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#065f46" }}>{c.companyName}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{c.domain} · {c.atsType ?? "auto-detect"}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Existing (duplicate) companies */}
+            {stats.existingDetails && stats.existingDetails.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9988AA", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                  Already in DB ({stats.existingDetails.length})
+                </div>
+                <div style={{ border: "1px solid #EAE4EF", borderRadius: 10, overflow: "hidden" }}>
+                  {stats.existingDetails.map((c, i) => (
+                    <div key={c.domain} style={{ padding: "8px 12px", background: i % 2 === 0 ? "#F9F7FB" : "#fff", borderBottom: i < stats.existingDetails!.length - 1 ? "1px solid #EAE4EF" : "none" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#220133" }}>{c.companyName}</div>
+                      <div style={{ fontSize: 11, color: "#9988AA", marginTop: 2 }}>{c.domain} · {c.atsType ?? "—"}</div>
+                      <div style={{ fontSize: 10, color: "#b0a0bb", marginTop: 1, wordBreak: "break-all" }}>{c.careerPageUrl}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Overwrite option */}
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={overwrite}
+                    onChange={e => setOverwrite(e.target.checked)}
+                    style={{ accentColor: "#FD5A0F", width: 14, height: 14 }}
+                  />
+                  <span style={{ fontSize: 12, color: "#553366", fontWeight: 600 }}>
+                    Overwrite existing entries with submitted data
+                  </span>
+                </label>
+              </div>
+            )}
+
             <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#92400e", marginBottom: 18 }}>
-              <strong>Confirm:</strong> {stats.newRows} new companies will be added to your dataset.
-              {stats.duplicates > 0 && ` ${stats.duplicates} duplicate domain(s) will be skipped.`}
+              <strong>Confirm:</strong> {overwrite ? stats.total : stats.newRows} companies will be added/updated.
+              {!overwrite && stats.duplicates > 0 && ` ${stats.duplicates} duplicate domain(s) will be skipped.`}
+              {overwrite && stats.existingInDb > 0 && ` ${stats.existingInDb} existing entries will be overwritten.`}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid #EAE4EF", background: "#fff", fontSize: 13, fontWeight: 600, color: "#553366", cursor: "pointer" }}>Cancel</button>
               <button onClick={handleConfirm} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #220133, #FD5A0F)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 14px rgba(253,90,15,0.3)" }}>
-                Append {stats.newRows} companies →
+                {overwrite ? `Overwrite & append ${stats.total} companies →` : `Append ${stats.newRows} companies →`}
               </button>
             </div>
           </div>
@@ -486,9 +543,26 @@ function UploadModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
         {/* Done */}
         {stage === "done" && (
-          <div style={{ textAlign: "center", padding: "28px 0" }}>
-            <div style={{ fontSize: 44, marginBottom: 10 }}>✅</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: "#059669" }}>Dataset updated!</p>
+          <div style={{ padding: "20px 0 8px" }}>
+            <div style={{ textAlign: "center", marginBottom: insertedDetails.length > 0 ? 16 : 0 }}>
+              <div style={{ fontSize: 44, marginBottom: 8 }}>✅</div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#059669" }}>Dataset updated!</p>
+            </div>
+            {insertedDetails.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#059669", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                  Added ({insertedDetails.length})
+                </div>
+                <div style={{ border: "1px solid #d1fae5", borderRadius: 10, overflow: "hidden" }}>
+                  {insertedDetails.map((c, i) => (
+                    <div key={c.domain} style={{ padding: "8px 12px", background: i % 2 === 0 ? "#f0fdf4" : "#fff", borderBottom: i < insertedDetails.length - 1 ? "1px solid #d1fae5" : "none" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#065f46" }}>{c.companyName}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{c.domain}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -32,6 +32,13 @@ interface RowError {
   reason: string;
 }
 
+export interface CompanyDetail {
+  companyName:   string;
+  domain:        string;
+  careerPageUrl: string;
+  atsType:       string | null;
+}
+
 function normalize(row: ManualRowInput, index: number): { row: NormalizedRow } | { error: RowError } {
   const companyName   = (row.companyName   ?? "").trim();
   const careerPageUrl = (row.careerPageUrl ?? "").trim();
@@ -68,10 +75,12 @@ function normalize(row: ManualRowInput, index: number): { row: NormalizedRow } |
   };
 }
 
-// POST ?dryRun=true → parse + dedup, return stats (no DB write)
-// POST             → insert new rows; update POC fields on existing domains
+// POST ?dryRun=true            → parse + dedup, return stats + details (no DB write)
+// POST                         → insert new rows; update POC fields on existing domains
+// POST ?overwrite=true         → delete existing matching domains first, then insert all
 export async function POST(req: NextRequest) {
-  const dryRun = req.nextUrl.searchParams.get("dryRun") === "true";
+  const dryRun    = req.nextUrl.searchParams.get("dryRun")    === "true";
+  const overwrite = req.nextUrl.searchParams.get("overwrite") === "true";
 
   let body: { rows?: ManualRowInput[] };
   try { body = await req.json(); }
@@ -98,27 +107,58 @@ export async function POST(req: NextRequest) {
   // Dedup against existing domains
   const incomingDomains = parsed.map(r => r.domain);
   const existing = await db
-    .select({ id: datasetRows.id, domain: datasetRows.domain })
+    .select({
+      id:            datasetRows.id,
+      domain:        datasetRows.domain,
+      companyName:   datasetRows.companyName,
+      careerPageUrl: datasetRows.careerPageUrl,
+      atsType:       datasetRows.atsType,
+    })
     .from(datasetRows)
     .where(inArray(datasetRows.domain, incomingDomains));
 
-  const existingByDomain = new Map(existing.map(r => [r.domain, r.id]));
-  const newRows          = parsed.filter(r => !existingByDomain.has(r.domain));
-  const updateRows       = parsed.filter(r => existingByDomain.has(r.domain) && (r.pocFirstName || r.pocLastName || r.pocEmail));
-  const duplicateCount   = parsed.length - newRows.length;
+  const existingByDomain  = new Map(existing.map(r => [r.domain, r]));
+  const newRows           = parsed.filter(r => !existingByDomain.has(r.domain));
+  const updateRows        = parsed.filter(r => existingByDomain.has(r.domain) && (r.pocFirstName || r.pocLastName || r.pocEmail));
+  const duplicateCount    = parsed.length - newRows.length;
+
+  const existingDetails: CompanyDetail[] = existing.map(r => ({
+    companyName:   r.companyName,
+    domain:        r.domain,
+    careerPageUrl: r.careerPageUrl,
+    atsType:       r.atsType,
+  }));
+
+  const newDetails: CompanyDetail[] = newRows.map(r => ({
+    companyName:   r.companyName,
+    domain:        r.domain,
+    careerPageUrl: r.careerPageUrl,
+    atsType:       r.atsType,
+  }));
 
   if (dryRun) {
     return NextResponse.json({
-      total:        parsed.length,
-      newRows:      newRows.length,
-      duplicates:   duplicateCount,
-      existingInDb: existingByDomain.size,
+      total:           parsed.length,
+      newRows:         newRows.length,
+      duplicates:      duplicateCount,
+      existingInDb:    existingByDomain.size,
+      existingDetails,
+      newDetails,
     });
   }
 
-  if (newRows.length > 0) {
+  // With overwrite: delete existing matches first so they get re-inserted fresh
+  const rowsToInsert = overwrite ? parsed : newRows;
+  if (overwrite && existing.length > 0) {
+    const ids = existing.map(r => r.id);
+    for (const id of ids) {
+      await db.delete(datasetRows).where(eq(datasetRows.id, id));
+    }
+  }
+
+  if (rowsToInsert.length > 0) {
     await db.insert(datasetRows).values(
-      newRows.map(r => ({
+      rowsToInsert.map(r => ({
         companyName:   r.companyName,
         domain:        r.domain,
         headquarters:  r.headquarters,
@@ -134,18 +174,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  for (const r of updateRows) {
-    const id = existingByDomain.get(r.domain)!;
-    await db
-      .update(datasetRows)
-      .set({ pocFirstName: r.pocFirstName, pocLastName: r.pocLastName, pocEmail: r.pocEmail })
-      .where(eq(datasetRows.id, id));
+  if (!overwrite) {
+    for (const r of updateRows) {
+      const rec = existingByDomain.get(r.domain)!;
+      await db
+        .update(datasetRows)
+        .set({ pocFirstName: r.pocFirstName, pocLastName: r.pocLastName, pocEmail: r.pocEmail })
+        .where(eq(datasetRows.id, rec.id));
+    }
   }
 
+  const insertedDetails: CompanyDetail[] = rowsToInsert.map(r => ({
+    companyName:   r.companyName,
+    domain:        r.domain,
+    careerPageUrl: r.careerPageUrl,
+    atsType:       r.atsType,
+  }));
+
   return NextResponse.json({
-    inserted:   newRows.length,
-    updated:    updateRows.length,
-    duplicates: duplicateCount,
-    total:      parsed.length,
+    inserted:        rowsToInsert.length,
+    updated:         overwrite ? 0 : updateRows.length,
+    duplicates:      overwrite ? 0 : duplicateCount,
+    total:           parsed.length,
+    insertedDetails,
   });
 }

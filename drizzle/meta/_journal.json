@@ -8,6 +8,13 @@
       "when": 1774596714379,
       "tag": "0000_faithful_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780410453868,
+      "tag": "0001_natural_black_queen",
+      "breakpoints": true
     }
   ]
 }
