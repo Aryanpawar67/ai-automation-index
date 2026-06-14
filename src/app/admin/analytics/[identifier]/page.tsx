@@ -201,11 +201,11 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
       {/* Topline cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Opens",          value: opens },
-          { label: "Sessions",       value: sessions.length },
-          { label: "Unique devices", value: uniqueDevices, hint: forwardedFlag ? "forwarded" : undefined },
-          { label: "Downloads",      value: downloads },
-          { label: "Avg time/visit", value: fmtSecs(avgTime), small: true },
+          { label: "Opens",          value: opens,            sub: "report_opened events · one per page-mount" },
+          { label: "Sessions",       value: sessions.length,  sub: "distinct sessionIds · new session per browser tab" },
+          { label: "Unique devices", value: uniqueDevices, hint: forwardedFlag ? "forwarded" : undefined, sub: "distinct ip_hash + user_agent combos · >1 = likely forwarded" },
+          { label: "Downloads",      value: downloads,         sub: "report_downloaded events · 0 for wizard (hub) sessions" },
+          { label: "Avg time/visit", value: fmtSecs(avgTime),  small: true, sub: "from report_session_end · 0s if tab closed without sending" },
         ].map((c) => (
           <div key={c.label} style={{
             background: "#fff", border: "1px solid #EAE4EF", borderRadius: 14,
@@ -222,6 +222,11 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
                 {c.hint}
               </p>
             )}
+            {c.sub && (
+              <p style={{ fontSize: 10, color: "#9988AA", margin: "2px 0 0" }}>
+                {c.sub}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -230,7 +235,7 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
         <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)" }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Scroll depth funnel</h3>
-          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Sessions that reached each milestone</p>
+          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Sessions that reached each scroll milestone — report_scrolled_depth events. Only fires from DashboardView (analysis) sessions, not wizard (hub). Expect 0 for wizard-only companies.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {funnel.map(f => (
               <div key={f.pct}>
@@ -253,7 +258,7 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
 
         <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)" }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Sections viewed</h3>
-          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Distinct sessions per section (analysis pages)</p>
+          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Distinct sessions per report section — report_section_viewed events. Only fires from DashboardView (analysis) sessions, not wizard (hub).</p>
           {sectionCounts.length === 0 ? (
             <p style={{ fontSize: 12, color: "#9988AA" }}>No section-view events yet.</p>
           ) : (
@@ -314,7 +319,7 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
       <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, boxShadow: "0 2px 12px rgba(34,1,51,0.06)", overflow: "hidden", marginBottom: 24 }}>
         <div style={{ padding: "16px 22px", borderBottom: "1px solid #EAE4EF" }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: 0 }}>Sessions</h3>
-          <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>One row per page-mount. Multiple devices for one token = link was forwarded.</p>
+          <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>hub = wizard v2 · analysis = legacy DashboardView · multiple devices = link was forwarded</p>
         </div>
         {sessions.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", color: "#9988AA", fontSize: 13 }}>No sessions yet.</div>
@@ -393,7 +398,7 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
       <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, boxShadow: "0 2px 12px rgba(34,1,51,0.06)", overflow: "hidden" }}>
         <div style={{ padding: "16px 22px", borderBottom: "1px solid #EAE4EF" }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: 0 }}>Event timeline</h3>
-          <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>Latest 200 events, most recent first</p>
+          <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>Latest 200 events, most recent first — report_opened · report_tab_hidden/visible · report_scrolled_depth · report_section_viewed · report_downloaded · report_session_end</p>
         </div>
         {events.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", color: "#9988AA", fontSize: 13 }}>No events yet.</div>

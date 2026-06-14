@@ -52,6 +52,9 @@ export default async function DownloadsPage() {
         <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
           {cardRows.length + pageRows.length} download{cardRows.length + pageRows.length !== 1 ? "s" : ""} · {ctaRows.length} CTA lead{ctaRows.length !== 1 ? "s" : ""} · {total} total
         </p>
+        <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>
+          Card = role-card PDF gate (report_leads · source:download) · Page = in-report PDF (report_downloads · has referrer + delete) · CTA Lead = &apos;Get your full analysis&apos; form (report_leads · source:cta). Referrer is only captured for Page rows.
+        </p>
       </div>
 
       <DownloadsTable rows={rows} />

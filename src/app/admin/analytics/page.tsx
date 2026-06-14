@@ -148,17 +148,17 @@ export default async function AnalyticsIndexPage({
           Report Analytics
         </h1>
         <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
-          Engagement on personalised report links sent in outbound campaigns
+          Self-hosted mirror of PostHog report events — opens, sessions, and downloads per company. Scroll depth and section views only appear for legacy analysis (DashboardView) sessions, not wizard.
         </p>
       </div>
 
       {/* Topline */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
         {[
-          { label: "Companies engaged", value: `${engaged} / ${rows.length}` },
-          { label: "Forwarded",         value: forwarded, hint: forwarded > 0 ? "multi-device" : undefined },
-          { label: "Total sessions",    value: totalSessions },
-          { label: "Total downloads",   value: totalDownloads },
+          { label: "Companies engaged", value: `${engaged} / ${rows.length}`, sub: "distinct sessions > 0 out of all token-enabled companies" },
+          { label: "Forwarded",         value: forwarded, hint: forwarded > 0 ? "multi-device" : undefined, sub: "link accessed from 2+ distinct device/network signatures" },
+          { label: "Total sessions",    value: totalSessions, sub: "distinct sessionIds · new session per tab/page-mount" },
+          { label: "Total downloads",   value: totalDownloads, sub: "report_downloaded events · 0 for wizard-only companies" },
         ].map(s => (
           <div key={s.label} style={{
             background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16,
@@ -173,6 +173,11 @@ export default async function AnalyticsIndexPage({
             {s.hint && (
               <p style={{ fontSize: 10, color: "#FD5A0F", margin: "2px 0 0", fontWeight: 600 }}>
                 {s.hint}
+              </p>
+            )}
+            {s.sub && (
+              <p style={{ fontSize: 10, color: "#9988AA", margin: "2px 0 0" }}>
+                {s.sub}
               </p>
             )}
           </div>
@@ -192,6 +197,9 @@ export default async function AnalyticsIndexPage({
       )}
 
       {/* Download Events with All / Card / Page toggle */}
+      <p style={{ fontSize: 12, color: "#9988AA", margin: "0 0 8px" }}>
+        Download events (report_downloaded) are only fired from DashboardView PDF downloads — not the wizard report. This table will be empty for wizard-only companies.
+      </p>
       <DownloadEventsTable events={downloadEvents} />
     </div>
   );
