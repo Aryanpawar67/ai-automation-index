@@ -9,6 +9,7 @@ import {
   boolean,
   index,
 } from "drizzle-orm/pg-core";
+import type { CompanyWizardData } from "@/lib/report/aggregate";
 
 export interface HrStackVendor {
   vendor:     string;
@@ -95,6 +96,7 @@ export const companies = pgTable("companies", {
   totalJobsAvailable:  integer("total_jobs_available"),
   slug:                text("slug").unique(),
   createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  wizardData:          jsonb("wizard_data").$type<CompanyWizardData>(),
 });
 
 export const pocs = pgTable("pocs", {
