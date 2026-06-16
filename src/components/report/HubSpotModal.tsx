@@ -66,24 +66,37 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  // Explicitly call hbspt.forms.create() as a backup for HubSpot's built-in
-  // hs-form-frame auto-detection (which works but can race with dynamic mounting).
+  // Load the HubSpot embed script if not already present, then create the form.
   useEffect(() => {
+    const PORTAL_ID = "820873";
+    const FORM_ID   = "5a2ff39f-bcf8-435a-be40-c6f0afdba087";
+
     const tryCreate = () => {
       if (!window.hbspt || !frameRef.current) return false;
-      if (frameRef.current.hasChildNodes()) return true; // auto-detect already fired
+      if (frameRef.current.hasChildNodes()) return true; // already rendered
       window.hbspt.forms.create({
-        portalId: "820873",
-        formId:   "5a2ff39f-bcf8-435a-be40-c6f0afdba087",
+        portalId: PORTAL_ID,
+        formId:   FORM_ID,
         target:   "#hs-form-target",
       });
       return true;
     };
 
-    if (!tryCreate()) {
-      const poll = setInterval(() => { if (tryCreate()) clearInterval(poll); }, 100);
-      return () => clearInterval(poll);
+    if (tryCreate()) return;
+
+    // Inject the embed script if it hasn't been added yet
+    const SCRIPT_SRC = "https://js.hsforms.net/forms/embed/v2.js";
+    if (!document.querySelector(`script[src="${SCRIPT_SRC}"]`)) {
+      const script = document.createElement("script");
+      script.src   = SCRIPT_SRC;
+      script.async = true;
+      script.onload = () => tryCreate();
+      document.head.appendChild(script);
     }
+
+    // Poll as fallback in case script was already loading from a prior mount
+    const poll = setInterval(() => { if (tryCreate()) clearInterval(poll); }, 150);
+    return () => clearInterval(poll);
   }, []);
 
   // Watch for iframe insertion to inject brand styles, and listen for form submission.

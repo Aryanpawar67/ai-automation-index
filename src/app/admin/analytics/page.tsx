@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import { db }            from "@/lib/db/client";
-import { sql, and, eq, gte, desc } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { reportEvents, companies } from "@/lib/db/schema";
 import AnalyticsCompanyTable, { type AnalyticsRow } from "@/components/admin/AnalyticsCompanyTable";
-import DownloadEventsTable,  { type DownloadEvent  } from "@/components/admin/DownloadEventsTable";
 import { formatLocation } from "@/lib/formatLocation";
 
 type Range = "7d" | "30d" | "90d" | "all";
@@ -41,8 +40,6 @@ export default async function AnalyticsIndexPage({
       c.slug                                                AS "slug",
       COUNT(*) FILTER (WHERE e.event = 'report_opened')     AS "opens",
       COUNT(DISTINCT e.session_id)                          AS "sessions",
-      COUNT(*) FILTER (WHERE e.event = 'report_downloaded' AND e.props->>'source' = 'role_card') AS "downloadCard",
-      COUNT(*) FILTER (WHERE e.event = 'report_downloaded' AND (e.props->>'source' IS NULL OR e.props->>'source' != 'role_card')) AS "downloadPage",
       COUNT(DISTINCT (
         COALESCE(e.ip_hash, '') || '|' || COALESCE(e.user_agent, '')
       )) FILTER (WHERE e.ip_hash IS NOT NULL OR e.user_agent IS NOT NULL)
@@ -89,57 +86,15 @@ export default async function AnalyticsIndexPage({
       slug:        (r.slug as string | null) ?? null,
       opens:       Number(r.opens ?? 0),
       sessions:    Number(r.sessions ?? 0),
-      downloads:    Number(r.downloadCard ?? 0) + Number(r.downloadPage ?? 0),
-      downloadCard: Number(r.downloadCard ?? 0),
-      downloadPage: Number(r.downloadPage ?? 0),
       devices:     Number(r.devices ?? 0),
       topLocation: g ? formatLocation(g.city ?? null, g.region ?? null, g.country ?? null, g.accuracy_km ?? null) : null,
       lastSeen:    fmtLastSeen(r.lastSeenAt ? (r.lastSeenAt as string) : null),
     };
   });
 
-  // Individual download events — use query builder (avoids empty sql-fragment issues)
-  const dlWhereConditions = days
-    ? and(
-        eq(reportEvents.event, "report_downloaded"),
-        gte(reportEvents.createdAt, new Date(Date.now() - days * 24 * 60 * 60 * 1000))
-      )
-    : eq(reportEvents.event, "report_downloaded");
-
-  const dlRows = await db
-    .select({
-      id:        reportEvents.id,
-      company:   companies.name,
-      jobTitle:  reportEvents.jobTitle,
-      props:     reportEvents.props,
-      createdAt: reportEvents.createdAt,
-    })
-    .from(reportEvents)
-    .innerJoin(companies, eq(companies.id, reportEvents.companyId))
-    .where(dlWhereConditions)
-    .orderBy(desc(reportEvents.createdAt))
-    .limit(200);
-
-  const downloadEvents: DownloadEvent[] = dlRows.map(r => {
-    const p = (r.props ?? {}) as Record<string, string | null>;
-    return {
-      id:        r.id,
-      company:   r.company,
-      jobTitle:  r.jobTitle ?? null,
-      source:    (p.source ?? null) as "role_card" | "report_page" | null,
-      email:     p.email ?? null,
-      createdAt: new Date(r.createdAt).toLocaleString("en-GB", {
-        day: "numeric", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-        timeZone: "Asia/Kolkata",
-      }),
-    };
-  });
-
-  const totalSessions  = rows.reduce((sum, r) => sum + r.sessions,  0);
-  const totalDownloads = rows.reduce((sum, r) => sum + r.downloads, 0);
-  const engaged        = rows.filter(r => r.sessions > 0).length;
-  const forwarded      = rows.filter(r => r.devices > 1).length;
+  const totalSessions = rows.reduce((sum, r) => sum + r.sessions, 0);
+  const engaged       = rows.filter(r => r.sessions > 0).length;
+  const forwarded     = rows.filter(r => r.devices > 1).length;
 
   return (
     <div>
@@ -148,17 +103,16 @@ export default async function AnalyticsIndexPage({
           Report Analytics
         </h1>
         <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
-          Self-hosted mirror of PostHog report events — opens, sessions, and downloads per company. Scroll depth and section views only appear for legacy analysis (DashboardView) sessions, not wizard.
+          Self-hosted mirror of PostHog report events — opens, sessions, and device/forwarding signals per company. Click a company for its wizard step funnel, role interest, CTA funnel, and event timeline.
         </p>
       </div>
 
       {/* Topline */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24 }}>
         {[
           { label: "Companies engaged", value: `${engaged} / ${rows.length}`, sub: "distinct sessions > 0 out of all token-enabled companies" },
           { label: "Forwarded",         value: forwarded, hint: forwarded > 0 ? "multi-device" : undefined, sub: "link accessed from 2+ distinct device/network signatures" },
           { label: "Total sessions",    value: totalSessions, sub: "distinct sessionIds · new session per tab/page-mount" },
-          { label: "Total downloads",   value: totalDownloads, sub: "report_downloaded events · 0 for wizard-only companies" },
         ].map(s => (
           <div key={s.label} style={{
             background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16,
@@ -196,11 +150,6 @@ export default async function AnalyticsIndexPage({
         <AnalyticsCompanyTable rows={rows} range={range} />
       )}
 
-      {/* Download Events with All / Card / Page toggle */}
-      <p style={{ fontSize: 12, color: "#9988AA", margin: "0 0 8px" }}>
-        Download events (report_downloaded) are only fired from DashboardView PDF downloads — not the wizard report. This table will be empty for wizard-only companies.
-      </p>
-      <DownloadEventsTable events={downloadEvents} />
     </div>
   );
 }

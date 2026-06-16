@@ -47,3 +47,16 @@ yarn-error.log*
 next-env.d.ts
 .logs/
 .worktrees/
+
+# migration-session artifacts (screenshots, exports, mockups — not for the repo)
+/*.xlsx
+/*.pdf
+/*.png
+/*.csv
+/aig-report-preview.html
+/hero-banner-variations.jsx
+/hubspot-modal-variations.html
+/preview-hero-changes.html
+/wizard-brainstorm.html
+/_archive/
+.vscode/

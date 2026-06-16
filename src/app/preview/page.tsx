@@ -117,7 +117,7 @@ function Variation1() {
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <a href="/preview/report" style={{ padding: "15px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#ff3333,#ff6700)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 30px rgba(255,50,50,0.25)", letterSpacing: 0.3, textDecoration: "none", display: "inline-block" }}>
+          <a data-dead-link="/preview/report route removed in wizard v2 migration — do not use" href="/preview/report" style={{ padding: "15px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#ff3333,#ff6700)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 30px rgba(255,50,50,0.25)", letterSpacing: 0.3, textDecoration: "none", display: "inline-block" }}>
             See What You&apos;re Losing →
           </a>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", maxWidth: 200 }}>No signup required. Your data is already analyzed.</span>
@@ -173,7 +173,7 @@ function Variation2() {
           </div>
         </div>
 
-        <a href="/preview/report" style={{ padding: "15px 30px", borderRadius: 12, border: "none", background: "#1a1a2e", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", textDecoration: "none", display: "inline-block" }}>
+        <a data-dead-link="/preview/report route removed in wizard v2 migration — do not use" href="/preview/report" style={{ padding: "15px 30px", borderRadius: 12, border: "none", background: "#1a1a2e", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", textDecoration: "none", display: "inline-block" }}>
           See Where You Stand — Full Report →
         </a>
         <div style={{ marginTop: 10, fontSize: 11, color: "#aaa" }}>Personalized for {COMPANY} · {TOTAL_ROLES} roles analyzed · No signup needed</div>
@@ -247,7 +247,7 @@ function Variation3() {
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/preview/report" style={{ padding: "15px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#38bdf8,#0ea5e9)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 30px rgba(56,189,248,0.2)", textDecoration: "none", display: "inline-block" }}>
+          <a data-dead-link="/preview/report route removed in wizard v2 migration — do not use" href="/preview/report" style={{ padding: "15px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#38bdf8,#0ea5e9)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 30px rgba(56,189,248,0.2)", textDecoration: "none", display: "inline-block" }}>
             View Full Maturity Assessment →
           </a>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>Interactive report · {DEPT_COUNT} departments · {TOTAL_ROLES} roles</span>
@@ -329,7 +329,7 @@ function Variation4() {
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/preview/report" style={{ padding: "15px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#ffb347,#ff8c3a)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 30px rgba(255,179,71,0.2)", textDecoration: "none", display: "inline-block" }}>
+          <a data-dead-link="/preview/report route removed in wizard v2 migration — do not use" href="/preview/report" style={{ padding: "15px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#ffb347,#ff8c3a)", color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 30px rgba(255,179,71,0.2)", textDecoration: "none", display: "inline-block" }}>
             See Full Skills Risk Report →
           </a>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{TOTAL_ROLES} roles · {atRiskSkills.length} at-risk skills · Reskilling pathways included</span>
@@ -387,7 +387,7 @@ export default function PreviewPage() {
         </div>
 
         <div style={{ textAlign: "center", marginTop: 24 }}>
-          <a href="/preview/report" style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textDecoration: "none" }}>
+          <a data-dead-link="/preview/report route removed in wizard v2 migration — do not use" href="/preview/report" style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textDecoration: "none" }}>
             → View full enhanced report page
           </a>
         </div>

@@ -55,50 +55,36 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
 
   // Per-session rollup
   type SessionRow = {
-    sessionId: string;
-    startedAt: Date;
-    endedAt:   Date;
+    sessionId:   string;
+    startedAt:   Date;
+    endedAt:     Date;
     durationSec: number;
-    userAgent: string | null;
-    ipHash:    string | null;
-    maxDepth:  number;
-    sectionsSeen: Set<string>;
-    downloaded: boolean;
-    jobTitle:   string | null;
-    reportType: string;
-    location:   string | null;
+    userAgent:   string | null;
+    ipHash:      string | null;
+    jobTitle:    string | null;
+    reportType:  string;
+    location:    string | null;
   };
   const sessionMap = new Map<string, SessionRow>();
   for (const e of events) {
     const locStr = formatLocation(e.city, e.region, e.country, e.accuracyKm);
     const loc = locStr === "—" ? null : locStr;
     const s = sessionMap.get(e.sessionId) ?? {
-      sessionId:    e.sessionId,
-      startedAt:    e.createdAt,
-      endedAt:      e.createdAt,
-      durationSec:  0,
-      userAgent:    e.userAgent,
-      ipHash:       e.ipHash,
-      maxDepth:     0,
-      sectionsSeen: new Set<string>(),
-      downloaded:   false,
-      jobTitle:     e.jobTitle,
-      reportType:   e.reportType,
-      location:     loc,
+      sessionId:   e.sessionId,
+      startedAt:   e.createdAt,
+      endedAt:     e.createdAt,
+      durationSec: 0,
+      userAgent:   e.userAgent,
+      ipHash:      e.ipHash,
+      jobTitle:    e.jobTitle,
+      reportType:  e.reportType,
+      location:    loc,
     };
     if (!s.location && loc) s.location = loc;
     if (e.createdAt < s.startedAt) s.startedAt = e.createdAt;
     if (e.createdAt > s.endedAt)   s.endedAt   = e.createdAt;
-    const props = (e.props ?? {}) as Record<string, unknown>;
-    if (e.event === "report_scrolled_depth") {
-      const d = Number(props.depth_pct);
-      if (Number.isFinite(d) && d > s.maxDepth) s.maxDepth = d;
-    } else if (e.event === "report_section_viewed") {
-      if (typeof props.section === "string") s.sectionsSeen.add(props.section);
-    } else if (e.event === "report_downloaded") {
-      s.downloaded = true;
-    } else if (e.event === "report_session_end") {
-      const t = Number(props.time_spent_seconds);
+    if (e.event === "report_session_end") {
+      const t = Number((e.props as Record<string, unknown>)?.time_spent_seconds);
       if (Number.isFinite(t)) s.durationSec = Math.max(s.durationSec, t);
     }
     sessionMap.set(e.sessionId, s);
@@ -109,34 +95,45 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
 
   // Topline
   const opens = events.filter(e => e.event === "report_opened").length;
-  const downloads = events.filter(e => e.event === "report_downloaded").length;
   const uniqueDevices = new Set(sessions.map(s => `${s.ipHash ?? ""}|${s.userAgent ?? ""}`).filter(k => k !== "|")).size;
   const avgTime = sessions.length > 0 ? sessions.reduce((a, b) => a + b.durationSec, 0) / sessions.length : 0;
 
-  // Scroll funnel
-  const scrollAgg = await db.execute(sql`
-    SELECT (props->>'depth_pct')::int AS pct, COUNT(DISTINCT session_id) AS n
-    FROM report_events
-    WHERE company_id = ${company.id} AND event = 'report_scrolled_depth'
-    GROUP BY 1 ORDER BY 1
-  `);
-  const depthCounts: Record<number, number> = {};
-  for (const r of scrollAgg.rows as unknown as Array<{ pct: number; n: number }>) {
-    depthCounts[r.pct] = Number(r.n);
+  // Wizard step funnel — count distinct sessions that reached each step.
+  // Uses the furthest `wizard_step_viewed` step seen per session.
+  const STEP_LABELS = ["At a glance", "Benefit", "Peers", "Roles"];
+  const maxStepBySession = new Map<string, number>();
+  for (const e of events) {
+    if (e.event !== "wizard_step_viewed") continue;
+    const st = Number((e.props as Record<string, unknown>)?.step);
+    if (!Number.isFinite(st)) continue;
+    maxStepBySession.set(e.sessionId, Math.max(maxStepBySession.get(e.sessionId) ?? 0, st));
   }
-  const funnel = [25, 50, 75, 100].map(pct => ({ pct, n: depthCounts[pct] ?? 0 }));
+  const stepReached = [0, 0, 0, 0];
+  for (const max of maxStepBySession.values()) {
+    for (let st = 1; st <= 4; st++) if (max >= st) stepReached[st - 1]++;
+  }
+  const maxStepCount = Math.max(1, ...stepReached);
+  const hasStepData  = stepReached.some(n => n > 0);
 
-  // Section views (analysis pages only)
-  const sectionAgg = await db.execute(sql`
-    SELECT props->>'section' AS section, COUNT(DISTINCT session_id) AS n
-    FROM report_events
-    WHERE company_id = ${company.id} AND event = 'report_section_viewed' AND props->>'section' IS NOT NULL
-    GROUP BY 1
-    ORDER BY n DESC
-  `);
-  const sectionCounts = (sectionAgg.rows as unknown as Array<{ section: string; n: number }>).map(r => ({ section: r.section, n: Number(r.n) }));
-  const maxSection = Math.max(1, ...sectionCounts.map(s => s.n));
-  const maxFunnel  = Math.max(1, ...funnel.map(f => f.n));
+  // Role interest — wizard_role_viewed counts by role title
+  const roleAgg = new Map<string, number>();
+  for (const e of events) {
+    if (e.event !== "wizard_role_viewed") continue;
+    const r = String((e.props as Record<string, unknown>)?.role ?? "").trim();
+    if (!r) continue;
+    roleAgg.set(r, (roleAgg.get(r) ?? 0) + 1);
+  }
+  const roleRows = Array.from(roleAgg.entries())
+    .map(([role, n]) => ({ role, n }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 12);
+  const maxRole = Math.max(1, ...roleRows.map(r => r.n));
+
+  // CTA funnel — clicked → submitted, plus dismissed
+  const ctaClicked   = events.filter(e => e.event === "wizard_cta_clicked").length;
+  const ctaSubmitted = events.filter(e => e.event === "wizard_cta_submitted").length;
+  const ctaDismissed = events.filter(e => e.event === "wizard_cta_dismissed").length;
+  const ctaConvPct   = ctaClicked > 0 ? Math.round((ctaSubmitted / ctaClicked) * 100) : 0;
 
   // Region breakdown — group by raw (city, region, country) but render with
   // accuracy-aware labels. We collapse the result by display label afterwards
@@ -199,13 +196,12 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
       </div>
 
       {/* Topline cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Opens",          value: opens,            sub: "report_opened events · one per page-mount" },
-          { label: "Sessions",       value: sessions.length,  sub: "distinct sessionIds · new session per browser tab" },
-          { label: "Unique devices", value: uniqueDevices, hint: forwardedFlag ? "forwarded" : undefined, sub: "distinct ip_hash + user_agent combos · >1 = likely forwarded" },
-          { label: "Downloads",      value: downloads,         sub: "report_downloaded events · 0 for wizard (hub) sessions" },
-          { label: "Avg time/visit", value: fmtSecs(avgTime),  small: true, sub: "from report_session_end · 0s if tab closed without sending" },
+          { label: "Opens",          value: opens,           sub: "report_opened events · one per page-mount" },
+          { label: "Sessions",       value: sessions.length, sub: "distinct sessionIds · new session per browser tab" },
+          { label: "Unique devices", value: uniqueDevices,   hint: forwardedFlag ? "forwarded" : undefined, sub: "distinct ip_hash + user_agent combos · >1 = likely forwarded" },
+          { label: "Avg time/visit", value: fmtSecs(avgTime), small: true, sub: "from report_session_end · 0s if tab closed without sending" },
         ].map((c) => (
           <div key={c.label} style={{
             background: "#fff", border: "1px solid #EAE4EF", borderRadius: 14,
@@ -231,56 +227,74 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
         ))}
       </div>
 
-      {/* Funnel + Sections side-by-side */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+      {/* Wizard step funnel + CTA funnel */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12, marginBottom: 24 }}>
+        {/* Step funnel */}
         <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)" }}>
-          <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Scroll depth funnel</h3>
-          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Sessions that reached each scroll milestone — report_scrolled_depth events. Only fires from DashboardView (analysis) sessions, not wizard (hub). Expect 0 for wizard-only companies.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {funnel.map(f => (
-              <div key={f.pct}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: "#553366", fontWeight: 600 }}>{f.pct}%</span>
-                  <span style={{ color: "#9988AA" }}>{f.n} session{f.n === 1 ? "" : "s"}</span>
-                </div>
-                <div style={{ height: 8, background: "#F4EFF6", borderRadius: 4, overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%",
-                    width: `${(f.n / maxFunnel) * 100}%`,
-                    background: "linear-gradient(90deg, #FD5A0F, #FDBB96)",
-                    transition: "width 0.4s",
-                  }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)" }}>
-          <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Sections viewed</h3>
-          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Distinct sessions per report section — report_section_viewed events. Only fires from DashboardView (analysis) sessions, not wizard (hub).</p>
-          {sectionCounts.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#9988AA" }}>No section-view events yet.</p>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Wizard step funnel</h3>
+          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Distinct sessions that reached each step — wizard_step_viewed. Replaces the legacy scroll-depth funnel for hub (wizard) sessions.</p>
+          {!hasStepData ? (
+            <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>No wizard step events yet.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {sectionCounts.map(s => (
-                <div key={s.section}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {stepReached.map((n, i) => (
+                <div key={i}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: "#553366", fontWeight: 600 }}>{s.section}</span>
-                    <span style={{ color: "#9988AA" }}>{s.n}</span>
+                    <span style={{ color: "#553366", fontWeight: 600 }}>Step {i + 1} · {STEP_LABELS[i]}</span>
+                    <span style={{ color: "#9988AA" }}>{n}</span>
                   </div>
                   <div style={{ height: 6, background: "#F4EFF6", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%",
-                      width: `${(s.n / maxSection) * 100}%`,
-                      background: "#220133",
-                    }} />
+                    <div style={{ height: "100%", width: `${(n / maxStepCount) * 100}%`, background: "linear-gradient(90deg, #220133, #553366)" }} />
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* CTA funnel */}
+        <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)" }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>CTA funnel</h3>
+          <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>&apos;Get your full analysis&apos; modal — clicked → submitted. Dismissed = closed without submitting.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {[
+              { label: "Clicked",   value: ctaClicked,   note: "wizard_cta_clicked" },
+              { label: "Submitted", value: ctaSubmitted, note: `${ctaConvPct}% of clicks · also a CTA lead`, accent: true },
+              { label: "Dismissed", value: ctaDismissed, note: "wizard_cta_dismissed" },
+            ].map(c => (
+              <div key={c.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: c.accent ? "#059669" : "#553366" }}>{c.label}</span>
+                  <span style={{ fontSize: 10, color: "#9988AA", marginLeft: 8 }}>{c.note}</span>
+                </div>
+                <span style={{ fontSize: 20, fontWeight: 800, color: c.accent ? "#059669" : "#220133" }}>{c.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Role interest */}
+      <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 12px rgba(34,1,51,0.06)", marginBottom: 24 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: "0 0 4px" }}>Role interest</h3>
+        <p style={{ fontSize: 11, color: "#9988AA", margin: "0 0 16px" }}>Step-4 role cards opened — wizard_role_viewed. Which roles prospects drill into. Replaces the legacy &apos;sections viewed&apos; chart.</p>
+        {roleRows.length === 0 ? (
+          <p style={{ fontSize: 12, color: "#9988AA", margin: 0 }}>No role cards opened yet.</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+            {roleRows.map((r, i) => (
+              <div key={i}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: "#553366", fontWeight: 600 }}>{r.role}</span>
+                  <span style={{ color: "#9988AA" }}>{r.n}</span>
+                </div>
+                <div style={{ height: 6, background: "#F4EFF6", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(r.n / maxRole) * 100}%`, background: "linear-gradient(90deg, #FD5A0F, #FDBB96)" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Regions */}
@@ -334,9 +348,6 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
                   { label: "Location", hint: LOCATION_TOOLTIP },
                   { label: "Device" },
                   { label: "Duration" },
-                  { label: "Max scroll" },
-                  { label: "Sections" },
-                  { label: "DL" },
                 ].map(h => (
                   <th key={h.label} title={h.hint} style={{
                     padding: "12px 18px", textAlign: "left", fontSize: 10, fontWeight: 700,
@@ -378,15 +389,6 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
                   <td style={{ padding: "12px 18px", fontSize: 12, color: "#220133", fontWeight: 600 }}>
                     {fmtSecs(s.durationSec)}
                   </td>
-                  <td style={{ padding: "12px 18px", fontSize: 12, color: "#220133", fontWeight: 600 }}>
-                    {s.maxDepth ? `${s.maxDepth}%` : "—"}
-                  </td>
-                  <td style={{ padding: "12px 18px", fontSize: 11, color: "#553366" }}>
-                    {s.sectionsSeen.size > 0 ? `${s.sectionsSeen.size}` : "—"}
-                  </td>
-                  <td style={{ padding: "12px 18px", fontSize: 14 }}>
-                    {s.downloaded ? <span style={{ color: "#059669", fontWeight: 700 }}>✓</span> : <span style={{ color: "#C4B5D0" }}>—</span>}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -398,7 +400,7 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
       <div style={{ background: "#fff", border: "1px solid #EAE4EF", borderRadius: 16, boxShadow: "0 2px 12px rgba(34,1,51,0.06)", overflow: "hidden" }}>
         <div style={{ padding: "16px 22px", borderBottom: "1px solid #EAE4EF" }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: "#220133", margin: 0 }}>Event timeline</h3>
-          <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>Latest 200 events, most recent first — report_opened · report_tab_hidden/visible · report_scrolled_depth · report_section_viewed · report_downloaded · report_session_end</p>
+          <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>Latest 200 events, most recent first — report_opened · report_tab_hidden/visible · report_session_end · wizard_step_viewed · wizard_role_viewed · wizard_info_viewed · wizard_cta_clicked · wizard_cta_submitted · wizard_cta_dismissed</p>
         </div>
         {events.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", color: "#9988AA", fontSize: 13 }}>No events yet.</div>
@@ -408,10 +410,12 @@ export default async function CompanyAnalyticsPage({ params }: { params: Promise
               {events.slice(0, 200).map((e, i) => {
                 const props = (e.props ?? {}) as Record<string, unknown>;
                 let detail = "";
-                if (e.event === "report_scrolled_depth") detail = `${props.depth_pct}%`;
-                else if (e.event === "report_section_viewed") detail = String(props.section ?? "");
-                else if (e.event === "report_session_end") detail = `${props.time_spent_seconds ?? "?"}s`;
-                else if (e.event === "report_downloaded") detail = String(props.email ?? "");
+                if (e.event === "report_session_end")      detail = `${props.time_spent_seconds ?? "?"}s`;
+                else if (e.event === "wizard_step_viewed") detail = `step ${props.step ?? "?"}`;
+                else if (e.event === "wizard_cta_clicked") detail = String(props.source ?? "");
+                else if (e.event === "wizard_cta_submitted") detail = String(props.email ?? "");
+                else if (e.event === "wizard_role_viewed") detail = String(props.role ?? "");
+                else if (e.event === "wizard_info_viewed") detail = String(props.page ?? "");
                 return (
                   <tr key={e.id} style={{ borderTop: i === 0 ? "none" : "1px solid #F4EFF6" }}>
                     <td style={{ padding: "8px 22px", fontSize: 11, color: "#9988AA", whiteSpace: "nowrap", width: 140 }}>

@@ -7,6 +7,7 @@ interface Props {
   company:             string;
   data:                CompanyWizardData;
   activeRole:          WizardRole | null;
+  isMobile?:           boolean;
   onRoleSelect:        (role: WizardRole | null) => void;
   onRequestAnalysis:   () => void;
 }
@@ -19,9 +20,10 @@ const LEVEL_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 const EFFORT_LABEL: Record<string, string> = { high: "High Effort", medium: "Med Effort", low: "Low Effort" };
 
 // ── Role list ──────────────────────────────────────────────────────────────────
-function RoleList({ company, data, onRoleSelect }: {
+function RoleList({ company, data, onRoleSelect, isMobile }: {
   company:     string;
   data:        CompanyWizardData;
+  isMobile?:   boolean;
   onRoleSelect: (role: WizardRole) => void;
 }) {
   return (
@@ -30,20 +32,22 @@ function RoleList({ company, data, onRoleSelect }: {
         AI opportunities for specific roles at <span style={{ color: "#4ade80" }}>{company}</span>
       </h1>
       <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center", marginBottom: 20 }}>
-        Based on iMocha&apos;s AI analysis of publicly available job postings · Click any role to see tasks, skills and AI tools
+        Based on iMocha&apos;s AI analysis of publicly available job postings · Tap any role to see tasks, skills and AI tools
       </p>
 
       {/* Mini stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 10, marginBottom: 18 }}>
         {[
           { label: "AI Implementation Opportunity", value: `${data.aiImplementationOpportunity}%`, cap: "of workforce can use AI to boost productivity" },
           { label: "Task Automation Potential",      value: `${data.taskAutomationPotential}%`,     cap: "of tasks could be enhanced with AI" },
           { label: "Hours Reclaimed / Week",          value: `${data.totalHoursSavedPerWeek}h`,      cap: "estimated across all analyzed roles", green: true },
         ].map(s => (
-          <div key={s.label} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "14px 18px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, textAlign: "center" }}>
-            <p style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.65)", lineHeight: 1.4 }}>{s.label}</p>
-            <p style={{ fontSize: 26, fontWeight: 900, color: s.green ? "#4ade80" : "#fff", letterSpacing: -1, lineHeight: 1.1 }}>{s.value}</p>
-            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{s.cap}</p>
+          <div key={s.label} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: isMobile ? "10px 14px" : "14px 18px", display: "flex", flexDirection: isMobile ? "row" : "column", alignItems: "center", gap: isMobile ? 10 : 3, textAlign: isMobile ? "left" : "center" }}>
+            <p style={{ fontSize: isMobile ? 22 : 26, fontWeight: 900, color: s.green ? "#4ade80" : "#fff", letterSpacing: -1, lineHeight: 1.1, flexShrink: 0 }}>{s.value}</p>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.65)", lineHeight: 1.4 }}>{s.label}</p>
+              {!isMobile && <p style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{s.cap}</p>}
+            </div>
           </div>
         ))}
       </div>
@@ -55,6 +59,12 @@ function RoleList({ company, data, onRoleSelect }: {
         </p>
         {(data.roles ?? []).map(role => {
           const color = scoreColor(role.overallAutomationScore);
+          // Task mix → stacked distribution bar (manual / augmentable / automatable)
+          const tot   = role.tasks.length;
+          const lowP  = tot ? Math.round(role.tasks.filter(t => t.automationPotential === "low").length    / tot * 100) : 0;
+          const medP  = tot ? Math.round(role.tasks.filter(t => t.automationPotential === "medium").length / tot * 100) : 0;
+          const highP = tot ? 100 - lowP - medP : 0;
+          const distTitle = `Task mix · ${lowP}% manual · ${medP}% AI-augmentable · ${highP}% automatable`;
           return (
             <div
               key={role.analysisId}
@@ -62,8 +72,8 @@ function RoleList({ company, data, onRoleSelect }: {
               style={{
                 display:     "flex",
                 alignItems:  "center",
-                padding:     "10px 18px",
-                gap:         14,
+                padding:     isMobile ? "12px 14px" : "10px 18px",
+                gap:         isMobile ? 10 : 14,
                 cursor:      "pointer",
                 borderTop:   "1px solid rgba(255,255,255,0.05)",
                 transition:  "background .12s",
@@ -71,22 +81,30 @@ function RoleList({ company, data, onRoleSelect }: {
               onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             >
-              <span style={{ flex: "0 0 180px", fontSize: 13, fontWeight: 500, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {role.jobTitle}
               </span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap" }}>
-                {role.department}
-              </span>
-              <span style={{ flexShrink: 0, fontSize: 11, color: "#4ade80", fontWeight: 600, whiteSpace: "nowrap" }}>
-                {role.estimatedHoursSavedPerWeek}h/wk
-              </span>
-              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, width: 36, textAlign: "right", color }}>
+              {!isMobile && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap" }}>
+                  {role.department}
+                </span>
+              )}
+              {!isMobile && (
+                <span style={{ flexShrink: 0, fontSize: 11, color: "#4ade80", fontWeight: 600, whiteSpace: "nowrap" }}>
+                  {role.estimatedHoursSavedPerWeek}h/wk
+                </span>
+              )}
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, width: 30, textAlign: "right", color }}>
                 {role.overallAutomationScore}
               </span>
-              <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 3, width: `${role.overallAutomationScore}%`, background: color }} />
-              </div>
-              <span style={{ flexShrink: 0, color: "rgba(255,255,255,0.5)", fontSize: 14, transition: "color .12s, transform .12s" }}>›</span>
+              {!isMobile && (
+                <div title={distTitle} style={{ flex: "0 0 96px", height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden", display: "flex", cursor: "help" }}>
+                  <div style={{ height: "100%", width: `${lowP}%`,  background: "#4ade80" }} />
+                  <div style={{ height: "100%", width: `${medP}%`,  background: "#fbbf24" }} />
+                  <div style={{ height: "100%", width: `${highP}%`, background: "#f87171" }} />
+                </div>
+              )}
+              <span style={{ flexShrink: 0, color: "#FD5A0F", fontSize: 17, fontWeight: 700, lineHeight: 1, textShadow: "0 0 8px rgba(253,90,15,0.75), 0 0 2px rgba(253,90,15,0.9)" }}>›</span>
             </div>
           );
         })}
@@ -95,8 +113,75 @@ function RoleList({ company, data, onRoleSelect }: {
   );
 }
 
+// ── AI opportunity card (expandable description) ─────────────────────────────────
+function OpportunityCard({ opp }: { opp: WizardRole["aiOpportunities"][number] }) {
+  const [expanded, setExpanded] = useState(false);
+  const impColor = opp.impact === "high" ? "#f87171" : opp.impact === "medium" ? "#fbbf24" : "#4ade80";
+  const impBd    = opp.impact === "high" ? "rgba(248,113,113,0.25)" : opp.impact === "medium" ? "rgba(251,191,36,0.25)" : "rgba(74,222,128,0.25)";
+  // Only offer the toggle when the text would actually clamp (~3 lines).
+  const isLong = opp.description.length > 150;
+  const clamp  = isLong && !expanded;
+
+  return (
+    <div
+      style={{
+        background:    "rgba(255,255,255,0.04)",
+        border:        "1px solid rgba(255,255,255,0.09)",
+        borderRadius:  12,
+        padding:       16,
+        display:       "flex",
+        flexDirection: "column",
+        gap:           8,
+        transition:    "transform .15s, border-color .15s",
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.transform   = "translateY(-2px)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.16)";
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.transform   = "translateY(0)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.09)";
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, borderRadius: 4, padding: "2px 8px", background: "transparent", color: impColor, border: `1px solid ${impBd}` }}>
+          {opp.impact} impact
+        </span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, borderRadius: 4, padding: "2px 8px", background: "transparent", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.12)" }}>
+          {EFFORT_LABEL[opp.effort]}
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{opp.estimatedTimeSaving}</span>
+      </div>
+      <p style={{ fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.4 }}>{opp.title}</p>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.65, ...(clamp ? { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" } : {}) }}>
+        {opp.description}
+      </p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", transition: "color .12s" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
+        >
+          {expanded ? "Show less" : "Show more"}
+          <span style={{ fontSize: 9, transform: expanded ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▾</span>
+        </button>
+      )}
+      {opp.tools.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 2 }}>
+          {opp.tools.map(t => (
+            <span key={t} style={{ fontSize: 10, fontWeight: 600, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", borderRadius: 4, padding: "2px 8px" }}>
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Role detail ────────────────────────────────────────────────────────────────
-function RoleDetail({ role, onBack }: { role: WizardRole; onBack: () => void }) {
+function RoleDetail({ role, onBack, isMobile }: { role: WizardRole; onBack: () => void; isMobile?: boolean }) {
   const [sort, setSort] = useState<"score" | "level">("score");
 
   const highCount = role.tasks.filter(t => t.automationPotential === "high").length;
@@ -161,18 +246,18 @@ function RoleDetail({ role, onBack }: { role: WizardRole; onBack: () => void }) 
       {/* Skills snapshot */}
       <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>Skills Snapshot</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
           {([
-            { label: "Future-Proof", skills: role.skillsAnalysis.futureProof,  cls: "#4ade80",  bg: "rgba(74,222,128,0.12)"  },
-            { label: "AI-Augmented", skills: role.skillsAnalysis.aiAugmented,   cls: "#fbbf24",  bg: "rgba(251,191,36,0.12)"  },
-            { label: "At Risk",      skills: role.skillsAnalysis.atRisk,        cls: "#f87171",  bg: "rgba(248,113,113,0.12)" },
+            { label: "Future-Proof", skills: role.skillsAnalysis.futureProof,  cls: "#4ade80" },
+            { label: "AI-Augmented", skills: role.skillsAnalysis.aiAugmented,   cls: "#fbbf24" },
+            { label: "At Risk",      skills: role.skillsAnalysis.atRisk,        cls: "#f87171" },
           ] as const).map(g => (
             <div key={g.label}>
               <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, color: g.cls, marginBottom: 6 }}>{g.label}</p>
               {g.skills.length === 0
                 ? <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>—</span>
                 : g.skills.map(s => (
-                    <span key={s} style={{ display: "inline-block", fontSize: 11, borderRadius: 4, padding: "2px 8px", margin: "2px 3px 2px 0", lineHeight: 1.6, background: g.bg, color: g.cls }}>
+                    <span key={s} style={{ display: "inline-block", fontSize: 12, margin: "2px 14px 2px 0", lineHeight: 1.7, color: "#fff" }}>
                       {s}
                     </span>
                   ))
@@ -249,7 +334,7 @@ function RoleDetail({ role, onBack }: { role: WizardRole; onBack: () => void }) 
       </div>
 
       {/* Task cards grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 24 }}>
         {sortedTasks.map((task, i) => {
           const pot = task.automationPotential;
           const borderColor = pot === "high" ? "#f87171" : pot === "medium" ? "#fbbf24" : "#4ade80";
@@ -308,58 +393,10 @@ function RoleDetail({ role, onBack }: { role: WizardRole; onBack: () => void }) 
           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 14, lineHeight: 1.5 }}>
             Highest-value AI tools and strategies for this role, ranked by potential impact.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {role.aiOpportunities.map((opp, i) => {
-              const impColor = opp.impact === "high" ? "#f87171" : opp.impact === "medium" ? "#fbbf24" : "#4ade80";
-              const impBg    = opp.impact === "high" ? "rgba(248,113,113,0.12)" : opp.impact === "medium" ? "rgba(251,191,36,0.12)" : "rgba(74,222,128,0.12)";
-              const impBd    = opp.impact === "high" ? "rgba(248,113,113,0.2)" : opp.impact === "medium" ? "rgba(251,191,36,0.2)" : "rgba(74,222,128,0.2)";
-              return (
-                <div
-                  key={i}
-                  style={{
-                    background:   "rgba(96,148,255,0.05)",
-                    border:       "1px solid rgba(96,148,255,0.18)",
-                    borderRadius: 12,
-                    padding:      16,
-                    display:      "flex",
-                    flexDirection: "column",
-                    gap:          8,
-                    transition:   "transform .15s, border-color .15s",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLDivElement).style.transform   = "translateY(-2px)";
-                    (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(96,148,255,0.35)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLDivElement).style.transform   = "translateY(0)";
-                    (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(96,148,255,0.18)";
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, borderRadius: 4, padding: "2px 8px", background: impBg, color: impColor, border: `1px solid ${impBd}` }}>
-                      {opp.impact} impact
-                    </span>
-                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, borderRadius: 4, padding: "2px 8px", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                      {EFFORT_LABEL[opp.effort]}
-                    </span>
-                    <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{opp.estimatedTimeSaving}</span>
-                  </div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.4 }}>{opp.title}</p>
-                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", lineHeight: 1.65, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                    {opp.description}
-                  </p>
-                  {opp.tools.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 2 }}>
-                      {opp.tools.map(t => (
-                        <span key={t} style={{ fontSize: 10, fontWeight: 600, background: "rgba(96,148,255,0.1)", border: "1px solid rgba(96,148,255,0.2)", color: "#6094FF", borderRadius: 4, padding: "2px 8px" }}>
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+            {role.aiOpportunities.map((opp, i) => (
+              <OpportunityCard key={i} opp={opp} />
+            ))}
           </div>
         </>
       )}
@@ -368,8 +405,8 @@ function RoleDetail({ role, onBack }: { role: WizardRole; onBack: () => void }) 
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
-export default function Step4Roles({ company, data, activeRole, onRoleSelect, onRequestAnalysis }: Props) {
-  void onRequestAnalysis; // available for future inline CTA use
+export default function Step4Roles({ company, data, activeRole, isMobile, onRoleSelect, onRequestAnalysis }: Props) {
+  void onRequestAnalysis;
 
   return (
     <div style={{
@@ -377,14 +414,14 @@ export default function Step4Roles({ company, data, activeRole, onRoleSelect, on
       width:      "100%",
       height:     "100%",
       overflowY:  "auto",
-      padding:    "28px 40px 0",
+      padding:    isMobile ? "20px 16px 0" : "28px 40px 0",
       scrollbarWidth: "thin",
       scrollbarColor: "rgba(255,255,255,0.15) transparent",
     }}>
       <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", paddingBottom: 28 }}>
         {activeRole
-          ? <RoleDetail role={activeRole} onBack={() => onRoleSelect(null)} />
-          : <RoleList   company={company} data={data} onRoleSelect={onRoleSelect} />
+          ? <RoleDetail role={activeRole} onBack={() => onRoleSelect(null)} isMobile={isMobile} />
+          : <RoleList   company={company} data={data} onRoleSelect={onRoleSelect} isMobile={isMobile} />
         }
       </div>
     </div>

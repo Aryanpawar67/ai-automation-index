@@ -5,6 +5,7 @@ import { createAnalysisGraph }             from "@/app/api/analyze/graph";
 import { isValidJD }                       from "@/lib/validation";
 import { eq, sql, and }                    from "drizzle-orm";
 import type { FinalAnalysis }              from "@/app/api/analyze/agents/types";
+import { computeWizardData }               from "@/lib/report/aggregate";
 
 export const analyzeJDFn = inngest.createFunction(
   {
@@ -72,7 +73,7 @@ export const analyzeJDFn = inngest.createFunction(
         return { status: "skipped", reason: "did not pass JD validation" };
       }
 
-      const [companyRow] = await db.select({ name: companies.name })
+      const [companyRow] = await db.select({ name: companies.name, slug: companies.slug })
         .from(companies)
         .where(eq(companies.id, jd.companyId));
 
@@ -134,6 +135,26 @@ export const analyzeJDFn = inngest.createFunction(
             completedAt: new Date(),
           })
           .where(eq(batches.id, batchId));
+
+        // Recompute and persist wizard data for this company
+        const allAnalysisRows = await db
+          .select({ id: analyses.id, result: analyses.result, department: jobDescriptions.department })
+          .from(analyses)
+          .innerJoin(jobDescriptions, eq(analyses.jobDescriptionId, jobDescriptions.id))
+          .where(eq(analyses.companyId, jd.companyId));
+
+        const wizardData = computeWizardData(
+          allAnalysisRows.map(a => ({
+            analysisId: a.id,
+            result:     a.result as FinalAnalysis,
+            department: a.department,
+          })),
+          companyRow?.slug ?? undefined
+        );
+
+        await db.update(companies)
+          .set({ wizardData })
+          .where(eq(companies.id, jd.companyId));
       }
 
       return { status: "complete" };

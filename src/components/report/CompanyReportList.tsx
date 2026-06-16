@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import dynamic from "next/dynamic";
-
-const DownloadRolePdfButton = dynamic(() => import("./DownloadRolePdfButton"), { ssr: false });
+import DownloadAllButton from "./DownloadAllButton";
 
 interface AnalysisRow {
   analysisId:   string;
@@ -14,6 +12,9 @@ interface AnalysisRow {
   hoursSaved:   string | null;
   createdAt:    string;
 }
+
+type SortKey = "rank" | "jdTitle" | "jdDepartment" | "overallScore" | "hoursSaved";
+type SortDir = "asc" | "desc";
 
 function potential(score: number): "high" | "medium" | "low" {
   if (score >= 65) return "high";
@@ -30,21 +31,56 @@ const POTENTIAL_CFG: Record<string, { label: string; text: string; bg: string; b
 const SCORE_COLOR = (score: number) =>
   score >= 65 ? "#ef4444" : score >= 40 ? "#f59e0b" : "#10b981";
 
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "overallScore", label: "Score"      },
+  { key: "hoursSaved",   label: "Hours/wk"   },
+  { key: "jdTitle",      label: "Title A–Z"  },
+  { key: "jdDepartment", label: "Department" },
+];
+
 export default function CompanyReportList({
   company,
   analyses,
   companyId,
-  identifier,
   token,
 }: {
-  company:    string;
-  analyses:   AnalysisRow[];
-  companyId:  string;
-  identifier: string;
-  token:      string;
+  company:   string;
+  analyses:  AnalysisRow[];
+  companyId: string;
+  token:     string;
 }) {
-  // Default order: highest score first
-  const sorted = [...analyses].sort((a, b) => (b.overallScore ?? -1) - (a.overallScore ?? -1));
+  const [sortKey, setSortKey] = useState<SortKey>("overallScore");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  const sorted = [...analyses].sort((a, b) => {
+    let av: string | number = 0;
+    let bv: string | number = 0;
+    if (sortKey === "overallScore") {
+      av = a.overallScore ?? -1;
+      bv = b.overallScore ?? -1;
+    } else if (sortKey === "hoursSaved") {
+      av = parseFloat(a.hoursSaved ?? "0") || 0;
+      bv = parseFloat(b.hoursSaved ?? "0") || 0;
+    } else if (sortKey === "jdTitle") {
+      av = a.jdTitle.toLowerCase();
+      bv = b.jdTitle.toLowerCase();
+    } else if (sortKey === "jdDepartment") {
+      av = (a.jdDepartment ?? "").toLowerCase();
+      bv = (b.jdDepartment ?? "").toLowerCase();
+    }
+    if (av < bv) return sortDir === "asc" ? -1 : 1;
+    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
 
   const scoredRows = analyses.filter(a => a.overallScore != null);
   const avgScore   = scoredRows.length
@@ -57,13 +93,25 @@ export default function CompanyReportList({
     <div style={{ animation: "fadeInUp 0.4s ease both" }}>
 
       {/* Page header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: "#220133", margin: "0 0 5px", letterSpacing: "-0.5px" }}>
-          {company}
-        </h1>
-        <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
-          AI automation analysis across your open roles · Powered by iMocha
-        </p>
+      <div style={{
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+        gap: 16, marginBottom: 28, flexWrap: "wrap",
+      }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: "#220133", margin: "0 0 5px", letterSpacing: "-0.5px" }}>
+            {company}
+          </h1>
+          <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
+            AI automation analysis across your open roles · Powered by Claude
+          </p>
+        </div>
+        {analyses.length > 0 && (
+          <DownloadAllButton
+            companyId={companyId}
+            company={company}
+            count={analyses.length}
+          />
+        )}
       </div>
 
       {analyses.length === 0 ? (
@@ -79,7 +127,9 @@ export default function CompanyReportList({
       ) : (
         <>
           {/* Summary strip */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24,
+          }}>
             <StatChip label="Total roles" value={String(analyses.length)} color="#220133" bg="#F4EFF6" border="#EAE4EF" />
             {avgScore != null && (
               <StatChip
@@ -96,8 +146,41 @@ export default function CompanyReportList({
             )}
           </div>
 
+          {/* Sort bar */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 18, flexWrap: "wrap",
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#9988AA", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              Sort by
+            </span>
+            {SORT_OPTIONS.map(opt => {
+              const isActive = sortKey === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => handleSort(opt.key)}
+                  style={{
+                    padding: "5px 14px", borderRadius: 20, cursor: "pointer",
+                    fontSize: 12, fontWeight: 600,
+                    background: isActive ? "#FD5A0F" : "#fff",
+                    color: isActive ? "#fff" : "#553366",
+                    border: isActive ? "1px solid transparent" : "1px solid #EAE4EF",
+                    boxShadow: isActive ? "0 2px 8px rgba(253,90,15,0.25)" : "none",
+                    transition: "all 0.15s",
+                    display: "flex", alignItems: "center", gap: 4,
+                  } as React.CSSProperties}
+                >
+                  {opt.label}
+                  {isActive && (
+                    <span style={{ fontSize: 9 }}>{sortDir === "asc" ? "▲" : "▼"}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Role cards grid */}
-          <div className="role-cards-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 32 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 32 }}>
             {sorted.map((a, i) => {
               const score    = a.overallScore ?? 0;
               const pot      = a.overallScore != null ? potential(score) : null;
@@ -115,15 +198,89 @@ export default function CompanyReportList({
                   scoreColor={scoreCol}
                   hours={hours}
                   potCfg={potCfg}
-                  href={`/report/${identifier}/${a.analysisId}?token=${encodeURIComponent(token)}`}
+                  href={`/report/${companyId}/${a.analysisId}?token=${token}`}
                   delay={i * 0.05}
-                  companyId={companyId}
-                  analysisId={a.analysisId}
-                  token={token}
-                  companySlug={identifier}
                 />
               );
             })}
+          </div>
+
+          {/* CEO value proposition */}
+          <div style={{
+            background: "linear-gradient(135deg, #220133 0%, #3D0060 50%, #220133 100%)",
+            border: "1px solid #3D0060", borderRadius: 24, overflow: "hidden",
+          }}>
+            <div style={{ padding: "36px 40px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <p style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                    color: "#FDBB96", margin: "0 0 10px",
+                  }}>
+                    Your next competitive advantage
+                  </p>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", lineHeight: 1.3, margin: "0 0 14px" }}>
+                    While others are still screening résumés, your top candidates are being hired.
+                  </h2>
+                  <p style={{ fontSize: 14, color: "#C4B5D0", lineHeight: 1.7, margin: "0 0 20px" }}>
+                    iMocha&apos;s AI-powered skills intelligence helps leading enterprises cut time-to-hire by{" "}
+                    <strong style={{ color: "#FDBB96" }}>up to 40%</strong>, identify automation-ready talent
+                    before competitors do, and build workforce strategies that compound in value year over year.
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {[
+                      { icon: "⚡", text: "Skills-first hiring"   },
+                      { icon: "🎯", text: "Predictive talent fit" },
+                      { icon: "📈", text: "AI-readiness scoring"  },
+                    ].map(item => (
+                      <span key={item.text} style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        fontSize: 12, fontWeight: 600, color: "#fff",
+                        background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.15)",
+                        borderRadius: 8, padding: "6px 12px",
+                      }}>
+                        {item.icon} {item.text}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{
+                  background: "rgba(253,90,15,0.12)", border: "1px solid rgba(253,90,15,0.3)",
+                  borderRadius: 18, padding: "22px 24px", minWidth: 200, maxWidth: 260, flexShrink: 0,
+                }}>
+                  <p style={{ fontSize: 13, color: "#FDBB96", fontStyle: "italic", lineHeight: 1.65, margin: "0 0 16px" }}>
+                    &ldquo;The automation opportunity in your workforce isn&apos;t a future threat — it&apos;s today&apos;s competitive edge. The question is who acts first.&rdquo;
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: "50%",
+                      background: "linear-gradient(135deg, #FD5A0F, #FDBB96)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 14, fontWeight: 800, color: "#fff",
+                    }}>i</div>
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: "#fff", margin: 0 }}>iMocha Intelligence</p>
+                      <p style={{ fontSize: 11, color: "#9988AA", margin: 0 }}>AI Workforce Insights</p>
+                    </div>
+                  </div>
+                  <a
+                    href="https://www.imocha.io/contact"
+                    target="_blank" rel="noreferrer"
+                    style={{
+                      display: "block", textAlign: "center",
+                      background: "#FD5A0F", color: "#fff",
+                      fontWeight: 700, fontSize: 13, borderRadius: 10,
+                      padding: "10px 0", textDecoration: "none",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#e54d0d")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "#FD5A0F")}
+                  >
+                    Talk to us →
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -132,9 +289,6 @@ export default function CompanyReportList({
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
-        }
-        @media screen and (max-width: 768px) {
-          .role-cards-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
         }
       `}</style>
     </div>
@@ -160,20 +314,16 @@ function StatChip({ label, value, color, bg, border }: {
   );
 }
 
-function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, href, delay, companyId, analysisId, token, companySlug }: {
-  rank:        number;
-  title:       string;
-  department:  string | null;
-  score:       number | null;
-  scoreColor:  string;
-  hours:       number | null;
-  potCfg:      { label: string; text: string; bg: string; border: string } | null;
-  href:        string;
-  delay:       number;
-  companyId:   string;
-  analysisId:  string;
-  token:       string;
-  companySlug: string;
+function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, href, delay }: {
+  rank:       number;
+  title:      string;
+  department: string | null;
+  score:      number | null;
+  scoreColor: string;
+  hours:      number | null;
+  potCfg:     { label: string; text: string; bg: string; border: string } | null;
+  href:       string;
+  delay:      number;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -183,15 +333,18 @@ function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, h
       onMouseLeave={() => setHovered(false)}
       style={{
         background: "#fff",
-        border: "1px solid #EAE4EF",
+        border: `1px solid ${hovered ? "#EAE4EF" : "#EAE4EF"}`,
         borderRadius: 20,
         padding: "20px 22px",
-        boxShadow: hovered ? "0 8px 32px rgba(34,1,51,0.10)" : "0 2px 12px rgba(34,1,51,0.06)",
+        boxShadow: hovered
+          ? "0 8px 32px rgba(34,1,51,0.10)"
+          : "0 2px 12px rgba(34,1,51,0.06)",
         transform: hovered ? "translateY(-2px)" : "none",
         transition: "box-shadow 0.18s, transform 0.18s",
         animation: `fadeInUp 0.35s ease ${delay}s both`,
         display: "flex", flexDirection: "column", gap: 12,
-      }}>
+      }}
+    >
       {/* Top row: rank + score */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -253,33 +406,25 @@ function RoleCard({ rank, title, department, score, scoreColor, hours, potCfg, h
         ) : (
           <div />
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <DownloadRolePdfButton
-            companyId={companyId}
-            analysisId={analysisId}
-            token={token}
-            title={title}
-            companySlug={companySlug}
-          />
-          <Link
-            href={href}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 5,
-              padding: "7px 16px", borderRadius: 10,
-              fontSize: 12, fontWeight: 700,
-              background: hovered ? "#FD5A0F" : "#FFF0EA",
-              color: hovered ? "#fff" : "#FD5A0F",
-              border: "1px solid #FDBB96",
-              textDecoration: "none",
-              flexShrink: 0,
-            }}
-          >
-            View report
-            <svg width="10" height="10" fill="none" viewBox="0 0 16 16">
-              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </Link>
-        </div>
+        <Link
+          href={href}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "7px 16px", borderRadius: 10,
+            fontSize: 12, fontWeight: 700,
+            background: hovered ? "#FD5A0F" : "#FFF0EA",
+            color: hovered ? "#fff" : "#FD5A0F",
+            border: "1px solid #FDBB96",
+            textDecoration: "none",
+            transition: "background 0.15s, color 0.15s",
+            flexShrink: 0,
+          }}
+        >
+          View report
+          <svg width="10" height="10" fill="none" viewBox="0 0 16 16">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </Link>
       </div>
     </div>
   );

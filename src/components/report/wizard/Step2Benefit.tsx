@@ -99,13 +99,14 @@ function RingCard({ title, pct, color, caption }: RingCardProps) {
 }
 
 interface Props {
-  company: string;
-  data:    CompanyWizardData;
+  company:   string;
+  data:      CompanyWizardData;
+  isMobile?: boolean;
 }
 
-export default function Step2Benefit({ company, data }: Props) {
+export default function Step2Benefit({ company, data, isMobile }: Props) {
   return (
-    <div style={{ width: "100%", maxWidth: 960 }}>
+    <div style={{ width: "100%", maxWidth: 960, paddingTop: isMobile ? 24 : 0, paddingBottom: isMobile ? 24 : 0 }}>
       <h1 style={{
         fontSize:      "clamp(22px,3vw,36px)",
         fontWeight:    800,
@@ -116,11 +117,11 @@ export default function Step2Benefit({ company, data }: Props) {
       }}>
         How <span style={{ color: "#4ade80" }}>{company}&apos;s</span> workforce can benefit from AI
       </h1>
-      <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, maxWidth: 640, marginBottom: 48 }}>
+      <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, maxWidth: 640, marginBottom: isMobile ? 24 : 48 }}>
         Here&apos;s the level of AI opportunity your workforce will experience. Our analysis shows which jobs remain human-led and which are to be enhanced by AI.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, maxWidth: 760, margin: "0 auto" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20, maxWidth: 760, margin: "0 auto" }}>
         <RingCard
           title="Human AI Partnership Opportunity"
           pct={data.humanAiPartnership}

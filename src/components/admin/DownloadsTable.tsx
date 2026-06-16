@@ -5,7 +5,7 @@ import DeleteDownloadButton from "@/components/admin/DeleteDownloadButton";
 
 export type DownloadRow = {
   id:          string;
-  type:        "card" | "page" | "cta";
+  type:        "page" | "cta";
   email:       string;
   companyName: string | null;
   reportSlug:  string | null;
@@ -14,17 +14,15 @@ export type DownloadRow = {
   deletableId: string | null; // non-null only for "page" rows (reportDownloads)
 };
 
-type Filter = "all" | "card" | "page" | "cta";
+type Filter = "all" | "page" | "cta";
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all",  label: "All"      },
-  { value: "card", label: "Card"     },
   { value: "page", label: "Page"     },
   { value: "cta",  label: "CTA Lead" },
 ];
 
-const TYPE_META: Record<"card" | "page" | "cta", { label: string; bg: string; color: string }> = {
-  card: { label: "Card",     bg: "#EEF2FF", color: "#4F46E5" },
+const TYPE_META: Record<"page" | "cta", { label: string; bg: string; color: string }> = {
   page: { label: "Page",     bg: "#F0FDF4", color: "#059669" },
   cta:  { label: "CTA Lead", bg: "#FFF0EA", color: "#FD5A0F" },
 };
@@ -74,7 +72,7 @@ export default function DownloadsTable({ rows }: { rows: DownloadRow[] }) {
                 gap:         5,
               }}
             >
-              {f.label}
+              <span>{f.label}</span>
               <span style={{
                 fontSize:    10,
                 fontWeight:  700,

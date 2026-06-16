@@ -6,17 +6,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LOCATION_TOOLTIP } from "@/lib/formatLocation";
 
 export interface AnalyticsRow {
-  companyId:    string;
-  name:         string;
-  slug:         string | null;
-  opens:        number;
-  sessions:     number;
-  downloads:    number;
-  downloadCard: number;
-  downloadPage: number;
-  devices:      number;
-  topLocation:  string | null;
-  lastSeen:     string;           // already formatted on the server; passing
+  companyId:   string;
+  name:        string;
+  slug:        string | null;
+  opens:       number;
+  sessions:    number;
+  devices:     number;
+  topLocation: string | null;
+  lastSeen:    string;            // already formatted on the server; passing
                                   // ISO + formatting client-side would cause
                                   // SSR/CSR timezone hydration mismatches.
 }
@@ -28,13 +25,12 @@ const RANGE_OPTIONS = [
   { value: "all", label: "All time" },
 ] as const;
 
-type EngagementFilter = "all" | "engaged" | "downloaded" | "forwarded";
+type EngagementFilter = "all" | "engaged" | "forwarded";
 
 const FILTER_PILLS: Array<{ value: EngagementFilter; label: string }> = [
-  { value: "all",        label: "All" },
-  { value: "engaged",    label: "Engaged" },
-  { value: "downloaded", label: "Downloaded" },
-  { value: "forwarded",  label: "Forwarded" },
+  { value: "all",       label: "All" },
+  { value: "engaged",   label: "Engaged" },
+  { value: "forwarded", label: "Forwarded" },
 ];
 
 export default function AnalyticsCompanyTable({
@@ -55,9 +51,8 @@ export default function AnalyticsCompanyTable({
     const q = query.trim().toLowerCase();
     return rows.filter(r => {
       if (q && !r.name.toLowerCase().includes(q) && !(r.slug ?? "").toLowerCase().includes(q)) return false;
-      if (pill === "engaged"    && r.sessions  === 0) return false;
-      if (pill === "downloaded" && r.downloads === 0) return false;
-      if (pill === "forwarded"  && r.devices   <= 1)  return false;
+      if (pill === "engaged"   && r.sessions === 0) return false;
+      if (pill === "forwarded" && r.devices  <= 1)  return false;
       return true;
     });
   }, [rows, query, pill]);
@@ -179,7 +174,6 @@ export default function AnalyticsCompanyTable({
                   { label: "Opens" },
                   { label: "Sessions" },
                   { label: "Devices", hint: "Distinct device/network signatures (ip_hash + user_agent). >1 = link was likely forwarded to another person or accessed from multiple devices." },
-                  { label: "Downloads" },
                   { label: "Last activity" },
                 ].map(h => (
                   <th key={h.label} title={h.hint} style={{
@@ -236,16 +230,6 @@ export default function AnalyticsCompanyTable({
                           FWD
                         </span>
                       )}
-                    </td>
-                    <td style={{ padding: "16px 24px", fontSize: 14, color: row.downloads > 0 ? "#059669" : "#9988AA", fontWeight: 700, whiteSpace: "nowrap" }}>
-                      {row.downloads === 0
-                        ? "0"
-                        : row.downloadCard > 0 && row.downloadPage > 0
-                          ? <>{row.downloads} <span style={{ fontSize: 11, fontWeight: 500, color: "#9988AA" }}>({row.downloadCard} card + {row.downloadPage} page)</span></>
-                          : row.downloadCard > 0
-                            ? <>{row.downloads} <span style={{ fontSize: 11, fontWeight: 500, color: "#9988AA" }}>(card)</span></>
-                            : <>{row.downloads} <span style={{ fontSize: 11, fontWeight: 500, color: "#9988AA" }}>(page)</span></>
-                      }
                     </td>
                     <td style={{ padding: "16px 24px", fontSize: 13, color: "#9988AA", whiteSpace: "nowrap" }}>
                       {row.lastSeen}

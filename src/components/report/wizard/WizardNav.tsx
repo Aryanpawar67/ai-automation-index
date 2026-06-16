@@ -3,13 +3,14 @@
 interface WizardNavProps {
   step:            number;
   hasActiveRole:   boolean;
+  isMobile?:       boolean;
   onBack:          () => void;
   onGetAnalysis:   () => void;
   onVision:        () => void;
   onHowItWorks:    () => void;
 }
 
-export default function WizardNav({ step, hasActiveRole, onBack, onGetAnalysis, onVision, onHowItWorks }: WizardNavProps) {
+export default function WizardNav({ step, hasActiveRole, isMobile, onBack, onGetAnalysis, onVision, onHowItWorks }: WizardNavProps) {
   const backHidden = step === 1 && !hasActiveRole;
 
   return (
@@ -17,12 +18,12 @@ export default function WizardNav({ step, hasActiveRole, onBack, onGetAnalysis, 
       display:         "flex",
       alignItems:      "center",
       justifyContent:  "space-between",
-      padding:         "0 40px",
+      padding:         isMobile ? "0 16px" : "0 40px",
       height:          60,
       borderBottom:    "1px solid rgba(255,255,255,0.1)",
       flexShrink:      0,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button
           onClick={onBack}
           style={{
@@ -50,26 +51,28 @@ export default function WizardNav({ step, hasActiveRole, onBack, onGetAnalysis, 
         >
           ←
         </button>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img
-            src="/imocha-logo.png"
-            alt="iMocha"
-            style={{ height: 26, width: "auto", filter: "brightness(0) invert(1)", display: "block" }}
-          />
-        </div>
+        <img
+          src="/imocha-logo.png"
+          alt="iMocha"
+          style={{ height: 24, width: "auto", filter: "brightness(0) invert(1)", display: "block" }}
+        />
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-        <button onClick={onVision} style={{ background: "none", border: "none", fontSize: 13, color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0 }}
-          onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
-          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}>
-          Vision
-        </button>
-        <button onClick={onHowItWorks} style={{ background: "none", border: "none", fontSize: 13, color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0 }}
-          onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
-          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}>
-          How it works
-        </button>
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 12 : 28 }}>
+        {!isMobile && (
+          <>
+            <button onClick={onVision} style={{ background: "none", border: "none", fontSize: 13, color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0 }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}>
+              Vision
+            </button>
+            <button onClick={onHowItWorks} style={{ background: "none", border: "none", fontSize: 13, color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0 }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}>
+              How it works
+            </button>
+          </>
+        )}
         <button
           onClick={onGetAnalysis}
           style={{
@@ -77,11 +80,12 @@ export default function WizardNav({ step, hasActiveRole, onBack, onGetAnalysis, 
             color:        "#fff",
             border:       "none",
             borderRadius: 8,
-            padding:      "9px 20px",
-            fontSize:     13,
+            padding:      isMobile ? "8px 14px" : "9px 20px",
+            fontSize:     isMobile ? 12 : 13,
             fontWeight:   700,
             cursor:       "pointer",
             transition:   "background .15s, transform .1s",
+            whiteSpace:   "nowrap",
           }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLButtonElement).style.background = "#e84e0a";
@@ -92,7 +96,7 @@ export default function WizardNav({ step, hasActiveRole, onBack, onGetAnalysis, 
             (e.currentTarget as HTMLButtonElement).style.transform  = "translateY(0)";
           }}
         >
-          Get your custom analysis
+          {isMobile ? "Get analysis" : "Get your custom analysis"}
         </button>
       </div>
     </nav>

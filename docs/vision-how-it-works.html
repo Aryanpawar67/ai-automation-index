@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vision & How It Works — iMocha AI Automation Report</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    
+    :root {
+      --bg:        #0e0e10;
+      --card:      rgba(255,255,255,0.05);
+      --border:    rgba(255,255,255,0.1);
+      --green:     #4ade80;
+      --orange:    #FD5A0F;
+      --blue:      #6094FF;
+      --amber:     #fbbf24;
+      --text:      #fff;
+      --muted:     rgba(255,255,255,0.55);
+      --subtle:    rgba(255,255,255,0.25);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 48px;
+      height: 60px;
+      background: rgba(14,14,16,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .logo {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      color: #fff;
+      text-decoration: none;
+    }
+    nav .logo span { color: var(--orange); }
+    nav .nav-links { display: flex; gap: 32px; }
+    nav .nav-links a {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .15s;
+    }
+    nav .nav-links a:hover,
+    nav .nav-links a.active { color: #fff; }
+    nav .cta {
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .15s;
+    }
+    nav .cta:hover { background: #e84e0a; }
+
+    /* ── SECTIONS ── */
+    section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 96px 24px;
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 46px);
+      font-weight: 900;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+    h1 em { font-style: normal; color: var(--green); }
+
+    h2 {
+      font-size: clamp(20px, 2.5vw, 28px);
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 16px;
+    }
+    h2 em { font-style: normal; color: var(--orange); }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 16px;
+    }
+    p:last-child { margin-bottom: 0; }
+
+    .lead {
+      font-size: 17px;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    /* ── DIVIDER ── */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 16px;
+    }
+
+    /* ── STEP CARDS ── */
+    .steps { display: flex; flex-direction: column; gap: 16px; margin-top: 48px; }
+    .step {
+      display: flex;
+      gap: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--green);
+      margin-top: 2px;
+    }
+    .step-body { flex: 1; }
+
+    /* ── CATEGORY PILLS ── */
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pill {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid;
+    }
+    .pill-green  { color: var(--green);  background: rgba(74,222,128,0.08);  border-color: rgba(74,222,128,0.25); }
+    .pill-orange { color: var(--orange); background: rgba(253,90,15,0.08);   border-color: rgba(253,90,15,0.25); }
+    .pill-blue   { color: var(--blue);   background: rgba(96,148,255,0.08);  border-color: rgba(96,148,255,0.25); }
+    .pill-amber  { color: var(--amber);  background: rgba(251,191,36,0.08);  border-color: rgba(251,191,36,0.25); }
+
+    /* ── CATEGORY TABLE ── */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .cat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .cat-card .cat-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .cat-card p { font-size: 13px; color: var(--muted); }
+
+    /* ── QUOTE ── */
+    .callout {
+      border-left: 3px solid var(--green);
+      padding: 16px 24px;
+      background: rgba(74,222,128,0.05);
+      border-radius: 0 12px 12px 0;
+      margin: 24px 0;
+    }
+    .callout p { color: rgba(255,255,255,0.8); font-style: italic; }
+
+    /* ── DISCLAIMER ── */
+    .disclaimer {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-top: 64px;
+    }
+    .disclaimer p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      line-height: 1.7;
+    }
+
+    /* ── HERO BG GRADIENTS ── */
+    .hero-section {
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-section::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 90% 20%, rgba(74,222,128,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 10% 80%, rgba(253,90,15,0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-section > * { position: relative; }
+
+    @media (max-width: 600px) {
+      nav { padding: 0 20px; }
+      nav .nav-links { display: none; }
+      section { padding: 64px 20px; }
+      .cat-grid { grid-template-columns: 1fr; }
+      .step { flex-direction: column; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a class="logo" href="#"><span>i</span>Mocha AI Report</a>
+  <div class="nav-links">
+    <a href="#vision" class="active">Vision</a>
+    <a href="#how-it-works">How it works</a>
+  </div>
+  <a class="cta" href="#">Get your custom analysis</a>
+</nav>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     VISION
+════════════════════════════════════════════════════════════════ -->
+<section id="vision" class="hero-section">
+  <span class="section-label">Our Vision</span>
+  <h1>Why we built the<br /><em>AI Automation Report</em></h1>
+  <p class="lead">
+    AI is reshaping every industry — but most organisations are navigating its impact without a clear picture of what it means for their specific workforce. Generic market reports don't answer the questions HR and business leaders actually face: <em>Which roles are changing? Where is the risk? Where is the opportunity?</em>
+  </p>
+
+  <div class="card">
+    <h3>Organisations are flying blind</h3>
+    <p>
+      The vast majority of AI transformation decisions are being made on intuition, analyst averages, or industry benchmarks that don't reflect a company's actual job architecture. An "average" automation score for "Financial Services" tells you very little about the specific mix of roles your organisation employs today.
+    </p>
+    <p>
+      Business leaders deserve role-level intelligence — grounded in their own job descriptions, not someone else's workforce.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>The gap between potential and readiness</h3>
+    <p>
+      Most AI adoption frameworks focus on technology selection. Very few start from the workforce itself: which skills are durable, which tasks can be augmented, and where should upskilling investment be concentrated.
+    </p>
+    <p>
+      We built this report to close that gap — turning publicly available job posting data into a structured, company-specific AI readiness picture that organisations can act on immediately.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>iMocha's role: skills intelligence at scale</h3>
+    <p>
+      iMocha's core platform has assessed skill proficiency for millions of professionals across enterprises worldwide. We apply the same rigour to the AI transition — using our deep skills taxonomy and AI analysis pipeline to evaluate automation potential at the task and role level.
+    </p>
+    <p>
+      The AI Automation Report is our commitment to making that intelligence accessible: a free, company-specific analysis that gives HR leaders a credible starting point for their AI workforce strategy.
+    </p>
+  </div>
+
+  <div class="callout">
+    <p>
+      "Every role in your organisation sits somewhere on the spectrum from fully human to highly automatable. Knowing where — before your competitors do — is the defining strategic advantage of the next decade."
+    </p>
+  </div>
+
+  <div style="margin-top: 40px;">
+    <h2>What we stand for</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;">
+
+      <div class="card" style="margin-bottom:0">
+        <h3 style="color: var(--green); font-size:14px; margin-bottom:6px;">Transparency</h3>
+        <p style="font-size:13px;">Every estimate in your report comes from analysis of real, publicly available job postings — not invented benchmarks. We tell you exactly what we analysed.</p>
+      </div>
+
+      <div class="card" style="margin-bottom:0">
+        <h3 style="color: var(--blue); font-size:14px; margin-bottom:6px;">Specificity</h3>
+        <p style="font-size:13px;">Your report reflects your organisation's actual role mix, not an industry average. Scores and rankings are computed from your job descriptions only.</p>
+      </div>
+
+      <div class="card" style="margin-bottom:0">
+        <h3 style="color: var(--orange); font-size:14px; margin-bottom:6px;">Actionability</h3>
+        <p style="font-size:13px;">We surface the roles, tasks, and skills that matter most for upskilling investment — ranked so HR leaders know where to start.</p>
+      </div>
+
+      <div class="card" style="margin-bottom:0">
+        <h3 style="color: var(--amber); font-size:14px; margin-bottom:6px;">Responsibility</h3>
+        <p style="font-size:13px;">AI scores are estimates, not verdicts. We present insights as a strategic starting point and recommend human validation before any workforce decision.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr />
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     HOW IT WORKS
+════════════════════════════════════════════════════════════════ -->
+<section id="how-it-works">
+  <span class="section-label">Methodology</span>
+  <h1>How the<br /><em style="color:var(--orange)">AI Automation Report</em><br />is built</h1>
+  <p class="lead">
+    Every report is generated through a four-stage pipeline that turns publicly available job posting data into structured, role-level AI automation intelligence — specific to your organisation.
+  </p>
+
+  <div class="steps">
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Data sourcing — public job postings</h3>
+        <p>
+          We collect publicly available job postings associated with your organisation's careers page. These postings are the authoritative, up-to-date description of what your organisation actually needs from its workforce — more current than internal job catalogues and more specific than O*NET or industry surveys.
+        </p>
+        <p>
+          We do not use confidential HR data, internal salary information, or any non-public employee records. The analysis is built entirely from information your organisation has already made public.
+        </p>
+        <div class="pill-row">
+          <span class="pill pill-green">Public careers pages</span>
+          <span class="pill pill-green">Job descriptions</span>
+          <span class="pill pill-green">No proprietary data required</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Task & skill extraction</h3>
+        <p>
+          Each job description is processed by iMocha's AI analysis pipeline, which decomposes the role into its constituent tasks, required skills, and implied responsibilities. Tasks are normalised across roles so that, for example, "data reconciliation" described differently across five finance roles is mapped to a consistent underlying activity.
+        </p>
+        <p>
+          Skills are mapped to iMocha's proprietary skills taxonomy — one of the largest in the industry — which classifies competencies across technical, cognitive, interpersonal, and domain-specific dimensions.
+        </p>
+        <div class="pill-row">
+          <span class="pill pill-blue">Task decomposition</span>
+          <span class="pill pill-blue">Skill mapping</span>
+          <span class="pill pill-blue">Cross-role normalisation</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Automation scoring</h3>
+        <p>
+          Each extracted task is evaluated against a multi-factor automation model that considers:
+        </p>
+        <ul style="color: rgba(255,255,255,0.7); margin: 12px 0 12px 20px; line-height: 2;">
+          <li><strong style="color:#fff">Cognitive complexity</strong> — degree of judgment, creativity, and novel problem-solving required</li>
+          <li><strong style="color:#fff">Predictability</strong> — whether the task follows well-defined rules or requires contextual adaptation</li>
+          <li><strong style="color:#fff">Data intensity</strong> — how much of the task involves processing structured information</li>
+          <li><strong style="color:#fff">Human interaction requirement</strong> — degree to which emotional intelligence, trust, or physical presence is intrinsic to the task</li>
+          <li><strong style="color:#fff">Current AI capability</strong> — assessed against the state of commercially available AI tools at the time of analysis</li>
+        </ul>
+        <p>
+          Tasks are classified into three categories, and an overall automation score (0–100) is computed per role as a weighted aggregate:
+        </p>
+
+        <div class="cat-grid">
+          <div class="cat-card">
+            <div class="cat-label" style="color: var(--green);">Low automation potential</div>
+            <p>Tasks that rely heavily on human judgment, creativity, relational skills, or physical dexterity. AI can assist but not replace the core activity.</p>
+          </div>
+          <div class="cat-card">
+            <div class="cat-label" style="color: var(--amber);">Medium — AI-augmentable</div>
+            <p>Tasks where AI tools can meaningfully accelerate output, reduce error rates, or shift effort — but human oversight and interpretation remain essential.</p>
+          </div>
+          <div class="cat-card">
+            <div class="cat-label" style="color: var(--orange);">High automation potential</div>
+            <p>Structured, rule-based tasks with well-defined inputs and outputs that current AI systems can perform with minimal human intervention.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h3>Company-level aggregation</h3>
+        <p>
+          Individual role scores are aggregated across your organisation's full job architecture to produce the company-level metrics shown in your report:
+        </p>
+        <div class="pill-row" style="margin-bottom: 16px;">
+          <span class="pill pill-green">AI Implementation Opportunity</span>
+          <span class="pill pill-amber">Task Automation Potential</span>
+          <span class="pill pill-blue">Workforce Upskilling Needs</span>
+          <span class="pill pill-orange">Hours Reclaimed per Week</span>
+        </div>
+        <p>
+          Department-level breakdowns are computed by grouping roles according to the department or function indicated in each job posting. Peer comparisons use an illustrative industry baseline to provide directional context — they are not derived from confidential competitor data.
+        </p>
+        <p>
+          All figures are estimates based on job description analysis at a point in time. They should be treated as indicative insights to inform strategic discussion, not as precise operational measurements.
+        </p>
+      </div>
+    </div>
+
+  </div><!-- /steps -->
+
+  <!-- WHAT WE DON'T DO -->
+  <div style="margin-top: 56px;">
+    <h2>What we <em>don't</em> do</h2>
+    <p style="margin-bottom: 24px; color: var(--muted);">Being clear about the boundaries of this analysis is as important as what it delivers.</p>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div class="card" style="display:flex; align-items:flex-start; gap:14px; padding: 18px 24px;">
+        <span style="color: var(--orange); font-size: 18px; flex-shrink:0; margin-top:1px;">✕</span>
+        <p style="margin:0;"><strong style="color:#fff">We do not access internal HR systems or proprietary employee data.</strong> The analysis is based solely on publicly available job postings.</p>
+      </div>
+      <div class="card" style="display:flex; align-items:flex-start; gap:14px; padding: 18px 24px;">
+        <span style="color: var(--orange); font-size: 18px; flex-shrink:0; margin-top:1px;">✕</span>
+        <p style="margin:0;"><strong style="color:#fff">We do not make predictions about specific employees.</strong> Scores apply to roles and tasks — never to individuals.</p>
+      </div>
+      <div class="card" style="display:flex; align-items:flex-start; gap:14px; padding: 18px 24px;">
+        <span style="color: var(--orange); font-size: 18px; flex-shrink:0; margin-top:1px;">✕</span>
+        <p style="margin:0;"><strong style="color:#fff">We do not guarantee specific business outcomes.</strong> Estimated hours saved and efficiency gains are modelled projections, not guaranteed results.</p>
+      </div>
+      <div class="card" style="display:flex; align-items:flex-start; gap:14px; padding: 18px 24px;">
+        <span style="color: var(--orange); font-size: 18px; flex-shrink:0; margin-top:1px;">✕</span>
+        <p style="margin:0;"><strong style="color:#fff">We do not claim that AI will replace specific roles.</strong> Automation scores reflect task-level potential — how AI can augment or assist, not a forecast of headcount reduction.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCLAIMER -->
+  <div class="disclaimer">
+    <p>
+      <strong style="color: rgba(255,255,255,0.5);">Disclaimer.</strong> The iMocha AI Automation Report is an informational tool intended to support strategic workforce planning discussions. All scores, estimates, and projections are derived from AI-assisted analysis of publicly available job postings and should be treated as indicative rather than definitive. Results reflect the job descriptions available at the time of analysis and may not capture the full scope of any organisation's workforce. iMocha makes no representations or warranties regarding the accuracy, completeness, or fitness for a particular purpose of any information contained in this report. The report does not constitute legal, financial, employment, or HR advice. Organisations should conduct their own due diligence and consult qualified professionals before making workforce decisions.
+    </p>
+  </div>
+
+</section>
+
+</body>
+</html>

@@ -21,11 +21,12 @@ function useCountUp(target: number, duration = 1200, delay = 300) {
 }
 
 interface Props {
-  company: string;
-  data:    CompanyWizardData;
+  company:   string;
+  data:      CompanyWizardData;
+  isMobile?: boolean;
 }
 
-function StatCard({ label, value, suffix, caption }: { label: string; value: number; suffix: string; caption: string }) {
+function StatCard({ label, value, suffix, caption, isMobile }: { label: string; value: number; suffix: string; caption: string; isMobile?: boolean }) {
   const animated = useCountUp(value);
   return (
     <div
@@ -33,7 +34,7 @@ function StatCard({ label, value, suffix, caption }: { label: string; value: num
         background:    "rgba(255,255,255,0.05)",
         border:        "1px solid rgba(255,255,255,0.1)",
         borderRadius:  16,
-        padding:       "32px 28px",
+        padding:       isMobile ? "18px 16px" : "32px 28px",
         display:       "flex",
         flexDirection: "column",
         alignItems:    "center",
@@ -62,23 +63,22 @@ function StatCard({ label, value, suffix, caption }: { label: string; value: num
   );
 }
 
-export default function Step1Glance({ company, data }: Props) {
+export default function Step1Glance({ company, data, isMobile }: Props) {
   const hoursAnimated = useCountUp(data.totalHoursSavedPerWeek);
 
-
   return (
-    <div style={{ width: "100%", maxWidth: 960 }}>
+    <div style={{ width: "100%", maxWidth: 960, paddingTop: isMobile ? 24 : 0, paddingBottom: isMobile ? 24 : 0 }}>
       <h1 style={{
-        fontSize:      "clamp(26px,3.5vw,40px)",
+        fontSize:      "clamp(22px,3.5vw,40px)",
         fontWeight:    800,
         lineHeight:    1.18,
         letterSpacing: -0.4,
-        marginBottom:  14,
+        marginBottom:  12,
         color:         "#fff",
       }}>
         Hi <span style={{ color: "#4ade80" }}>{company}</span>, here&apos;s your AI Readiness Assessment Report
       </h1>
-      <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, maxWidth: 640, marginBottom: 36 }}>
+      <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, maxWidth: 640, marginBottom: isMobile ? 20 : 36 }}>
         {company}&apos;s AI readiness profile spans{" "}
         <span style={{ color: "#4ade80", fontWeight: 500 }}>{data.totalRolesAnalyzed} roles</span>
         {data.functionsRepresented > 0 && (
@@ -87,24 +87,27 @@ export default function Step1Glance({ company, data }: Props) {
         {" "}— benchmarked for automation potential, skill disruption risk, and projected weekly time reclaimed.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20, maxWidth: 900 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: isMobile ? 12 : 20, maxWidth: 900 }}>
         <StatCard
           label="AI Implementation Opportunity"
           value={data.aiImplementationOpportunity}
           suffix="%"
           caption={`average AI readiness score across ${data.totalRolesAnalyzed} analyzed roles`}
+          isMobile={isMobile}
         />
         <StatCard
           label="Task Automation Potential"
           value={data.taskAutomationPotential}
           suffix="%"
           caption="of tasks in analyzed roles identified as AI-enhanceable"
+          isMobile={isMobile}
         />
         <StatCard
           label="Role Skill Adaptation Rate"
           value={data.workforceUpskillingNeeds}
           suffix="%"
           caption="of skills in analyzed job descriptions flagged as AI-augmented or at-risk"
+          isMobile={isMobile}
         />
       </div>
 
@@ -114,14 +117,13 @@ export default function Step1Glance({ company, data }: Props) {
         alignItems:     "center",
         justifyContent: "center",
         gap:            14,
-        marginTop:      22,
+        marginTop:      18,
         background:     "rgba(74,222,128,0.07)",
         border:         "1px solid rgba(74,222,128,0.2)",
         borderRadius:   12,
-        padding:        "14px 28px",
-        maxWidth:       900,
+        padding:        isMobile ? "14px 16px" : "14px 28px",
       }}>
-        <span style={{ fontSize: 28, fontWeight: 900, color: "#4ade80", letterSpacing: -1 }}>
+        <span style={{ fontSize: 28, fontWeight: 900, color: "#4ade80", letterSpacing: -1, flexShrink: 0 }}>
           {hoursAnimated}h
         </span>
         <span style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", lineHeight: 1.55 }}>

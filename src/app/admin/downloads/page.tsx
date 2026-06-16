@@ -13,18 +13,11 @@ function fmt(date: Date): string {
 }
 
 export default async function DownloadsPage() {
-  const [cardRows, pageRows, ctaRows] = await Promise.all([
-    // Role-card gated downloads
-    db.select({ id: reportLeads.id, email: reportLeads.email, companyName: companies.name, createdAt: reportLeads.createdAt })
-      .from(reportLeads)
-      .leftJoin(companies, eq(reportLeads.companyId, companies.id))
-      .where(sql`${reportLeads.source} = 'download'`)
-      .orderBy(desc(reportLeads.createdAt)),
-
+  const [pageRows, ctaRows] = await Promise.all([
     // Internal-page PDF downloads
     db.select().from(reportDownloads).orderBy(desc(reportDownloads.downloadedAt)),
 
-    // Hero / CTA leads
+    // Wizard CTA leads
     db.select({ id: reportLeads.id, email: reportLeads.email, companyName: companies.name, createdAt: reportLeads.createdAt })
       .from(reportLeads)
       .leftJoin(companies, eq(reportLeads.companyId, companies.id))
@@ -34,7 +27,6 @@ export default async function DownloadsPage() {
 
   // Merge into a single array, sort by raw timestamp, then format dates for display
   const merged = [
-    ...cardRows.map(r => ({ id: r.id, type: "card" as const, email: r.email, companyName: r.companyName ?? null, reportSlug: null as string | null, referrer: null as string | null, deletableId: null as string | null, ts: new Date(r.createdAt).getTime() })),
     ...pageRows.map(r => ({ id: r.id, type: "page" as const, email: r.email, companyName: r.companyName ?? null, reportSlug: r.reportSlug ?? null, referrer: r.referrer ?? null, deletableId: r.id,           ts: new Date(r.downloadedAt).getTime() })),
     ...ctaRows.map(r => ({  id: r.id, type: "cta"  as const, email: r.email, companyName: r.companyName ?? null, reportSlug: null as string | null, referrer: null as string | null, deletableId: null as string | null, ts: new Date(r.createdAt).getTime() })),
   ].sort((a, b) => b.ts - a.ts);
@@ -50,10 +42,10 @@ export default async function DownloadsPage() {
           Downloads &amp; Leads
         </h1>
         <p style={{ fontSize: 13, color: "#9988AA", margin: 0 }}>
-          {cardRows.length + pageRows.length} download{cardRows.length + pageRows.length !== 1 ? "s" : ""} · {ctaRows.length} CTA lead{ctaRows.length !== 1 ? "s" : ""} · {total} total
+          {pageRows.length} PDF download{pageRows.length !== 1 ? "s" : ""} · {ctaRows.length} CTA lead{ctaRows.length !== 1 ? "s" : ""} · {total} total
         </p>
         <p style={{ fontSize: 11, color: "#9988AA", margin: "2px 0 0" }}>
-          Card = role-card PDF gate (report_leads · source:download) · Page = in-report PDF (report_downloads · has referrer + delete) · CTA Lead = &apos;Get your full analysis&apos; form (report_leads · source:cta). Referrer is only captured for Page rows.
+          Page = in-report PDF download (report_downloads · has referrer + delete) · CTA Lead = &apos;Get your full analysis&apos; wizard form (report_leads · source:cta). Referrer only on Page rows.
         </p>
       </div>
 

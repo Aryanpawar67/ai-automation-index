@@ -57,6 +57,7 @@ export default async function CompanyReportHub({
       <ReportWizard
         company={company.name}
         companyId={company.id}
+        companySlug={publicIdentifier}
         wizardData={company.wizardData}
         token={token}
       />

@@ -2,16 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db }                        from "@/lib/db/client";
 import { reportLeads, companies }    from "@/lib/db/schema";
 import { eq }                        from "drizzle-orm";
-import { promises as dns }           from "dns";
-
-async function hasMxRecord(domain: string): Promise<boolean> {
-  try {
-    const records = await dns.resolveMx(domain);
-    return records.length > 0;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(
   req: NextRequest,
