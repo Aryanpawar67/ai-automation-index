@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 declare global {
@@ -57,7 +57,26 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
   const [submitted, setSubmitted] = useState(false);
   const listenerAdded  = useRef(false);
   const frameRef       = useRef<HTMLDivElement>(null);
+  const createdRef     = useRef(false);
   const submittedEmail = useRef<string | undefined>(undefined);
+
+  // Keep the latest onSubmitted in a ref so the once-only effects below never
+  // close over a stale callback (ReportWizard passes a fresh arrow each render).
+  const onSubmittedRef = useRef(onSubmitted);
+  useEffect(() => { onSubmittedRef.current = onSubmitted; }, [onSubmitted]);
+
+  // Single funnel for "the form was submitted", fed by BOTH the forms.create
+  // callback (primary) and the window postMessage listener (fallback). Guarded
+  // so the lead is recorded exactly once regardless of which signal arrives.
+  const firedRef = useRef(false);
+  const handleSubmitted = useCallback((email?: string) => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    submittedEmail.current = email;
+    setSubmitted(true);
+    // Brief delay so the success state is visible before the parent closes the modal.
+    setTimeout(() => onSubmittedRef.current(submittedEmail.current), 1500);
+  }, []);
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -70,14 +89,22 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
   useEffect(() => {
     const PORTAL_ID = "820873";
     const FORM_ID   = "5a2ff39f-bcf8-435a-be40-c6f0afdba087";
+    const node      = frameRef.current; // stable for the modal's lifetime
 
     const tryCreate = () => {
-      if (!window.hbspt || !frameRef.current) return false;
-      if (frameRef.current.hasChildNodes()) return true; // already rendered
+      if (!window.hbspt || !node) return false;
+      if (createdRef.current) return true; // already created (Strict Mode / poll re-entry)
+      createdRef.current = true;
+      node.innerHTML = ""; // drop any stray render before creating once
       window.hbspt.forms.create({
         portalId: PORTAL_ID,
         formId:   FORM_ID,
         target:   "#hs-form-target",
+        // Primary, reliable submit signal — HubSpot invokes this for THIS form
+        // only, so no id-matching guesswork. data.submissionValues holds the fields.
+        onFormSubmitted: (_form: unknown, data?: { submissionValues?: Record<string, string> }) => {
+          handleSubmitted(data?.submissionValues?.email);
+        },
       });
       return true;
     };
@@ -96,8 +123,14 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
 
     // Poll as fallback in case script was already loading from a prior mount
     const poll = setInterval(() => { if (tryCreate()) clearInterval(poll); }, 150);
-    return () => clearInterval(poll);
-  }, []);
+    return () => {
+      clearInterval(poll);
+      // Reset so the next (Strict Mode) effect run re-creates exactly one form
+      // instead of leaving a stale render behind it.
+      createdRef.current = false;
+      if (node) node.innerHTML = "";
+    };
+  }, [handleSubmitted]);
 
   // Watch for iframe insertion to inject brand styles, and listen for form submission.
   useEffect(() => {
@@ -120,20 +153,22 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
     listenerAdded.current = true;
 
     const handleMessage = (e: MessageEvent) => {
-      // Debug: log all HubSpot callbacks so we can verify the email extraction path
-      if (e.data?.type === "hsFormCallback") {
-        console.log("[HubSpot postMessage]", JSON.stringify(e.data));
-      }
+      if (e.data?.type !== "hsFormCallback" || e.data?.eventName !== "onFormSubmitted") return;
 
-      if (
-        e.data?.type      === "hsFormCallback" &&
-        e.data?.eventName === "onFormSubmitted" &&
-        e.data?.id        === "5a2ff39f-bcf8-435a-be40-c6f0afdba087"
-      ) {
-        submittedEmail.current = e.data?.data?.submissionValues?.email as string | undefined;
-        setSubmitted(true);
-        setTimeout(() => onSubmitted(submittedEmail.current), 2000);
-      }
+      // Fallback to the forms.create callback. We do NOT require an exact form-id
+      // match here — different embed builds send different id fields (id / formGuid /
+      // none), and a strict check silently dropped real submissions. The firedRef
+      // guard in handleSubmitted prevents a double record if both signals arrive.
+      const d = e.data?.data ?? {};
+      const email =
+        (d.submissionValues?.email as string | undefined) ??
+        (Array.isArray(d.submissionValues)
+          ? d.submissionValues.find((f: { name?: string; value?: string }) => f?.name === "email")?.value
+          : undefined) ??
+        (Array.isArray(d.formData)
+          ? d.formData.find((f: { name?: string; value?: string }) => f?.name === "email")?.value
+          : undefined);
+      handleSubmitted(email);
     };
 
     window.addEventListener("message", handleMessage);
@@ -141,7 +176,7 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
       observer.disconnect();
       window.removeEventListener("message", handleMessage);
     };
-  }, [onSubmitted]);
+  }, [handleSubmitted]);
 
   // Close on Escape
   useEffect(() => {
@@ -280,15 +315,11 @@ export default function HubSpotModal({ onClose, onSubmitted, headline, subline }
               </div>
             ) : (
               <>
-                {/* HubSpot form target — populated by hbspt.forms.create() in useEffect */}
-                <div
-                  ref={frameRef}
-                  id="hs-form-target"
-                  className="hs-form-frame"
-                  data-region="na1"
-                  data-form-id="5a2ff39f-bcf8-435a-be40-c6f0afdba087"
-                  data-portal-id="820873"
-                />
+                {/* HubSpot form target — rendered ONCE by hbspt.forms.create() in the
+                    useEffect above. The hs-form-frame class + data-* attributes were
+                    removed because HubSpot's script auto-renders those too, which
+                    double-rendered the form (the "form bleed"). */}
+                <div ref={frameRef} id="hs-form-target" />
                 <p style={{ fontSize: 11, color: "#9B8AAB", marginTop: 14, textAlign: "center" }}>
                   No spam. Your data is handled per iMocha&apos;s privacy policy.
                 </p>
