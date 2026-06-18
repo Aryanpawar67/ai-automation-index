@@ -13,9 +13,10 @@
  * detail endpoint per role. Concurrency-limited to avoid rate-limiting.
  */
 
-import { stripHtml }         from "../stripHtml";
-import { targetScrapeCount } from "../jdLimits";
-import type { ScrapedJD }    from "../scraper";
+import { stripHtml }                      from "../stripHtml";
+import { targetScrapeCount }              from "../jdLimits";
+import { looksNonEnglish, translateToEnglish } from "../translate";
+import type { ScrapedJD }                 from "../scraper";
 
 const HEADERS = {
   "Accept":      "application/json",
@@ -137,6 +138,99 @@ export async function scrapeEightfold(
       rawText,
       sourceUrl:  p.canonicalPositionUrl ?? `https://${cfg.host}/careers/job/${p.id}`,
       department: p.department ?? p.business_unit,
+    } satisfies ScrapedJD;
+  });
+
+  const jds = fetched.filter((x): x is NonNullable<typeof x> => x !== null);
+  return { jds, totalAvailable };
+}
+
+// ── Eightfold PCS-X (newer career-site API) ──────────────────────────────────
+// Some tenants (e.g. jobs.vodafone.com) run the newer "PCS X" surface, which the
+// /api/apply/v2 endpoint above doesn't serve (it 403s). It exposes:
+//   list:   GET /api/pcsx/search?domain={domain}&query=&location=&start=N&sort_by=timestamp
+//           → { data: { positions: [{ id, name, department, publicUrl }], count } }
+//   detail: GET /api/pcsx/position_details?position_id={id}&domain={domain}&hl=en
+//           → { data: { jobDescription: <HTML>, name, publicUrl } }
+// These reject the research-bot UA, so use a browser UA + Referer.
+
+const PCSX_HEADERS = {
+  "Accept":     "application/json",
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+};
+
+interface PcsxPosition { id: number; name: string; department?: string; positionUrl?: string; publicUrl?: string }
+interface PcsxSearchData { positions?: PcsxPosition[]; count?: number }
+
+async function pcsxSearch(host: string, domain: string, start: number): Promise<PcsxSearchData | undefined> {
+  try {
+    const res = await fetch(
+      `https://${host}/api/pcsx/search?domain=${domain}&query=&location=&start=${start}&sort_by=timestamp&`,
+      { headers: { ...PCSX_HEADERS, "Referer": `https://${host}/careers` }, signal: AbortSignal.timeout(15_000) }
+    );
+    if (!res.ok) return undefined;
+    const d = await res.json() as { data?: PcsxSearchData };
+    return d.data;
+  } catch { return undefined; }
+}
+
+async function pcsxDetail(host: string, domain: string, id: number): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://${host}/api/pcsx/position_details?position_id=${id}&domain=${domain}&hl=en`,
+      { headers: { ...PCSX_HEADERS, "Referer": `https://${host}/careers` }, signal: AbortSignal.timeout(12_000) }
+    );
+    if (!res.ok) return "";
+    const d = await res.json() as { data?: { jobDescription?: string } };
+    return stripHtml(d.data?.jobDescription ?? "");
+  } catch { return ""; }
+}
+
+export async function scrapeEightfoldPcsx(host: string, domain: string): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
+  const PAGE = 10, MAX_PAGES = 30;
+  const seen: Set<string> = new Set();
+  const deduped: PcsxPosition[] = [];
+  let totalAvailable = 0;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const data = await pcsxSearch(host, domain, page * PAGE);
+    if (!data) break;
+    if (page === 0) totalAvailable = data.count ?? 0;
+    const positions = data.positions ?? [];
+    if (positions.length === 0) break;
+    for (const p of positions) {
+      const key = roleFamilyKey(p.name || "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(p);
+    }
+    const target = targetScrapeCount(totalAvailable || deduped.length);
+    if (deduped.length >= target) break;
+    if (positions.length < PAGE) break;
+  }
+
+  if (deduped.length === 0) return { jds: [], totalAvailable };
+  totalAvailable = totalAvailable || deduped.length;
+
+  const keep    = targetScrapeCount(totalAvailable);
+  const toFetch = deduped.slice(0, keep);
+
+  const fetched = await mapWithConcurrency(toFetch, CONCURRENCY, async (p) => {
+    let rawText = await pcsxDetail(host, domain, p.id);
+    if (!rawText || rawText.length < 200) return null;
+    let title = p.name;
+    // Global tenants (e.g. Vodafone) post in many languages; the report is
+    // English-only, so translate any non-English posting.
+    if (looksNonEnglish(rawText) || looksNonEnglish(title)) {
+      const t = await translateToEnglish(title, rawText);
+      title   = t.title;
+      rawText = t.rawText;
+    }
+    return {
+      title,
+      rawText,
+      sourceUrl:  p.publicUrl ?? p.positionUrl ?? `https://${host}/careers?pid=${p.id}`,
+      department: p.department,
     } satisfies ScrapedJD;
   });
 

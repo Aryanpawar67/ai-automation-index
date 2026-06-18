@@ -36,6 +36,16 @@ export function looksGerman(text: string): boolean {
 }
 
 /**
+ * True if a job-length text lacks the common English structural words we'd
+ * expect — a cheap signal that it's in another language (German, French, etc.)
+ * and should be translated. Only gates the (paid) translation call.
+ */
+export function looksNonEnglish(text: string): boolean {
+  if (text.trim().length < 60) return false;        // too short to judge
+  return score(text, EN_MARKERS) < 2;
+}
+
+/**
  * Translate a job title + description to English. On any failure the original
  * strings are returned unchanged so a translation hiccup never drops the JD.
  */

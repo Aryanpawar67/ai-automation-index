@@ -18,7 +18,7 @@ import { scrapeAflac }                  from "./scrapers/aflac";
 import { scrapeAssurant }               from "./scrapers/assurant";
 import { scrapeTTCPortals }             from "./scrapers/ttcPortals";
 import { scrapeJibe }                   from "./scrapers/jibe";
-import { scrapeEightfold }              from "./scrapers/eightfold";
+import { scrapeEightfold, scrapeEightfoldPcsx } from "./scrapers/eightfold";
 import { scrapeDoehler }                from "./scrapers/doehler";
 import { scrapeBamboohr, extractBamboohrSubdomain, findBamboohrSubdomain } from "./scrapers/bamboohr";
 import { scrapeNihilent }               from "./scrapers/nihilent";
@@ -57,6 +57,7 @@ function looksLikeListingNoise(jds: ScrapedJD[]): boolean {
 const CUSTOM_GREENHOUSE_BOARDS: Array<[RegExp, string]> = [
   [/stripe\.com\/jobs/i, "stripe"],
   [/hioscar\.com/i,      "oscar"],
+  [/alpha-sense\.com/i,  "alphasense"],
 ];
 
 function detectATS(url: string): { ats: string; boardSlug?: string } | null {
@@ -430,6 +431,11 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // Nihilent — server-rendered WordPress careers page (accordion of openings).
     if (/nihilent\.com\/job-openings/i.test(url)) {
       const { jds, totalAvailable } = await scrapeNihilent(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Vodafone — Eightfold PCS-X career site (newer /api/pcsx surface).
+    if (/jobs\.vodafone\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeEightfoldPcsx("jobs.vodafone.com", "vodafone.com");
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     // BambooHR — direct tenant host, or a vanity domain embedding the careers
