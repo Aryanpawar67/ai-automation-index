@@ -12,6 +12,7 @@
 import { stripHtml } from "../stripHtml";
 import type { ScrapedJD } from "../scraper";
 import { LARGE_SCRAPE, targetScrapeCount } from "../jdLimits";
+import { isSapLegacyCareerPortal, scrapeSuccessFactorsLegacy } from "./successFactorsLegacy";
 
 export interface SapScrapeResult {
   jds:             ScrapedJD[];
@@ -239,12 +240,16 @@ export async function scrapeSAPSuccessFactors(url: string): Promise<SapScrapeRes
   const tenant = extractSapTenant(url);
   if (tenant) return scrapeViaJobs2Web(tenant, url);
 
-  // 2. Company code in URL → try CSB first, OData as fallback
+  // 2. Company code in URL → try CSB first, OData next
   const companyCode = extractCompanyCode(url);
   if (companyCode) {
     const csb = await scrapeViaCsb(companyCode, url);
     if (csb.jds.length > 0) return csb;
-    return scrapeViaOData(companyCode, url);
+    const odata = await scrapeViaOData(companyCode, url);
+    if (odata.jds.length > 0) return odata;
+    // Legacy DWR career servlet (CSB/OData both empty) — render + scrape detail pages.
+    if (isSapLegacyCareerPortal(url)) return scrapeSuccessFactorsLegacy(url);
+    return { jds: [] };
   }
 
   // 3. Custom domain — fetch page HTML to find SAP config
@@ -280,7 +285,11 @@ export async function scrapeSAPSuccessFactors(url: string): Promise<SapScrapeRes
       if (csb.jds.length > 0) return csb;
       return scrapeViaOData(code, url);
     }
-  } catch { /* fall through to Firecrawl */ }
+  } catch { /* fall through */ }
+
+  // Legacy DWR career servlet (no REST/OData/jobs2web) — render the list with
+  // Firecrawl and scrape the server-rendered detail pages.
+  if (isSapLegacyCareerPortal(url)) return scrapeSuccessFactorsLegacy(url);
 
   return { jds: [] };
 }

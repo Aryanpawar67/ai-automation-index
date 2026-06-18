@@ -40,6 +40,11 @@ function looksLikeListingNoise(jds: ScrapedJD[]): boolean {
   // Noise signal: all JDs point to the same sourceUrl (nav anchors / fallback entries)
   const uniqueUrls = new Set(jds.map(j => j.sourceUrl ?? ""));
   if (jds.length >= 2 && uniqueUrls.size === 1) return true;
+  // Noise signal: every JD carries the identical body — happens when a listing
+  // page's own markdown gets assigned as the rawText of each extracted link
+  // (e.g. JS-rendered portals where only the list page, not the detail, resolved).
+  const uniqueBodies = new Set(jds.map(j => j.rawText));
+  if (jds.length >= 2 && uniqueBodies.size === 1) return true;
   return false;
 }
 
