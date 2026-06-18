@@ -55,7 +55,7 @@ const CLUSTERS: { label: string; keywords: string[] }[] = [
   { label: "People & Admin",keywords: ["hr", "human resource", "recruit", "talent", "people", "admin", "facilit", "workplace", "culture", "learning", "l&d", "training"] },
 ];
 
-function mapToCluster(dept: string): string {
+export function mapToCluster(dept: string): string {
   const d = dept.toLowerCase();
   for (const c of CLUSTERS) {
     if (c.keywords.some(k => d.includes(k))) return c.label;

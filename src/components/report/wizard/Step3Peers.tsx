@@ -1,6 +1,6 @@
 "use client";
 
-import type { CompanyWizardData } from "@/lib/report/aggregate";
+import { mapToCluster, type CompanyWizardData } from "@/lib/report/aggregate";
 import WizardRadarChart           from "./WizardRadarChart";
 
 interface Props {
@@ -10,8 +10,37 @@ interface Props {
 }
 
 export default function Step3Peers({ company, data, isMobile }: Props) {
-  const topDept = data.departmentRadar.length > 0
-    ? data.departmentRadar.reduce((a, b) => a.score > b.score ? a : b).department
+  // Build the headline from the company's REAL analysed functions only — never
+  // from the hardcoded fallback axes (clusters with no roles), and avoiding
+  // single-role flukes. The wording is driven by the ACTUAL plotted gap
+  // (company score vs the industry-average line) so the writeup can never
+  // contradict what the chart shows.
+  const baselineFor = (dept: string) =>
+    data.peerBaseline.find(p => p.department === dept)?.score ?? 55;
+
+  const clusterStats = new Map<string, { count: number; hours: number }>();
+  for (const r of data.roles) {
+    const c = mapToCluster(r.department);
+    const s = clusterStats.get(c) ?? { count: 0, hours: 0 };
+    s.count += 1;
+    s.hours += r.estimatedHoursSavedPerWeek || 0;
+    clusterStats.set(c, s);
+  }
+
+  const realClusters = data.departmentRadar
+    .map(d => {
+      const stat     = clusterStats.get(d.department) ?? { count: 0, hours: 0 };
+      const baseline = baselineFor(d.department);
+      return { dept: d.department, score: d.score, baseline, count: stat.count, hours: stat.hours, gap: d.score - baseline };
+    })
+    .filter(d => d.count > 0);
+
+  // Prefer well-supported clusters (>= 2 roles) so a lone role can't headline;
+  // fall back to all real clusters if none reach the threshold.
+  const supported = realClusters.filter(d => d.count >= 2);
+  const pool      = supported.length > 0 ? supported : realClusters;
+  const headline  = pool.length > 0
+    ? [...pool].sort((a, b) => b.gap - a.gap || b.count - a.count || b.score - a.score)[0]
     : null;
 
   const textBlock = (
@@ -29,11 +58,21 @@ export default function Step3Peers({ company, data, isMobile }: Props) {
       <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.75, marginBottom: 14 }}>
         This chart benchmarks {company}&apos;s automation potential across departments, relative to an illustrative industry baseline. Departments further from the center show greater AI opportunity.
       </p>
-      {topDept && (
+      {headline && (
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.75, marginBottom: 14 }}>
-          For {company},{" "}
-          <span style={{ color: "#4ade80", fontWeight: 600 }}>{topDept}</span>
-          {" "}shows greater AI opportunity than the illustrative industry baseline.
+          {(() => {
+            const name    = <span style={{ color: "#4ade80", fontWeight: 600 }}>{headline.dept}</span>;
+            const roleTxt = `${headline.count} role${headline.count === 1 ? "" : "s"} analysed`;
+            const hrs     = Math.round(headline.hours);
+            const hrTxt   = hrs > 0 ? `, ~${hrs} hrs/week recoverable` : "";
+            if (headline.gap >= 3) {
+              return <>For {company}, {name} shows greater AI-automation potential than the illustrative industry average — its strongest opportunity ({roleTxt}{hrTxt}).</>;
+            }
+            if (headline.gap > -3) {
+              return <>For {company}, {name} tracks in line with the illustrative industry average and is its most automatable function ({roleTxt}{hrTxt}).</>;
+            }
+            return <>For {company}, {name} concentrates the most analysed roles ({roleTxt}{hrTxt}) — a near-term automation focus, with room to close the gap to the industry average.</>;
+          })()}
         </p>
       )}
 

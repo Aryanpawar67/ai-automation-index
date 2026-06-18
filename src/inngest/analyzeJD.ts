@@ -121,7 +121,7 @@ export const analyzeJDFn = inngest.createFunction(
       // Check if all JDs in the batch are now done → transition batch status
       const [counts] = await db
         .select({
-          total:     sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} NOT IN ('invalid','cancelled') THEN 1 END)`.mapWith(Number),
+          total:     sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} NOT IN ('invalid','cancelled','scraped') THEN 1 END)`.mapWith(Number),
           processed: sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'complete' THEN 1 END)`.mapWith(Number),
           failed:    sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'failed' THEN 1 END)`.mapWith(Number),
         })
@@ -170,7 +170,7 @@ export const analyzeJDFn = inngest.createFunction(
       // Check if this failure completes the batch (mirrors the success-path check)
       const [counts] = await db
         .select({
-          total:     sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} NOT IN ('invalid','cancelled') THEN 1 END)`.mapWith(Number),
+          total:     sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} NOT IN ('invalid','cancelled','scraped') THEN 1 END)`.mapWith(Number),
           processed: sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'complete' THEN 1 END)`.mapWith(Number),
           failed:    sql<number>`COUNT(CASE WHEN ${jobDescriptions.status} = 'failed' THEN 1 END)`.mapWith(Number),
         })
