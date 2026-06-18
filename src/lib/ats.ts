@@ -3,6 +3,7 @@ export const ATS_OPTIONS = [
   { value: "sap_sf",       label: "SAP SuccessFactors" },
   { value: "oracle_hcm",   label: "Oracle HCM"         },
   { value: "oracle_taleo", label: "Oracle Taleo"       },
+  { value: "bamboohr",     label: "BambooHR"           },
 ] as const;
 
 export type AtsValue = typeof ATS_OPTIONS[number]["value"];
@@ -21,6 +22,8 @@ export const HCM_MAP: Record<string, AtsValue> = {
   "sap successfactors": "sap_sf",
   "successfactors":     "sap_sf",
   "sap sf":             "sap_sf",
+  "bamboohr":           "bamboohr",
+  "bamboo hr":          "bamboohr",
 };
 
 // Resolves a raw label (e.g. "Workday", "SAP SuccessFactors", "sap_sf")

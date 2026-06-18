@@ -20,6 +20,8 @@ import { scrapeTTCPortals }             from "./scrapers/ttcPortals";
 import { scrapeJibe }                   from "./scrapers/jibe";
 import { scrapeEightfold }              from "./scrapers/eightfold";
 import { scrapeDoehler }                from "./scrapers/doehler";
+import { scrapeBamboohr, extractBamboohrSubdomain, findBamboohrSubdomain } from "./scrapers/bamboohr";
+import { scrapeNihilent }               from "./scrapers/nihilent";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -424,6 +426,20 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     if (/jobs\.doehler\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeDoehler();
       if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Nihilent — server-rendered WordPress careers page (accordion of openings).
+    if (/nihilent\.com\/job-openings/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeNihilent(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // BambooHR — direct tenant host, or a vanity domain embedding the careers
+    // widget (atsType='bamboohr'); recover the tenant and use its JSON API.
+    if (atsType === "bamboohr" || /\.bamboohr\.com/i.test(url)) {
+      const sub = extractBamboohrSubdomain(url) ?? await findBamboohrSubdomain(url);
+      if (sub) {
+        const { jds, totalAvailable } = await scrapeBamboohr(sub);
+        if (jds.length > 0) return { success: true, jds, totalAvailable, resolvedUrl: `https://${sub}.bamboohr.com/careers` };
+      }
     }
     if (/careers\.progressive\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeTTCPortals("https://careers.progressive.com/search/jobs/");
