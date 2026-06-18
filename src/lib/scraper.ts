@@ -19,6 +19,7 @@ import { scrapeAssurant }               from "./scrapers/assurant";
 import { scrapeTTCPortals }             from "./scrapers/ttcPortals";
 import { scrapeJibe }                   from "./scrapers/jibe";
 import { scrapeEightfold }              from "./scrapers/eightfold";
+import { scrapeDoehler }                from "./scrapers/doehler";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -411,6 +412,12 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     }
     if (/jobs\.assurant\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeAssurant();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Döhler Group — SAP SuccessFactors/jobs2web on a custom domain; German-first,
+    // so postings are fetched via the en_US locale and translated where needed.
+    if (/jobs\.doehler\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeDoehler();
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     if (/careers\.progressive\.com/i.test(url)) {
