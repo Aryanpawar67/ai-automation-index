@@ -27,6 +27,7 @@ import { scrapeDarwinbox }              from "./scrapers/darwinbox";
 import { scrapeRipplehire }             from "./scrapers/ripplehire";
 import { scrapeBajaj }                  from "./scrapers/bajaj";
 import { scrapeHilti }                  from "./scrapers/hilti";
+import { scrapeKeka }                   from "./scrapers/keka";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -472,6 +473,11 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // Darwinbox recruiting career sites (e.g. *.darwinbox.in).
     if (atsType === "darwinbox" || /\.darwinbox\.in/i.test(url)) {
       const { jds, totalAvailable } = await scrapeDarwinbox(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Keka Hire career sites (e.g. *.keka.com/careers).
+    if (atsType === "keka" || /\.keka\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeKeka(url);
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     // RippleHire career sites (e.g. *.ripplehire.com/candidate/?token=...).
