@@ -8,6 +8,7 @@ export const ATS_OPTIONS = [
   { value: "eightfold",    label: "Eightfold"          },
   { value: "darwinbox",    label: "Darwinbox"          },
   { value: "ripplehire",   label: "RippleHire"         },
+  { value: "phenom",       label: "Phenom"             },
 ] as const;
 
 export type AtsValue = typeof ATS_OPTIONS[number]["value"];
@@ -34,6 +35,7 @@ export const HCM_MAP: Record<string, AtsValue> = {
   "darwinbox":          "darwinbox",
   "ripplehire":         "ripplehire",
   "ripple hire":        "ripplehire",
+  "phenom":             "phenom",
 };
 
 // Resolves a raw label (e.g. "Workday", "SAP SuccessFactors", "sap_sf")

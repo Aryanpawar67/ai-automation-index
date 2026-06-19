@@ -370,6 +370,14 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       });
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
+    // FIS — Phenom tenant (careers.fisglobal.com, refNum FIGLUS).
+    if (/careers\.fisglobal\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapePhenom({
+        host:   "careers.fisglobal.com",
+        refNum: "FIGLUS",
+      });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
     // Marsh McLennan Agency — uses parent's Phenom tenant (refNum MAMCGLOBAL,
     // 1,976 tenant-wide) but filtered to the MMA business unit (~458 jobs).
     // Match the /mma-search path so we only apply this filter when the URL
