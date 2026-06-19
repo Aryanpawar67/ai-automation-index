@@ -28,6 +28,8 @@ import { scrapeRipplehire }             from "./scrapers/ripplehire";
 import { scrapeBajaj }                  from "./scrapers/bajaj";
 import { scrapeHilti }                  from "./scrapers/hilti";
 import { scrapeKeka }                   from "./scrapers/keka";
+import { scrapeTurbohire }              from "./scrapers/turbohire";
+import { scrapeZwayam }                 from "./scrapers/zwayam";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -478,6 +480,16 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // Keka Hire career sites (e.g. *.keka.com/careers).
     if (atsType === "keka" || /\.keka\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeKeka(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // TurboHire career sites (e.g. *.turbohire.co).
+    if (atsType === "turbohire" || /\.turbohire\.co/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeTurbohire(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Crisil — Zwayam ATS (career.crisil.com); companyId is base64("15438").
+    if (/career\.crisil\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeZwayam({ domain: "career.crisil.com", companyId: "MTU0Mzg=" });
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     // RippleHire career sites (e.g. *.ripplehire.com/candidate/?token=...).
