@@ -25,6 +25,8 @@ import { scrapeNihilent }               from "./scrapers/nihilent";
 import { scrapeSapSiteBuilder }         from "./scrapers/successFactorsSiteBuilder";
 import { scrapeDarwinbox }              from "./scrapers/darwinbox";
 import { scrapeRipplehire }             from "./scrapers/ripplehire";
+import { scrapeBajaj }                  from "./scrapers/bajaj";
+import { scrapeHilti }                  from "./scrapers/hilti";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -453,8 +455,18 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // /search/ page. Its URL carries createNewAlert=false (a Taleo tell), so route
     // it here BEFORE the Taleo branch; the legacy careersection endpoint only
     // exposes a partial list and under-reports the true total.
-    if (/careers\.tataautocomp\.com/i.test(url)) {
+    if (/careers\.tataautocomp\.com|jobs\.birlasoft\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeSapSiteBuilder(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Bajaj Auto — custom ASP.NET careers handler (jobs + descriptions inline).
+    if (/bajajauto\.com\/careers/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeBajaj();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Hilti — Umbraco/Avature careers behind Cloudflare; render via Firecrawl.
+    if (/careers\.hilti\.group/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeHilti();
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     // Darwinbox recruiting career sites (e.g. *.darwinbox.in).

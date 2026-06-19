@@ -61,10 +61,13 @@ function parseDetail(html: string): { title: string; rawText: string } | null {
   // Strip leaked search-form chrome that precedes the body on some templates.
   rawText = rawText.replace(/^.*?(About Us|Job Description|Position Summary|Your Role)\b/i, "$1").trim();
   if (rawText.length < 150) return null;
-  const title =
-    ($("h1").first().text().trim() ||
-     $("title").text().replace(/\s+Job Details\b.*$/i, "").replace(/\s*[|\-–—].*$/, "").trim()) ||
-    "Untitled";
+  // Prefer the <title> tag (clean "Role Job Details | Company"); fall back to the
+  // <h1>, which on some tenants (e.g. Birlasoft) carries a "Title:" label prefix.
+  const cleanTitle = (s: string) =>
+    s.replace(/\s+/g, " ").replace(/^\s*Title:\s*/i, "").replace(/\s+Job Details\b.*$/i, "").replace(/\s*[|\-–—]\s*[^|]*$/, "").trim();
+  const fromTitleTag = cleanTitle($("title").text());
+  const fromH1       = cleanTitle($("h1").first().text());
+  const title = (fromTitleTag.length > 3 ? fromTitleTag : fromH1) || "Untitled";
   return { title, rawText };
 }
 
