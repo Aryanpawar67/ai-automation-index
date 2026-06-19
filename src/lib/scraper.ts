@@ -30,6 +30,7 @@ import { scrapeHilti }                  from "./scrapers/hilti";
 import { scrapeKeka }                   from "./scrapers/keka";
 import { scrapeTurbohire }              from "./scrapers/turbohire";
 import { scrapeZwayam }                 from "./scrapers/zwayam";
+import { scrapeDassault }               from "./scrapers/dassault";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -418,6 +419,11 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       });
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
+    // Forvia (Faurecia) — Eightfold ATS at jobs.faurecia.com
+    if (/jobs\.faurecia\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeEightfold({ host: "jobs.faurecia.com", domain: "faurecia.com" });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
     // New York Life — Eightfold ATS at careers.newyorklife.com (~241 jobs)
     if (/careers\.newyorklife\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeEightfold({
@@ -490,6 +496,11 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // Crisil — Zwayam ATS (career.crisil.com); companyId is base64("15438").
     if (/career\.crisil\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeZwayam({ domain: "career.crisil.com", companyId: "MTU0Mzg=" });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Dassault Systèmes — custom Exalead career search at 3ds.com.
+    if (/3ds\.com\/careers/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeDassault();
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     // RippleHire career sites (e.g. *.ripplehire.com/candidate/?token=...).
