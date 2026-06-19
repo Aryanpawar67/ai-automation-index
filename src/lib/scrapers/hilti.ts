@@ -37,6 +37,12 @@ function jobPaths(html: string): string[] {
   return [...new Set([...html.matchAll(/\/en\/jobs\/\d+-en\/[a-z0-9-]+\/?/gi)].map(m => m[0]))];
 }
 
+/** "Showing 1 to 20 of 757 matching jobs" — bold markers (**) may wrap numbers. */
+function totalFrom(html: string): number {
+  const m = html.match(/of\s+\**\s*([\d,]+)\s*\**\s+matching\s+jobs/i);
+  return m ? Number(m[1].replace(/,/g, "")) : 0;
+}
+
 function parseDetail(md: string): { title: string; rawText: string } | null {
   const h1 = md.match(/^#\s+(.+)$/m);
   const title = (h1?.[1] ?? "").trim();
@@ -72,21 +78,28 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
 export async function scrapeHilti(): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
   // Collect job links across paged listings (dedupe by numeric id).
   const byId = new Map<string, string>();
+  // Only need enough links to cover the scrape target; the true headcount comes
+  // from the listing's "of N matching jobs" count, not the links collected.
+  let reportedTotal = 0;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const sep  = page === 1 ? "" : `&page=${page}`;
-    const html = await firecrawl(`${LIST_BASE}${sep}`, "rawHtml");
-    if (!html) break;
+    // Use markdown: it carries both the job links and the human-readable
+    // "of N matching jobs" count (in rawHtml that count is split across tags).
+    const md = await firecrawl(`${LIST_BASE}${sep}`, "markdown");
+    if (!md) break;
+    if (page === 1) reportedTotal = totalFrom(md);
     const before = byId.size;
-    for (const path of jobPaths(html)) {
+    for (const path of jobPaths(md)) {
       const id = path.match(/\/jobs\/(\d+)-en\//i)?.[1];
       if (id && !byId.has(id)) byId.set(id, `${ORIGIN}${path}`);
     }
     if (byId.size === before) break; // page added nothing new → stop
+    if (byId.size >= 24) break;      // enough for the 20-job LARGE-tier target
   }
 
   const links = [...byId.values()];
   if (links.length === 0) return { jds: [], totalAvailable: 0 };
-  const totalAvailable = links.length;
+  const totalAvailable = Math.max(reportedTotal, links.length);
 
   const keep    = targetScrapeCount(totalAvailable);
   const toFetch = links.slice(0, keep + 4);

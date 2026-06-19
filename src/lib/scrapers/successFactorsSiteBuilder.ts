@@ -33,8 +33,14 @@ function jobLinksFrom(html: string, origin: string): string[] {
 }
 
 function totalFrom(html: string): number {
-  const m = html.match(/of\s+([\d,]+)\b/i);
-  return m ? Number(m[1].replace(/,/g, "")) : 0;
+  // Prefer the explicit results count ("Results 1 to 25 of 652" / "Results 1 – 25
+  // of 652"). A bare "of N" also matches the page count ("Page 1 of 27"), which
+  // is much smaller — so match the Results phrase first, then fall back to the
+  // LARGEST "of N" on the page.
+  const r = html.match(/Results?\s+[\d,]+\s*(?:to|–|-|—)\s*[\d,]+\s+of\s+([\d,]+)/i);
+  if (r) return Number(r[1].replace(/,/g, ""));
+  const all = [...html.matchAll(/\bof\s+([\d,]+)\b/gi)].map(m => Number(m[1].replace(/,/g, "")));
+  return all.length ? Math.max(...all) : 0;
 }
 
 function buildSearchUrl(url: string, startrow: number): string {
