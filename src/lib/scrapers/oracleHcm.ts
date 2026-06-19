@@ -29,39 +29,69 @@ export function extractTaleoTenant(url: string): string | null {
   return m ? m[1] : null;
 }
 
-/** Taleo REST API on any host (covers taleo.net AND custom domains). */
-async function scrapeOracleTaleoOnHost(host: string): Promise<ScrapedJD[]> {
+interface TaleoReq { jobId?: string | number; title?: string }
+
+/** Fetch one joblist page; null on throttle/redirect/non-JSON. */
+async function fetchTaleoPage(host: string, pg: number): Promise<TaleoReq[] | null> {
   try {
-    const listRes = await fetch(
-      `https://${host}/careersection/rest/jobboard/joblist?lang=en&act=showpage&pg=1`,
+    const res = await fetch(
+      `https://${host}/careersection/rest/jobboard/joblist?lang=en&act=showpage&pg=${pg}`,
       { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12_000) }
     );
-    if (!listRes.ok) return [];
-    const data = await listRes.json();
-    const jobs  = (data?.requisition ?? []).slice(0, 15);
-    const jds: ScrapedJD[] = [];
-    for (const job of jobs) {
-      try {
-        const jdRes = await fetch(
-          `https://${host}/careersection/api/jobdescription/en/detail/${job.jobId}`,
-          { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(8_000) }
-        );
-        if (!jdRes.ok) continue;
-        const jdData  = await jdRes.json();
-        const rawText = stripHtml(jdData?.jobDescription ?? jdData?.description ?? "");
-        if (rawText.length < 100) continue;
-        jds.push({
-          title:    job.title ?? "Untitled",
-          rawText,
-          sourceUrl: `https://${host}/careersection/jobdetail.ftl?job=${job.jobId}`,
-        });
-      } catch { continue; }
-    }
-    return jds;
-  } catch { return []; }
+    if (!res.ok || res.url.includes("errorpage")) return null;
+    if (!(res.headers.get("content-type") ?? "").includes("json")) return null;
+    const data = await res.json();
+    return (data?.requisition ?? []) as TaleoReq[];
+  } catch { return null; }
 }
 
-export async function scrapeOracleTaleo(url: string): Promise<ScrapedJD[]> {
+/** Taleo REST API on any host (covers taleo.net AND custom domains). */
+async function scrapeOracleTaleoOnHost(host: string): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
+  // Paginate the joblist to learn the TRUE total (Taleo serves ~25/page), not
+  // just the first page — otherwise totalAvailable under-reports and the report
+  // shows the wrong "roles available" count.
+  const seen = new Set<string>();
+  const reqs: TaleoReq[] = [];
+  let pageSize = 0;
+  for (let pg = 1; pg <= 20; pg++) {
+    const page = await fetchTaleoPage(host, pg);
+    if (!page || page.length === 0) break;
+    if (pg === 1) pageSize = page.length;
+    for (const r of page) {
+      const id = String(r.jobId ?? "");
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      reqs.push(r);
+    }
+    if (page.length < pageSize) break; // last page
+  }
+
+  const totalAvailable = reqs.length;
+  if (totalAvailable === 0) return { jds: [], totalAvailable: 0 };
+
+  const keep = targetScrapeCount(totalAvailable);
+  const jds: ScrapedJD[] = [];
+  for (const job of reqs.slice(0, keep)) {
+    try {
+      const jdRes = await fetch(
+        `https://${host}/careersection/api/jobdescription/en/detail/${job.jobId}`,
+        { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(8_000) }
+      );
+      if (!jdRes.ok) continue;
+      const jdData  = await jdRes.json();
+      const rawText = stripHtml(jdData?.jobDescription ?? jdData?.description ?? "");
+      if (rawText.length < 100) continue;
+      jds.push({
+        title:    job.title ?? "Untitled",
+        rawText,
+        sourceUrl: `https://${host}/careersection/jobdetail.ftl?job=${job.jobId}`,
+      });
+    } catch { continue; }
+  }
+  return { jds, totalAvailable };
+}
+
+export async function scrapeOracleTaleo(url: string): Promise<{ jds: ScrapedJD[]; totalAvailable: number }> {
   // Standard taleo.net hosted
   const tenant = extractTaleoTenant(url);
   if (tenant) return scrapeOracleTaleoOnHost(`${tenant}.taleo.net`);
@@ -70,7 +100,7 @@ export async function scrapeOracleTaleo(url: string): Promise<ScrapedJD[]> {
   try {
     const host = new URL(url).hostname;
     return scrapeOracleTaleoOnHost(host);
-  } catch { return []; }
+  } catch { return { jds: [], totalAvailable: 0 }; }
 }
 
 // ── Oracle HCM Cloud ──────────────────────────────────────────────────────────

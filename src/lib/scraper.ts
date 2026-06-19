@@ -22,6 +22,7 @@ import { scrapeEightfold, scrapeEightfoldPcsx } from "./scrapers/eightfold";
 import { scrapeDoehler }                from "./scrapers/doehler";
 import { scrapeBamboohr, extractBamboohrSubdomain, findBamboohrSubdomain } from "./scrapers/bamboohr";
 import { scrapeNihilent }               from "./scrapers/nihilent";
+import { scrapeSapSiteBuilder }         from "./scrapers/successFactorsSiteBuilder";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -438,6 +439,14 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       const { jds, totalAvailable } = await scrapeEightfoldPcsx("jobs.vodafone.com", "vodafone.com");
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
+    // Tata AutoComp — SAP SuccessFactors RMK Site Builder with a server-rendered
+    // /search/ page. Its URL carries createNewAlert=false (a Taleo tell), so route
+    // it here BEFORE the Taleo branch; the legacy careersection endpoint only
+    // exposes a partial list and under-reports the true total.
+    if (/careers\.tataautocomp\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeSapSiteBuilder(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
     // BambooHR — direct tenant host, or a vanity domain embedding the careers
     // widget (atsType='bamboohr'); recover the tenant and use its JSON API.
     if (atsType === "bamboohr" || /\.bamboohr\.com/i.test(url)) {
@@ -484,8 +493,8 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     if (atsType === "oracle_taleo" || /taleo\.net/i.test(url) || isTaleoCustomDomain(url)) {
-      const jds = await scrapeOracleTaleo(url);
-      if (jds.length > 0) return { success: true, jds, totalAvailable: jds.length };
+      const { jds, totalAvailable } = await scrapeOracleTaleo(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable: Math.max(totalAvailable, jds.length) };
     }
     if (atsType === "sap_sf" || /\.jobs2web\.com|successfactors\.com|sapsf\.com/i.test(url)) {
       const result = await scrapeSAPSuccessFactors(url);
