@@ -23,6 +23,8 @@ import { scrapeDoehler }                from "./scrapers/doehler";
 import { scrapeBamboohr, extractBamboohrSubdomain, findBamboohrSubdomain } from "./scrapers/bamboohr";
 import { scrapeNihilent }               from "./scrapers/nihilent";
 import { scrapeSapSiteBuilder }         from "./scrapers/successFactorsSiteBuilder";
+import { scrapeDarwinbox }              from "./scrapers/darwinbox";
+import { scrapeRipplehire }             from "./scrapers/ripplehire";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -445,6 +447,16 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // exposes a partial list and under-reports the true total.
     if (/careers\.tataautocomp\.com/i.test(url)) {
       const { jds, totalAvailable } = await scrapeSapSiteBuilder(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Darwinbox recruiting career sites (e.g. *.darwinbox.in).
+    if (atsType === "darwinbox" || /\.darwinbox\.in/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeDarwinbox(url);
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // RippleHire career sites (e.g. *.ripplehire.com/candidate/?token=...).
+    if (atsType === "ripplehire" || /\.ripplehire\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeRipplehire(url);
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     // BambooHR — direct tenant host, or a vanity domain embedding the careers
