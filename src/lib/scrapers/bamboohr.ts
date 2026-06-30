@@ -118,6 +118,6 @@ export async function scrapeBamboohr(subdomain: string): Promise<{ jds: ScrapedJ
     } satisfies ScrapedJD;
   });
 
-  const jds = fetched.filter((x): x is ScrapedJD => x !== null);
+  const jds = fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[];
   return { jds, totalAvailable };
 }
