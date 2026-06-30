@@ -141,6 +141,6 @@ export async function scrapeDoehler(): Promise<{ jds: ScrapedJD[]; totalAvailabl
   const toFetch = en.jobs.slice(0, keep);
 
   const fetched = await mapWithConcurrency(toFetch, CONCURRENCY, fetchDetail);
-  const jds = fetched.filter((x): x is ScrapedJD => x !== null);
+  const jds = fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[];
   return { jds, totalAvailable };
 }

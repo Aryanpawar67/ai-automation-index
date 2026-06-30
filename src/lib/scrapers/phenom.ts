@@ -252,7 +252,7 @@ export async function scrapePhenom(
   const toFetch = deduped.slice(0, keep);
 
   const fetched = await mapWithConcurrency(toFetch, CONCURRENCY, j => fetchJobDescription(cfg, j));
-  const jds     = fetched.filter((x): x is ScrapedJD => x !== null);
+  const jds     = fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[];
 
   return { jds, totalAvailable };
 }

@@ -116,6 +116,6 @@ export async function scrapeHilti(): Promise<{ jds: ScrapedJD[]; totalAvailable:
     return { title, rawText: rawText.slice(0, 12_000), sourceUrl: link } satisfies ScrapedJD;
   });
 
-  const jds = fetched.filter((x): x is ScrapedJD => x !== null).slice(0, keep);
+  const jds = (fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[]).slice(0, keep);
   return { jds, totalAvailable };
 }

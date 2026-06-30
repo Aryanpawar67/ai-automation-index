@@ -112,6 +112,6 @@ export async function scrapeRipplehire(url: string): Promise<{ jds: ScrapedJD[];
     } satisfies ScrapedJD;
   });
 
-  const jds = fetched.filter((x): x is ScrapedJD => x !== null).slice(0, want);
+  const jds = (fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[]).slice(0, want);
   return { jds, totalAvailable };
 }

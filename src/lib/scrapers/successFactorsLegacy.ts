@@ -162,6 +162,6 @@ export async function scrapeSuccessFactorsLegacy(url: string): Promise<{ jds: Sc
     } catch { return null; }
   });
 
-  const jds = fetched.filter((x): x is ScrapedJD => x !== null).slice(0, keep);
+  const jds = (fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[]).slice(0, keep);
   return { jds, totalAvailable };
 }

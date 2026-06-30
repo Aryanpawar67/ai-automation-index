@@ -76,6 +76,6 @@ export async function scrapeAflac(): Promise<{ jds: ScrapedJD[]; totalAvailable:
   const toFetch = urls.slice(0, keep);
 
   const fetched = await mapWithConcurrency(toFetch, CONCURRENCY, fetchJD);
-  const jds     = fetched.filter((x): x is ScrapedJD => x !== null);
+  const jds     = fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[];
   return { jds, totalAvailable };
 }

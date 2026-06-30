@@ -63,7 +63,7 @@ export async function scrapeCapgemini(countryCode?: string): Promise<{ jds: Scra
       sourceUrl:  job.apply_job_url ?? undefined,
       department: [job.department, location].filter(Boolean).join(" | ") || undefined,
     };
-  }).filter((x): x is ScrapedJD => x !== null);
+  }).filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[];
 
   return { jds, totalAvailable };
 }

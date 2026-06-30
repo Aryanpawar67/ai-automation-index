@@ -118,6 +118,6 @@ export async function scrapeTurbohire(url: string): Promise<{ jds: ScrapedJD[]; 
     } satisfies ScrapedJD;
   });
 
-  const jds = fetched.filter((x): x is ScrapedJD => x !== null).slice(0, keep);
+  const jds = (fetched.filter((x): x is NonNullable<typeof x> => x !== null) as ScrapedJD[]).slice(0, keep);
   return { jds, totalAvailable };
 }
