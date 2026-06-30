@@ -31,6 +31,9 @@ import { scrapeKeka }                   from "./scrapers/keka";
 import { scrapeTurbohire }              from "./scrapers/turbohire";
 import { scrapeZwayam }                 from "./scrapers/zwayam";
 import { scrapeDassault }               from "./scrapers/dassault";
+import { scrapeDatamatics }             from "./scrapers/datamatics";
+import { scrapeUltraTech }              from "./scrapers/ultratech";
+import { scrapeCapgemini }              from "./scrapers/capgemini";
 import { targetScrapeCount }       from "./jdLimits";
 
 export interface ScrapedJD {
@@ -501,6 +504,43 @@ export async function scrapeCareerPage(url: string, atsType?: string | null): Pr
     // Dassault Systèmes — custom Exalead career search at 3ds.com.
     if (/3ds\.com\/careers/i.test(url)) {
       const { jds, totalAvailable } = await scrapeDassault();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Datamatics — HubSpot CMS page that server-renders all openings inline,
+    // grouped into location tabs (datamatics.com/human-resources/job-openings).
+    if (/datamatics\.com\/human-resources\/job-openings/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeDatamatics();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // UltraTech Cement — AEM GraphQL listing + Firecrawl-rendered PeopleStrong
+    // detail pages (ultratechcement.com/corporate/career/jobs-at-ultratech).
+    if (/ultratechcement\.com\/corporate\/career/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeUltraTech();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Cohesity — Workday wd5 tenant (AEM careers page is JS-rendered, useless for scraping).
+    if (/cohesity\.com\/careers\/open-positions/i.test(url)) {
+      const { jds, totalAvailable, resolvedUrl } = await scrapeWorkday(url, {
+        tenant:      "cohesity",
+        jobSite:     "Cohesity_Careers",
+        host:        "cohesity.wd5.myworkdayjobs.com",
+        resolvedUrl: "https://cohesity.wd5.myworkdayjobs.com/Cohesity_Careers",
+      });
+      if (jds.length > 0) return { success: true, jds, totalAvailable, resolvedUrl };
+    }
+    // Capgemini — custom Azure job-stream API (cg-jobs WP plugin).
+    if (/capgemini\.com\/careers/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeCapgemini();
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // NCS Group — Zwayam ATS (careers.in.ncs-i.com).
+    if (/careers\.in\.ncs-i\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeZwayam({ domain: "careers.in.ncs-i.com", companyId: "MTU5NTU=" });
+      if (jds.length > 0) return { success: true, jds, totalAvailable };
+    }
+    // Yazaki India — Zwayam ATS (careers.in.yazaki.com).
+    if (/careers\.in\.yazaki\.com/i.test(url)) {
+      const { jds, totalAvailable } = await scrapeZwayam({ domain: "careers.in.yazaki.com", companyId: "MTU4MDA=" });
       if (jds.length > 0) return { success: true, jds, totalAvailable };
     }
     // RippleHire career sites (e.g. *.ripplehire.com/candidate/?token=...).

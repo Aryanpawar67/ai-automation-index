@@ -118,6 +118,8 @@ export default function ReportWizard({ company, companyId, companySlug, wizardDa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, activeRole]);
 
+  const isComplete = wizardData.analysisType === "complete";
+
   return (
     <>
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "#0e0e10", color: "#fff", fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif', overflow: "hidden" }}>
@@ -130,6 +132,40 @@ export default function ReportWizard({ company, companyId, companySlug, wizardDa
           onVision={() => handleInfo("vision")}
           onHowItWorks={() => handleInfo("how-it-works")}
         />
+        {isComplete && (
+          <div style={{
+            display:       "flex",
+            justifyContent:"flex-end",
+            alignItems:    "center",
+            padding:       isMobile ? "10px 16px" : "10px 40px",
+            flexShrink:    0,
+          }}>
+            <span style={{
+              fontSize:      11,
+              fontWeight:    700,
+              letterSpacing: 0.8,
+              color:         "#f59e0b",
+              background:    "rgba(245,158,11,0.1)",
+              border:        "1px solid rgba(245,158,11,0.3)",
+              borderRadius:  5,
+              padding:       "5px 18px",
+              display:       "inline-flex",
+              alignItems:    "center",
+              gap:           6,
+              boxShadow:     "0 0 8px rgba(245,158,11,0.35), 0 0 20px rgba(245,158,11,0.15)",
+            }}>
+              <span style={{
+                width:        6,
+                height:       6,
+                borderRadius: "50%",
+                background:   "#f59e0b",
+                boxShadow:    "0 0 6px rgba(245,158,11,0.9)",
+                flexShrink:   0,
+              }} />
+              COMPLETE ANALYSIS
+            </span>
+          </div>
+        )}
 
         {/* Content */}
         <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>

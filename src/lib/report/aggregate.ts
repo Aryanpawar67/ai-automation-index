@@ -33,6 +33,7 @@ export interface WizardRole {
 }
 
 export interface CompanyWizardData {
+  analysisType:                "complete" | "standard";
   totalRolesAnalyzed:          number;
   functionsRepresented:        number;
   aiImplementationOpportunity: number;
@@ -74,10 +75,12 @@ function seededRand(seed: string, index: number): number {
 
 export function computeWizardData(
   inputs: { analysisId: string; result: FinalAnalysis; department: string | null }[],
-  seed = "default"
+  seed = "default",
+  isComplete = false,
 ): CompanyWizardData {
   if (inputs.length === 0) {
     return {
+      analysisType: isComplete ? "complete" : "standard",
       totalRolesAnalyzed: 0,
       functionsRepresented: 0,
       aiImplementationOpportunity: 0,
@@ -209,6 +212,7 @@ export function computeWizardData(
   ).length;
 
   return {
+    analysisType: isComplete ? "complete" : "standard",
     totalRolesAnalyzed: total,
     functionsRepresented,
     aiImplementationOpportunity,

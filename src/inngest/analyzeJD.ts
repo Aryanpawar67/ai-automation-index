@@ -136,12 +136,22 @@ export const analyzeJDFn = inngest.createFunction(
           })
           .where(eq(batches.id, batchId));
 
-        // Recompute and persist wizard data for this company
+        // Recompute wizard data from only this batch's analyses — not all-time company
+        // history — so each batch (including complete-analysis runs) produces a clean report.
         const allAnalysisRows = await db
           .select({ id: analyses.id, result: analyses.result, department: jobDescriptions.department })
           .from(analyses)
           .innerJoin(jobDescriptions, eq(analyses.jobDescriptionId, jobDescriptions.id))
-          .where(eq(analyses.companyId, jd.companyId));
+          .where(and(
+            eq(analyses.companyId, jd.companyId),
+            eq(jobDescriptions.batchId, batchId),
+          ));
+
+        const [batchRow] = await db
+          .select({ name: batches.name })
+          .from(batches)
+          .where(eq(batches.id, batchId));
+        const isComplete = (batchRow?.name ?? "").startsWith("COMPLETE ANALYSIS");
 
         const wizardData = computeWizardData(
           allAnalysisRows.map(a => ({
@@ -149,7 +159,8 @@ export const analyzeJDFn = inngest.createFunction(
             result:     a.result as FinalAnalysis,
             department: a.department,
           })),
-          companyRow?.slug ?? undefined
+          companyRow?.slug ?? undefined,
+          isComplete,
         );
 
         await db.update(companies)

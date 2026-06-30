@@ -65,6 +65,7 @@ function StatCard({ label, value, suffix, caption, isMobile }: { label: string; 
 
 export default function Step1Glance({ company, data, isMobile }: Props) {
   const hoursAnimated = useCountUp(data.totalHoursSavedPerWeek);
+  const isComplete = data.analysisType === "complete";
 
   return (
     <div style={{ width: "100%", maxWidth: 960, paddingTop: isMobile ? 24 : 0, paddingBottom: isMobile ? 24 : 0 }}>
@@ -76,15 +77,28 @@ export default function Step1Glance({ company, data, isMobile }: Props) {
         marginBottom:  12,
         color:         "#fff",
       }}>
-        Hi <span style={{ color: "#4ade80" }}>{company}</span>, here&apos;s your AI Readiness Assessment Report
+        Hi <span style={{ color: "#4ade80" }}>{company}</span>, here&apos;s your {isComplete ? "complete " : ""}AI Readiness Assessment Report
       </h1>
       <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, maxWidth: 640, marginBottom: isMobile ? 20 : 36 }}>
-        {company}&apos;s AI readiness profile spans{" "}
-        <span style={{ color: "#4ade80", fontWeight: 500 }}>{data.totalRolesAnalyzed} roles</span>
-        {data.functionsRepresented > 0 && (
-          <> across <span style={{ color: "#4ade80", fontWeight: 500 }}>{data.functionsRepresented} function {data.functionsRepresented === 1 ? "area" : "areas"}</span></>
+        {isComplete ? (
+          <>
+            {company}&apos;s full-workforce AI readiness profile covers{" "}
+            <span style={{ color: "#f59e0b", fontWeight: 500 }}>all {data.totalRolesAnalyzed} active roles</span>
+            {data.functionsRepresented > 0 && (
+              <> across <span style={{ color: "#f59e0b", fontWeight: 500 }}>{data.functionsRepresented} function {data.functionsRepresented === 1 ? "area" : "areas"}</span></>
+            )}
+            {" "}— complete coverage benchmarked for automation potential, skill disruption risk, and projected weekly time reclaimed.
+          </>
+        ) : (
+          <>
+            {company}&apos;s AI readiness profile spans{" "}
+            <span style={{ color: "#4ade80", fontWeight: 500 }}>{data.totalRolesAnalyzed} roles</span>
+            {data.functionsRepresented > 0 && (
+              <> across <span style={{ color: "#4ade80", fontWeight: 500 }}>{data.functionsRepresented} function {data.functionsRepresented === 1 ? "area" : "areas"}</span></>
+            )}
+            {" "}— benchmarked for automation potential, skill disruption risk, and projected weekly time reclaimed.
+          </>
         )}
-        {" "}— benchmarked for automation potential, skill disruption risk, and projected weekly time reclaimed.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: isMobile ? 12 : 20, maxWidth: 900 }}>

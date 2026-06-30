@@ -31,7 +31,23 @@ export interface ZwayamConfig {
   companyId: string;
 }
 
-interface ZwayamSource { id?: number | string; jobTitle?: string; jobUrl?: string; departmentName?: string }
+interface ZwayamSource {
+  id?:                        number | string;
+  jobTitle?:                  string;
+  jobUrl?:                    string;
+  departmentName?:            string;
+  companyId?:                 number | string;
+  role?:                      string;   // full HTML job description
+  mediumDescription?:         string;   // truncated HTML description
+  desiredSkill?:              string;
+  jdSkillsKnown?:             string;
+  skillsToEvaluate?:          string;
+  yrsOfExperience?:           string;
+  experienceUIField?:         string;
+  location?:                  string;
+  designation?:               string;
+  roles?:                     string;
+}
 interface ZwayamResp { data?: { totalCount?: number; data?: Array<{ _source?: ZwayamSource }> } }
 
 function numericCompanyId(b64: string): string {
@@ -59,22 +75,54 @@ async function searchPage(cfg: ZwayamConfig, startNo: number): Promise<ZwayamRes
 }
 
 async function jobDetail(cfg: ZwayamConfig, src: ZwayamSource): Promise<{ title: string; rawText: string } | null> {
+  // Try the detail API for a richer longDescription; use it as the body if available.
+  const resolvedId = src.companyId != null ? String(src.companyId) : numericCompanyId(cfg.companyId);
+  let longDesc = "";
   try {
     const res = await fetch(DETAIL_URL, {
       method:  "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json", "User-Agent": UA, "Referer": `https://${cfg.domain}/` },
       body:    JSON.stringify({
         jobUrl: `${src.jobUrl}?id=${src.id}`, externalSource: "CareerSite",
-        campusUrl: "empty", companyId: numericCompanyId(cfg.companyId), jobId: String(src.id),
+        campusUrl: "empty", companyId: resolvedId, jobId: String(src.id),
       }),
       signal:  AbortSignal.timeout(12_000),
     });
-    if (!res.ok) return null;
-    const d = await res.json() as { jobTitle?: string; longDescription?: string };
-    const rawText = stripHtml(d.longDescription ?? "");
-    if (rawText.length < 100) return null;
-    return { title: d.jobTitle ?? src.jobTitle ?? "Untitled", rawText };
-  } catch { return null; }
+    if (res.ok) {
+      const d = await res.json() as { jobTitle?: string; longDescription?: string };
+      longDesc = stripHtml(d.longDescription ?? "");
+    }
+  } catch { /* fall through to inline composition */ }
+
+  // Always compose a structured body — ensures skills/metadata are present for
+  // validation even when the listing only has short bullet-point descriptions.
+  const rawText = buildInlineText(src, longDesc);
+  if (!rawText) return null;
+  return { title: src.jobTitle ?? "Untitled", rawText };
+}
+
+/** Compose a structured JD body from Zwayam listing fields.
+ *  longDesc (from the detail API) is used as the responsibilities body when richer. */
+function buildInlineText(src: ZwayamSource, longDesc = ""): string {
+  const parts: string[] = [];
+  const title = src.roles ?? src.jobTitle ?? "";
+  if (title) parts.push(`Role: ${title}`);
+  if (src.departmentName) parts.push(`Department: ${src.departmentName}`);
+  if (src.location) parts.push(`Location: ${src.location}`);
+  if (src.yrsOfExperience || src.experienceUIField)
+    parts.push(`Experience required: ${src.yrsOfExperience ?? src.experienceUIField}`);
+  if (src.designation) parts.push(`Designation: ${src.designation}`);
+
+  // Prefer detail API longDesc when it's richer than the listing's role field.
+  const inlineDesc = stripHtml(src.role ?? src.mediumDescription ?? "");
+  const body = longDesc.length > inlineDesc.length ? longDesc : inlineDesc;
+  if (body) parts.push(`\nKey Responsibilities:\n${body}`);
+
+  const skills = [src.jdSkillsKnown, src.skillsToEvaluate, src.desiredSkill]
+    .filter(Boolean).join(", ");
+  if (skills) parts.push(`\nSkills required: ${skills}`);
+
+  return parts.join("\n");
 }
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {

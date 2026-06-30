@@ -3,7 +3,8 @@ import { db }                 from "@/lib/db/client";
 import { companies, jobDescriptions, batches } from "@/lib/db/schema";
 import { scrapeCareerPage }   from "@/lib/scraper";
 import { isValidJD }          from "@/lib/validation";
-import { eq, sql }            from "drizzle-orm";
+import { targetAnalyseCount } from "@/lib/jdLimits";
+import { eq, sql, asc, and }  from "drizzle-orm";
 
 export const scrapeCompanyFn = inngest.createFunction(
   {
@@ -80,6 +81,47 @@ export const scrapeCompanyFn = inngest.createFunction(
         scrapeStatus: "complete",
         scrapedAt:    new Date(),
       }).where(eq(companies.id, companyId));
+
+      // Auto-trigger analysis: pick up to the per-company cap from the scraped
+      // pool (oldest first), mark them pending, leave the rest as reserve.
+      if (batchId !== "cron") {
+        const [refreshedCompany] = await db
+          .select({ totalJobsAvailable: companies.totalJobsAvailable })
+          .from(companies)
+          .where(eq(companies.id, companyId));
+
+        const cap = targetAnalyseCount(refreshedCompany?.totalJobsAvailable);
+
+        const toQueue = await db
+          .select({ id: jobDescriptions.id })
+          .from(jobDescriptions)
+          .where(and(
+            eq(jobDescriptions.companyId, companyId),
+            eq(jobDescriptions.batchId, batchId),
+            eq(jobDescriptions.status, "scraped"),
+          ))
+          .orderBy(asc(jobDescriptions.createdAt))
+          .limit(cap);
+
+        if (toQueue.length > 0) {
+          for (const jd of toQueue) {
+            await db.update(jobDescriptions)
+              .set({ status: "pending" })
+              .where(eq(jobDescriptions.id, jd.id));
+          }
+
+          await db.update(batches)
+            .set({ totalJds: sql`(SELECT COUNT(*) FROM job_descriptions WHERE batch_id = ${batchId} AND status NOT IN ('invalid','cancelled','scraped'))` })
+            .where(eq(batches.id, batchId));
+
+          await inngest.send(
+            toQueue.map(jd => ({
+              name: "jd/analyze" as const,
+              data: { jobDescriptionId: jd.id, batchId },
+            }))
+          );
+        }
+      }
 
       const scraped  = result.jds.length;
       const invalid  = result.jds.filter(j => !isValidJD(j.title, j.rawText)).length;
