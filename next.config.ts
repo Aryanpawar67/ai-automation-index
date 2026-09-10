@@ -18,7 +18,15 @@ const TOOL_ROUTES: { source: string; destination: string }[] = [
 const nextConfig: NextConfig = {
   serverExternalPackages: ["xlsx"],
   async rewrites() {
-    return TOOL_ROUTES;
+    return {
+      // beforeFiles runs BEFORE Next.js checks its own filesystem routes.
+      // This is required for any proxied path that contains /api/ — otherwise
+      // Next.js intercepts the request internally and returns 404/405 before
+      // ever forwarding to the upstream service.
+      beforeFiles: TOOL_ROUTES,
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 
