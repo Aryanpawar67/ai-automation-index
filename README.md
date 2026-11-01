@@ -490,14 +490,4 @@ The full checklist — routing, CORS, challenge tokens, bot protection, security
 | [`docs/plans/`](docs/plans/) | Auto-recovery scraper agent, PostHog migration |
 | [`ADDING_TOOLS.md`](ADDING_TOOLS.md) | Shipping a new tool under `index.imocha.io/<slug>` |
 
----
-
-## Known limitations
-
-- **Admin protection is not enforced yet.** `/api/admin/login` sets an `admin_session` cookie, but nothing validates it: `src/middleware.ts` passes every request through and no admin route or page checks the cookie. Until that is wired up (for example by verifying the cookie in the middleware), treat `/admin` and `/api/admin` as open and restrict them at the network or hosting level.
-- **Some public endpoints don't check the report token.** `GET /api/report/<companyId>` returns a company's analysis titles and scores without one, and `POST /api/preview/track-download` accepts unauthenticated writes. Both are low-risk individually but worth tightening if report links are meant to be strictly private.
-- **Enrichment modules are not connected.** `industryEnricher`, `hrStackEnricher` and `linkedinFinder` in `src/lib/` (and the matching `dataset_rows` columns) exist, but no admin route or UI calls them yet.
-- **No in-app paste-a-JD page.** `/` redirects to the marketing site. The streaming API (`/api/analyze`) and `/dashboard` still work, but the form that used to live on `/` is gone.
-- **`/preview` is a hard-coded demo** for a single prospect, not data-driven.
-- **Some docs describe plans, not the current state** — e.g. the industry-enrichment routes and the multi-touch landing pages. Where a doc and the code disagree, trust the code.
-- **PDF endpoints and download components exist but aren't linked from the wizard** (kept for a future download button).
+ components exist but aren't linked from the wizard** (kept for a future download button).
